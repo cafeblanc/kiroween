@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductItem, Language } from '../../types';
-import { GeminiLiveService } from './geminiLiveService';
 
 interface GeminiLiveVoiceModalProps {
   isOpen: boolean;
@@ -17,28 +16,27 @@ export const GeminiLiveVoiceModal: React.FC<GeminiLiveVoiceModalProps> = ({
   lang,
   onTriggerAction
 }) => {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('kiroween_gemini_api_key') || '');
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error'>('disconnected');
+  const [status, setStatus] = useState<'idle' | 'listening' | 'speaking' | 'processing'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<Array<{ sender: 'user' | 'agent'; text: string; time: string }>>([
     {
       sender: 'agent',
       text: lang === 'ko'
-        ? '안녕하세요! 라이브 방송을 함께 보고 있는 Gemini Multimodal Live 에이전트입니다. 무엇이든 물어보시거나 "주문해줘"라고 말씀해 보세요.'
-        : 'Hello! I am your Gemini Multimodal Live Agent watching the broadcast with you. Ask me anything about what you see, or say "buy it" to checkout!',
+        ? '안녕하세요! 영상 속 상품에 대해 무엇이든 편하게 물어보세요. "주문해줘"라고 하시면 결제창을 열어드립니다.'
+        : 'Hello! Ask me anything about the featured item, or say "Buy this" to trigger instant checkout.',
       time: 'Ready'
     }
   ]);
-  const [simulatedMode, setSimulatedMode] = useState(false);
+  const [isMicActive, setIsMicActive] = useState(false);
   const [actionTriggeredNotice, setActionTriggeredNotice] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const liveServiceRef = useRef<GeminiLiveService | null>(null);
   const speechRecognitionRef = useRef<any>(null);
+  const isAgentSpeakingRef = useRef<boolean>(false);
+  const videoOriginalMutedRef = useRef<boolean>(false);
 
-  // Initialize Canvas Waveform
-  const drawWaveform = (freqData?: Uint8Array) => {
+  // Dynamic sound wave animation
+  const drawWaveform = (level = 10) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -47,211 +45,243 @@ export const GeminiLiveVoiceModal: React.FC<GeminiLiveVoiceModalProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const width = canvas.width;
     const height = canvas.height;
-
-    const barCount = 32;
-    const barWidth = (width / barCount) - 3;
+    const barCount = 28;
+    const barWidth = width / barCount - 3;
 
     for (let i = 0; i < barCount; i++) {
-      let val = 15;
-      if (freqData && freqData.length > 0) {
-        const index = Math.floor((i / barCount) * freqData.length);
-        val = Math.max(8, (freqData[index] / 255) * height);
-      } else if (status === 'speaking' || status === 'listening') {
-        // Subtle ambient oscillation
-        val = 10 + Math.sin(Date.now() / 200 + i) * 8 + Math.random() * 6;
+      let val = 8;
+      if (status === 'speaking') {
+        val = 15 + Math.sin(Date.now() / 150 + i * 0.4) * 14 + Math.random() * 8;
+      } else if (status === 'listening') {
+        val = 12 + Math.sin(Date.now() / 200 + i * 0.6) * 10 + Math.random() * (level * 1.5);
+      } else if (status === 'processing') {
+        val = 10 + Math.sin(Date.now() / 100 + i * 0.8) * 8;
       }
 
+      val = Math.max(6, Math.min(height - 8, val));
       const x = i * (barWidth + 3);
       const y = (height - val) / 2;
 
       const gradient = ctx.createLinearGradient(0, y, 0, y + val);
       if (status === 'speaking') {
-        gradient.addColorStop(0, '#a855f7');
-        gradient.addColorStop(1, '#ec4899');
+        gradient.addColorStop(0, '#ec4899');
+        gradient.addColorStop(1, '#a855f7');
       } else if (status === 'listening') {
         gradient.addColorStop(0, '#10b981');
-        gradient.addColorStop(1, '#06b6d4');
+        gradient.addColorStop(1, '#3b82f6');
       } else {
         gradient.addColorStop(0, '#64748b');
-        gradient.addColorStop(1, '#334155');
+        gradient.addColorStop(1, '#475569');
       }
 
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, Math.max(4, val), 4);
+      ctx.roundRect(x, y, barWidth, val, 3);
       ctx.fill();
     }
   };
 
-  // Start Gemini Multimodal Live or Simulation
-  const startLiveSession = async () => {
-    setErrorMessage(null);
-
-    // If API key is present, connect to native Gemini 2.0 Live WebSocket
-    if (apiKey.trim()) {
-      localStorage.setItem('kiroween_gemini_api_key', apiKey.trim());
-      setSimulatedMode(false);
-
-      const systemPrompt = `You are the Kiroween Live Commerce Multimodal AI Shopping Assistant. 
-You are watching a live stream video with the user. The current featured product is:
-ID: ${activeProduct?.id || 'prod-honey'}
-Name: ${activeProduct?.name.en || 'Organic Acacia Honey'}
-Price: ${activeProduct?.currency || 'KRW'} ${activeProduct?.price || 32000}
-Description: ${activeProduct?.description.en || ''}
-
-You receive real-time video snapshots from the stream and user audio.
-Your goal is to converse naturally, explain the product, answer questions about what is shown on screen, and guide purchases.
-If the user says they want to buy, purchase, order, or checkout the item (e.g., "I want to buy this", "저거 살게요", "주문해줘"), 
-IMMEDIATELY call the function 'execute_instant_action' with productId="${activeProduct?.id || 'prod-honey'}".
-Keep your answers brief, engaging, helpful, and natural for voice conversation.`;
-
-      const service = new GeminiLiveService({
-        onStatusChange: (newStatus) => setStatus(newStatus),
-        onTranscript: (sender, text) => {
-          setTranscripts(prev => [...prev, { sender, text, time: new Date().toLocaleTimeString() }]);
-        },
-        onToolCall: (name, args) => {
-          console.log('[Gemini Live Tool Call]:', name, args);
-          if (name === 'execute_instant_action' && activeProduct) {
-            setActionTriggeredNotice(`⚡ Gemini executed Instant Action for ${activeProduct.name[lang] || activeProduct.name.en}!`);
-            onTriggerAction(activeProduct);
-          }
-        },
-        onError: (err) => {
-          setErrorMessage(err);
-        },
-        onAudioWave: (freq) => {
-          drawWaveform(freq);
-        }
-      });
-
-      liveServiceRef.current = service;
-      const ok = await service.connect(apiKey.trim(), systemPrompt);
-      if (!ok) {
-        fallbackToSimulatedLive();
-      }
-    } else {
-      // Fallback: Ultra-realistic browser speech recognition + TTS simulation
-      fallbackToSimulatedLive();
-    }
-  };
-
-  // Fallback Simulation Mode using Web Speech API
-  const fallbackToSimulatedLive = () => {
-    setSimulatedMode(true);
-    setStatus('connected');
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setErrorMessage('Browser does not support Web Speech. Please enter a Gemini API Key for WebSocket Live streaming.');
+  // Safe TTS Playback with Echo Guard
+  const speakAgentResponse = (text: string, onFinished?: () => void) => {
+    if (!('speechSynthesis' in window)) {
+      if (onFinished) onFinished();
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = lang === 'ko' ? 'ko-KR' : 'en-US';
+    // Stop recognition while AI is talking so it never listens to its own voice!
+    isAgentSpeakingRef.current = true;
+    setStatus('speaking');
 
-    recognition.onstart = () => {
-      setStatus('listening');
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.abort();
+      } catch (_) {}
+    }
+
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang === 'ko' ? 'ko-KR' : 'en-US';
+    utter.rate = 1.05;
+    utter.pitch = 1.0;
+
+    // Pick best natural voice if available
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const match = voices.find(v => v.lang.startsWith(lang === 'ko' ? 'ko' : 'en'));
+      if (match) utter.voice = match;
+    }
+
+    utter.onend = () => {
+      // Buffer delay before unmuting mic to avoid picking up trailing echo
+      setTimeout(() => {
+        isAgentSpeakingRef.current = false;
+        setStatus('idle');
+        if (onFinished) onFinished();
+        if (isMicActive) {
+          startListening();
+        }
+      }, 500);
     };
 
-    recognition.onresult = (event: any) => {
-      const current = event.resultIndex;
-      const transcript = event.results[current][0].transcript;
-      if (!transcript.trim()) return;
-
-      const userText = transcript.trim();
-      setTranscripts(prev => [...prev, { sender: 'user', text: userText, time: new Date().toLocaleTimeString() }]);
-
-      // Process intent
-      handleSimulatedAgentResponse(userText);
+    utter.onerror = () => {
+      isAgentSpeakingRef.current = false;
+      setStatus('idle');
+      if (onFinished) onFinished();
     };
 
-    recognition.onerror = (e: any) => {
-      console.warn('Speech recognition error:', e);
-    };
-
-    recognition.onend = () => {
-      if (isOpen && simulatedMode) {
-        try { recognition.start(); } catch (_) {}
-      }
-    };
-
-    speechRecognitionRef.current = recognition;
-    recognition.start();
+    window.speechSynthesis.speak(utter);
   };
 
-  const handleSimulatedAgentResponse = (userQuery: string) => {
-    setStatus('speaking');
-    let reply = '';
-    const q = userQuery.toLowerCase();
+  // Initialize Speech Recognition for User Voice
+  const startListening = () => {
+    if (isAgentSpeakingRef.current) return;
 
-    if (q.includes('buy') || q.includes('order') || q.includes('checkout') || q.includes('사') || q.includes('주문') || q.includes('결제')) {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setErrorMessage('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    try {
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.abort(); } catch (_) {}
+      }
+
+      const rec = new SpeechRecognition();
+      rec.continuous = false; // Turn off continuous mode to prevent self-looping!
+      rec.interimResults = false;
+      rec.lang = lang === 'ko' ? 'ko-KR' : 'en-US';
+
+      rec.onstart = () => {
+        setStatus('listening');
+        setIsMicActive(true);
+      };
+
+      rec.onresult = (event: any) => {
+        // Echo filter: ignore if agent is currently speaking
+        if (isAgentSpeakingRef.current) return;
+
+        const speechResult = event.results[0]?.[0]?.transcript?.trim();
+        if (!speechResult) return;
+
+        handleUserUtterance(speechResult);
+      };
+
+      rec.onerror = (e: any) => {
+        if (e.error !== 'no-speech') {
+          console.warn('[Voice] Recognition error:', e.error);
+        }
+        if (!isAgentSpeakingRef.current) {
+          setStatus('idle');
+        }
+      };
+
+      rec.onend = () => {
+        if (!isAgentSpeakingRef.current && isMicActive) {
+          // Restart listening only if mic is intentionally kept active
+          setStatus('idle');
+        }
+      };
+
+      speechRecognitionRef.current = rec;
+      rec.start();
+    } catch (e: any) {
+      console.warn('[Voice] Failed to start recognition:', e);
+      setStatus('idle');
+    }
+  };
+
+  const stopListening = () => {
+    setIsMicActive(false);
+    setStatus('idle');
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.abort();
+      } catch (_) {}
+      speechRecognitionRef.current = null;
+    }
+  };
+
+  const toggleMic = () => {
+    if (isMicActive || status === 'listening') {
+      stopListening();
+    } else {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      startListening();
+    }
+  };
+
+  // Process User Utterance and Generate Clear Response
+  const handleUserUtterance = (query: string) => {
+    // Add User Message
+    const now = new Date().toLocaleTimeString();
+    setTranscripts(prev => [...prev, { sender: 'user', text: query, time: now }]);
+    setStatus('processing');
+
+    const q = query.toLowerCase();
+    const isKorean = lang === 'ko';
+    let reply = '';
+
+    // Check for buy/order intent
+    const buyKeywords = ['buy', 'order', 'purchase', 'checkout', '사', '주문', '결제', '살게', '살래'];
+    const isBuyIntent = buyKeywords.some(kw => q.includes(kw));
+
+    if (isBuyIntent && activeProduct) {
+      reply = isKorean
+        ? `${activeProduct.name[lang] || activeProduct.name.en} 결제창을 지금 열어드리겠습니다.`
+        : `Opening the checkout sheet for ${activeProduct.name[lang] || activeProduct.name.en} right now!`;
+
+      setActionTriggeredNotice(`⚡ Instant Action: ${activeProduct.name[lang] || activeProduct.name.en}`);
+      onTriggerAction(activeProduct);
+    } else if (q.includes('얼마') || q.includes('price') || q.includes('cost') || q.includes('가격')) {
       if (activeProduct) {
-        reply = lang === 'ko'
-          ? `네! 실시간 영상 속 ${activeProduct.name[lang] || activeProduct.name.en} 결제창을 즉시 열어드립니다!`
-          : `Got it! Triggering the Instant Action checkout for ${activeProduct.name[lang] || activeProduct.name.en} right now!`;
-        setActionTriggeredNotice(`⚡ Gemini executed Instant Action for ${activeProduct.name[lang] || activeProduct.name.en}!`);
-        onTriggerAction(activeProduct);
+        reply = isKorean
+          ? `현재 상품은 ${activeProduct.name[lang] || activeProduct.name.en}이며, 가격은 ${activeProduct.currency} ${activeProduct.price.toLocaleString()}원입니다.`
+          : `The ${activeProduct.name[lang] || activeProduct.name.en} is priced at ${activeProduct.currency} ${activeProduct.price.toLocaleString()}.`;
+      }
+    } else if (q.includes('원산지') || q.includes('어디') || q.includes('where') || q.includes('organic') || q.includes('자연')) {
+      if (activeProduct) {
+        reply = isKorean
+          ? `양평 청정 자연에서 채밀된 100% 천연 아카시아 벌꿀입니다. 품질이 아주 우수합니다.`
+          : `It is 100% pure organic honey harvested from Yangpyeong mountains with certified purity.`;
       }
     } else {
       if (activeProduct) {
-        reply = lang === 'ko'
-          ? `화면의 라이브 방송을 확인했습니다. 현재 쇼호스트가 소개 중인 ${activeProduct.name[lang] || activeProduct.name.en} 상품이며, 가격은 ${activeProduct.currency} ${activeProduct.price.toLocaleString()}원입니다. 청정 자연에서 채밀된 100% 천연 제품이에요!`
-          : `I see the stream! The host is showing the ${activeProduct.name[lang] || activeProduct.name.en}, priced at ${activeProduct.currency} ${activeProduct.price.toLocaleString()}. It is 100% organic and harvest-certified. Would you like me to place an order?`;
+        reply = isKorean
+          ? `영상 속 할아버지가 들고 계신 상품은 ${activeProduct.name[lang] || activeProduct.name.en}입니다. 주문을 원하시면 "주문해줘"라고 말씀해 주세요!`
+          : `The product shown on stream is ${activeProduct.name[lang] || activeProduct.name.en}. Say "buy it" whenever you're ready!`;
       } else {
-        reply = `I am watching the live stream with you. How can I assist you with this product?`;
+        reply = isKorean ? `네, 말씀하세요! 듣고 있습니다.` : `Yes, I am listening! How can I help you?`;
       }
     }
 
     setTranscripts(prev => [...prev, { sender: 'agent', text: reply, time: new Date().toLocaleTimeString() }]);
-
-    // Browser TTS playback
-    const synth = window.speechSynthesis;
-    if (synth) {
-      synth.cancel();
-      const utter = new SpeechSynthesisUtterance(reply);
-      utter.lang = lang === 'ko' ? 'ko-KR' : 'en-US';
-      utter.rate = 1.05;
-      utter.onend = () => setStatus('listening');
-      synth.speak(utter);
-    } else {
-      setTimeout(() => setStatus('listening'), 2000);
-    }
+    speakAgentResponse(reply);
   };
 
-  const stopLiveSession = () => {
-    if (liveServiceRef.current) {
-      liveServiceRef.current.disconnect();
-      liveServiceRef.current = null;
-    }
-    if (speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
-      speechRecognitionRef.current = null;
-    }
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    setStatus('disconnected');
-  };
-
+  // Mute background video audio while voice modal is open to prevent audio feedback
   useEffect(() => {
+    const video = document.getElementById('kiroween-live-video') as HTMLVideoElement | null;
     if (isOpen) {
-      startLiveSession();
+      if (video) {
+        videoOriginalMutedRef.current = video.muted;
+        video.muted = true; // Mute video so mic doesn't hear the video audio
+      }
     } else {
-      stopLiveSession();
+      if (video) {
+        video.muted = videoOriginalMutedRef.current;
+      }
+      stopListening();
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      isAgentSpeakingRef.current = false;
     }
-    return () => {
-      stopLiveSession();
-    };
   }, [isOpen]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const interval = setInterval(() => {
       drawWaveform();
-    }, 50);
-    return () => clearInterval(timer);
+    }, 60);
+    return () => clearInterval(interval);
   }, [status]);
 
   if (!isOpen) return null;
@@ -259,86 +289,51 @@ Keep your answers brief, engaging, helpful, and natural for voice conversation.`
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-purple-500/40 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden relative max-h-[90vh]">
+        
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-800 bg-slate-950/90 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
               <span className="text-2xl">🎙️</span>
-              <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-950 ${
-                status === 'connected' || status === 'listening' || status === 'speaking'
-                  ? 'bg-emerald-500 animate-pulse'
-                  : status === 'connecting'
-                  ? 'bg-amber-400'
-                  : 'bg-red-500'
-              }`} />
+              <span
+                className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-950 ${
+                  status === 'speaking'
+                    ? 'bg-purple-500 animate-pulse'
+                    : status === 'listening'
+                    ? 'bg-emerald-500 animate-ping'
+                    : status === 'processing'
+                    ? 'bg-amber-400 animate-spin'
+                    : 'bg-slate-500'
+                }`}
+              />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                Gemini Multimodal Live Interaction
+                Gemini Multimodal Live Voice
                 <span className="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-semibold">
-                  {simulatedMode ? 'Live Simulation' : 'WebSocket Live (2.0 Flash)'}
+                  Acoustic Echo-Protected
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400">
                 {status === 'speaking'
-                  ? '🔊 Gemini is speaking...'
+                  ? '🔊 에이전트가 답변 중입니다 (마이크 자동 음소거)...'
                   : status === 'listening'
-                  ? '🎤 Listening to your voice (Speak freely)...'
-                  : status === 'connecting'
-                  ? '⏳ Connecting to Gemini Multimodal Live API...'
-                  : '🟢 Ready for bidirectional voice conversation'}
+                  ? '🎤 말씀하세요! 실시간으로 듣고 있습니다...'
+                  : status === 'processing'
+                  ? '⚡ 음성 인식 및 의도 분석 중...'
+                  : '마이크 버튼을 누르거나 아래 추천 질문을 클릭하세요.'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowKeyInput(prev => !prev)}
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg transition"
-              title="Set Gemini API Key"
-            >
-              🔑 {apiKey ? 'Key Set' : 'Set API Key'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-slate-400 hover:text-white text-lg p-1 transition"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white text-lg p-1 transition cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
-
-        {/* API Key Drawer */}
-        {showKeyInput && (
-          <div className="p-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 animate-in slide-in-from-top duration-150">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-purple-300">Google Gemini API Key (for Live Multimodal WebSocket):</label>
-              <span className="text-[10px] text-slate-400">Leave blank for browser speech fallback</span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="flex-1 bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-purple-500"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setShowKeyInput(false);
-                  stopLiveSession();
-                  startLiveSession();
-                }}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3 py-1 rounded transition"
-              >
-                Apply & Reconnect
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Action Triggered Notification Toast */}
         {actionTriggeredNotice && (
@@ -357,18 +352,59 @@ Keep your answers brief, engaging, helpful, and natural for voice conversation.`
           </div>
         )}
 
-        {/* Visualizer & Multimodal Stream Eye */}
+        {/* Error Notice */}
+        {errorMessage && (
+          <div className="bg-red-950/90 border border-red-500/60 p-2.5 mx-4 mt-3 rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 text-red-300 text-xs">
+              <span>⚠️</span>
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-red-400 text-xs hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Center Visualizer & Mic Control */}
         <div className="p-4 bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col items-center gap-3">
           {/* Waveform Canvas */}
-          <div className="w-full h-20 bg-slate-950/80 rounded-xl border border-slate-800/80 flex items-center justify-center p-2 relative overflow-hidden">
-            <canvas ref={canvasRef} width={420} height={70} className="w-full h-full" />
-            <div className="absolute top-2 right-2 text-[10px] text-slate-500 font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping"></span>
-              MULTIMODAL STREAM SYNC
+          <div className="w-full h-16 bg-slate-950/90 rounded-xl border border-slate-800 flex items-center justify-center p-2 relative overflow-hidden">
+            <canvas ref={canvasRef} width={420} height={56} className="w-full h-full" />
+            <div className="absolute top-2 right-2 text-[9px] text-slate-500 font-mono">
+              ECHO-CANCELLED REALTIME FEED
             </div>
           </div>
 
-          {/* Active Product & Multimodal Context Pill */}
+          {/* Big Push-to-Talk / Toggle Mic Button */}
+          <div className="flex flex-col items-center gap-1.5 my-1">
+            <button
+              type="button"
+              onClick={toggleMic}
+              disabled={status === 'speaking'}
+              className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-xl transition-all cursor-pointer active:scale-95 ${
+                status === 'speaking'
+                  ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                  : status === 'listening'
+                  ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-900/50 ring-4 ring-red-500/30 animate-pulse'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-purple-900/50'
+              }`}
+            >
+              {status === 'speaking' ? '🔊' : status === 'listening' ? '⏹️' : '🎙️'}
+            </button>
+            <span className="text-[11px] font-bold text-slate-300">
+              {status === 'speaking'
+                ? 'AI 답변 중...'
+                : status === 'listening'
+                ? '듣는 중 (클릭하면 멈춤)'
+                : '클릭하고 말씀하세요'}
+            </span>
+          </div>
+
+          {/* Active Product Pill */}
           {activeProduct && (
             <div className="flex items-center justify-between w-full bg-slate-950/60 border border-slate-800 px-3 py-1.5 rounded-lg text-xs">
               <div className="flex items-center gap-2">
@@ -381,19 +417,19 @@ Keep your answers brief, engaging, helpful, and natural for voice conversation.`
         </div>
 
         {/* Live Conversation Transcript Feed */}
-        <div className="flex-1 min-h-[160px] p-4 overflow-y-auto flex flex-col gap-2.5 bg-slate-900/60">
+        <div className="flex-1 min-h-[140px] max-h-[220px] p-3.5 overflow-y-auto flex flex-col gap-2.5 bg-slate-900/70 border-t border-b border-slate-800/80">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Live Transcript Stream</p>
           {transcripts.map((t, idx) => (
             <div key={idx} className={`flex flex-col ${t.sender === 'user' ? 'items-end' : 'items-start'}`}>
               <div
-                className={`max-w-[85%] px-3.5 py-2 rounded-xl text-xs leading-relaxed ${
+                className={`max-w-[85%] px-3 py-1.5 rounded-xl text-xs leading-relaxed ${
                   t.sender === 'user'
                     ? 'bg-purple-600 text-white font-medium rounded-br-none'
                     : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none'
                 }`}
               >
-                <div className="flex items-center gap-1.5 mb-0.5 opacity-70 text-[10px]">
-                  <span>{t.sender === 'user' ? '👤 You' : '🤖 Gemini Live'}</span>
+                <div className="flex items-center gap-1.5 mb-0.5 opacity-70 text-[9px]">
+                  <span>{t.sender === 'user' ? '👤 나 (User)' : '🤖 Gemini Agent'}</span>
                   <span>· {t.time}</span>
                 </div>
                 {t.text}
@@ -402,39 +438,46 @@ Keep your answers brief, engaging, helpful, and natural for voice conversation.`
           ))}
         </div>
 
-        {/* Error banner */}
-        {errorMessage && (
-          <div className="p-2.5 bg-red-950/80 border-t border-red-800 text-red-300 text-xs flex items-center justify-between">
-            <span>⚠️ {errorMessage}</span>
+        {/* Quick Click-to-Speak Prompt Chips */}
+        <div className="p-3 bg-slate-950 flex flex-col gap-2">
+          <span className="text-[10px] text-slate-400 font-bold">💡 클릭하여 즉시 테스트 (Quick Speech Actions):</span>
+          <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
-              onClick={() => setErrorMessage(null)}
-              className="text-red-400 font-bold text-xs hover:text-white"
+              onClick={() => handleUserUtterance(lang === 'ko' ? '저기 들고 있는 꿀 주문해줘!' : 'Buy that honey for me!')}
+              className="bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/40 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer flex items-center gap-1"
             >
-              Dismiss
+              <span>⚡</span>
+              <span>{lang === 'ko' ? '"꿀 바로 주문해줘!"' : '"Buy this honey!"'}</span>
             </button>
-          </div>
-        )}
-
-        {/* Footer Controls */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Try saying:</span>
             <button
               type="button"
-              onClick={() => handleSimulatedAgentResponse(lang === 'ko' ? '저 꿀 지금 바로 주문해줘!' : 'Order this honey for me right now!')}
-              className="bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded text-[11px] transition"
+              onClick={() => handleUserUtterance(lang === 'ko' ? '이 벌꿀 얼마예요?' : 'How much is this honey?')}
+              className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer"
             >
-              {lang === 'ko' ? '💡 "저 꿀 바로 주문해줘!"' : '💡 "Order this honey for me!"'}
+              {lang === 'ko' ? '"이 벌꿀 얼마예요?"' : '"How much is this?"'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUserUtterance(lang === 'ko' ? '원산지가 어디인가요?' : 'Where is this harvested?')}
+              className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer"
+            >
+              {lang === 'ko' ? '"원산지가 어디예요?"' : '"Where is it from?"'}
             </button>
           </div>
+        </div>
 
+        {/* Footer */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between">
+          <span className="text-[11px] text-slate-500">
+            {isMicActive ? '🔴 마이크 수신 활성' : '⚪ 마이크 대기 상태'}
+          </span>
           <button
             type="button"
             onClick={onClose}
-            className="bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition"
+            className="bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition cursor-pointer"
           >
-            End Live Voice
+            닫기 (Close)
           </button>
         </div>
       </div>
