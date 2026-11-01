@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StreamPlayer } from './modules/stream/StreamPlayer';
 import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
+import { AdminStudioModal } from './modules/admin/AdminStudioModal';
 import { ProductItem, ActionOrder, Language } from './types';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -59,6 +60,7 @@ export const App: React.FC = () => {
   const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
   const [activeProduct, setActiveProduct] = useState<ProductItem | null>(INITIAL_PRODUCTS[0]);
   const [isActionOpen, setIsActionOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
   const [lang, setLang] = useState<Language>('en');
 
@@ -72,6 +74,18 @@ export const App: React.FC = () => {
     setTimeout(() => {
       setLatestOrder(null);
     }, 4000);
+  };
+
+  const handleAddProduct = (newProd: ProductItem) => {
+    setProducts(prev => [newProd, ...prev]);
+    setActiveProduct(newProd);
+  };
+
+  const handleDeleteProduct = (id: string) => {
+    setProducts(prev => prev.filter(p => p.id !== id));
+    if (activeProduct?.id === id) {
+      setActiveProduct(products.find(p => p.id !== id) || null);
+    }
   };
 
   return (
@@ -88,8 +102,17 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Switcher & Language Switcher */}
+        {/* Product Switcher, Admin Button & Language Switcher */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsAdminOpen(true)}
+            className="bg-slate-800 hover:bg-slate-700 text-purple-400 border border-purple-500/40 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1"
+          >
+            <span>⚙️</span>
+            <span className="hidden sm:inline">Admin Studio</span>
+          </button>
+
           <div className="flex bg-slate-950 border border-slate-700 rounded-lg p-0.5">
             {products.map(p => (
               <button
@@ -150,6 +173,15 @@ export const App: React.FC = () => {
         isOpen={isActionOpen}
         onClose={() => setIsActionOpen(false)}
         onSuccess={handleActionSuccess}
+      />
+
+      {/* Admin Studio Modal */}
+      <AdminStudioModal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+        products={products}
+        onAddProduct={handleAddProduct}
+        onDeleteProduct={handleDeleteProduct}
       />
 
       {/* Success Toast */}
