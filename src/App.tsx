@@ -3,7 +3,6 @@ import { StreamPlayer } from './modules/stream/StreamPlayer';
 import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
 import { AdminStudioModal } from './modules/admin/AdminStudioModal';
-import { GptLiveVoiceModal } from './modules/agent/GptLiveVoiceModal';
 import { PayPalReceiptModal } from './modules/action/PayPalReceiptModal';
 import { ProductItem, ActionOrder, Language } from './types';
 
@@ -151,13 +150,19 @@ export const App: React.FC = () => {
   const [activeProduct, setActiveProduct] = useState<ProductItem | null>(INITIAL_PRODUCTS[0]);
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [isGptVoiceOpen, setIsGptVoiceOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
+  const [successToast, setSuccessToast] = useState<ActionOrder | null>(null);
   const [lang, setLang] = useState<Language>('en');
 
   const handleActionSuccess = (order: ActionOrder) => {
     setLatestOrder(order);
+    setSuccessToast(order);
+    // Dismiss success toast after exactly 2 seconds as requested
+    setTimeout(() => {
+      setSuccessToast(null);
+    }, 2000);
+
     setIsReceiptOpen(true);
     if (activeProduct) {
       setProducts(prev =>
@@ -192,17 +197,8 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Switcher, Admin Button, gpt-live-1 Voice & Language Switcher */}
+        {/* Product Switcher, Admin Button & Language Switcher */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsGptVoiceOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-          >
-            <span className="animate-pulse">🎙️</span>
-            <span className="hidden sm:inline">gpt-live-1</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setIsAdminOpen(true)}
@@ -259,7 +255,6 @@ export const App: React.FC = () => {
           <AgentChat
             lang={lang}
             activeProduct={activeProduct}
-            onOpenGptVoice={() => setIsGptVoiceOpen(true)}
             onTriggerAction={prod => {
               setActiveProduct(prod);
               setIsActionOpen(true);
@@ -285,18 +280,6 @@ export const App: React.FC = () => {
         onDeleteProduct={handleDeleteProduct}
       />
 
-      {/* gpt-live-1 WebRTC Full-Duplex Realtime Voice Modal */}
-      <GptLiveVoiceModal
-        isOpen={isGptVoiceOpen}
-        onClose={() => setIsGptVoiceOpen(false)}
-        activeProduct={activeProduct}
-        lang={lang}
-        onTriggerAction={prod => {
-          setActiveProduct(prod);
-          setIsActionOpen(true);
-        }}
-      />
-
       {/* Official PayPal Order Receipt & Logistics Tracking Modal */}
       <PayPalReceiptModal
         order={latestOrder}
@@ -305,13 +288,13 @@ export const App: React.FC = () => {
         lang={lang}
       />
 
-      {/* Success Toast */}
-      {latestOrder && (
+      {/* Success Toast (Automatically disappears in 2 seconds) */}
+      {successToast && (
         <div className="fixed top-14 right-4 bg-emerald-600 border border-emerald-400 text-white p-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-in fade-in duration-200">
           <span className="text-2xl">🎉</span>
           <div>
             <p className="text-xs font-bold">Action Completed Successfully!</p>
-            <p className="text-[11px] opacity-90">ID: {latestOrder.orderId} · Tracking: {latestOrder.trackingNumber}</p>
+            <p className="text-[11px] opacity-90">ID: {successToast.orderId} · Tracking: {successToast.trackingNumber}</p>
           </div>
         </div>
       )}

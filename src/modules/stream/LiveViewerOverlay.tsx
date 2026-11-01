@@ -115,18 +115,19 @@ interface LiveViewerOverlayProps {
 }
 
 export const LiveViewerOverlay: React.FC<LiveViewerOverlayProps> = ({ lang }) => {
-  const [comments, setComments] = useState<LiveComment[]>(SAMPLE_COMMENTS.slice(0, 3));
+  const [comments, setComments] = useState<LiveComment[]>(SAMPLE_COMMENTS.slice(0, 2));
   const [viewerCount, setViewerCount] = useState(1482);
   const [hearts, setHearts] = useState<Array<{ id: number; left: number; emoji: string }>>([]);
   const [isOverlayVisible, setIsOverlayVisible] = useState(true);
 
-  // Periodic incoming comment stream (every 3.5s)
+  // Periodic incoming comment stream (every 3.5s, keep at most 3 comments)
   useEffect(() => {
     let commentIndex = 3;
     const interval = setInterval(() => {
       const nextComment = SAMPLE_COMMENTS[commentIndex % SAMPLE_COMMENTS.length];
       const uniqueComment = { ...nextComment, id: Date.now().toString() };
-      setComments(prev => [...prev.slice(-4), uniqueComment]);
+      // Keep maximum 3 comments so it never covers the video
+      setComments(prev => [...prev.slice(-2), uniqueComment]);
       commentIndex++;
 
       // Jitter viewer count realistically

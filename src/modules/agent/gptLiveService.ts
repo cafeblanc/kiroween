@@ -35,13 +35,20 @@ export class GptLiveService {
       this.callbacks.onStatusChange('connecting');
 
       // 1. Get User Media with WebRTC hardware echo cancellation
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+      try {
+        this.localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      } catch (mediaErr: any) {
+        if (mediaErr?.name === 'NotAllowedError' || mediaErr?.message?.toLowerCase().includes('permission')) {
+          throw new Error('브라우저 마이크 권한이 차단되었습니다 (Permission denied). 브라우저 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 마이크 권한을 [허용]으로 변경한 후 다시 시도해주세요.');
         }
-      });
+        throw new Error('마이크 장치 접근 실패: ' + (mediaErr?.message || '장치를 확인할 수 없습니다.'));
+      }
 
       // 2. Setup Audio Visualizer
       this.setupVisualizer(this.localStream);
@@ -101,6 +108,8 @@ export class GptLiveService {
           console.warn('[gpt-live-1] Ephemeral session notice:', sessionRes.status, errData);
           if (sessionRes.status === 401) {
             throw new Error('OpenAI API 키가 올바르지 않습니다 (401 Unauthorized). 키를 다시 확인해주세요.');
+          } else if (sessionRes.status === 403) {
+            throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 권한이 없거나 제한된 Project 키입니다. platform.openai.com에서 Realtime 권한이 켜진 키인지 확인해주세요.');
           } else if (sessionRes.status === 429) {
             throw new Error('OpenAI API 사용량 한도 초과 또는 잔여 크레딧 부족 (429 Rate Limit/Quota Exceeded). 계정 크레딧을 확인해주세요.');
           }
