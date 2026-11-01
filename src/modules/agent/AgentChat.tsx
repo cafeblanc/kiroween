@@ -5,14 +5,14 @@ interface AgentChatProps {
   lang: Language;
   onTriggerAction: (product: ProductItem) => void;
   activeProduct: ProductItem | null;
-  onOpenGeminiVoice: () => void;
+  onOpenGptVoice: () => void;
 }
 
 export const AgentChat: React.FC<AgentChatProps> = ({
   lang,
   onTriggerAction,
   activeProduct,
-  onOpenGeminiVoice
+  onOpenGptVoice
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -86,11 +86,11 @@ export const AgentChat: React.FC<AgentChatProps> = ({
 
         <button
           type="button"
-          onClick={onOpenGeminiVoice}
+          onClick={onOpenGptVoice}
           className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg shadow-purple-900/40 flex items-center gap-1.5 transition active:scale-95 cursor-pointer animate-pulse"
         >
           <span>🎙️</span>
-          <span>Gemini Live</span>
+          <span>gpt-live-1</span>
         </button>
       </div>
 
