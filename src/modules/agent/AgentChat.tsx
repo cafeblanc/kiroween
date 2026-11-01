@@ -31,8 +31,12 @@ export const AgentChat: React.FC<AgentChatProps> = ({
   ]);
   const [input, setInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -95,7 +99,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-2.5">
+      <div
+        ref={chatContainerRef}
+        className="flex-1 p-3 overflow-y-auto flex flex-col gap-2.5 scroll-smooth"
+      >
         {messages.map(m => (
           <div key={m.id} className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}>
             <div

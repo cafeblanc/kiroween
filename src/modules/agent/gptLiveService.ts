@@ -18,16 +18,16 @@ export class GptLiveService {
   private remoteAudio: HTMLAudioElement | null = null;
   private callbacks: GptLiveCallbacks;
   private isConnected = false;
-
-  public getIsConnected(): boolean {
-    return this.isConnected;
-  }
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private animFrameId: number | null = null;
 
   constructor(callbacks: GptLiveCallbacks) {
     this.callbacks = callbacks;
+  }
+
+  public getIsConnected(): boolean {
+    return this.isConnected;
   }
 
   public async connect(apiKey: string, instructions: string, featuredProductId: string): Promise<boolean> {
@@ -74,33 +74,64 @@ export class GptLiveService {
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
 
-      // 6. Connect to OpenAI Realtime Endpoint using gpt-live-1 (with fallback to gpt-4o-realtime-preview if alias differs)
-      const model = 'gpt-live-1';
-      let sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${model}`, {
+      // 6. Connect to OpenAI Realtime Endpoint via Vite Proxy (/api/openai) to bypass browser CORS
+      // First try to obtain an ephemeral token from sessions endpoint
+      let activeBearer = apiKey.trim();
+      try {
+        const sessionRes = await fetch('/api/openai/v1/realtime/sessions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeBearer}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-realtime-preview',
+            voice: 'verse'
+          })
+        });
+
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData.client_secret?.value) {
+            activeBearer = sessionData.client_secret.value;
+            console.log('[gpt-live-1] Ephemeral session token obtained successfully');
+          }
+        } else {
+          const errData = await sessionRes.text();
+          console.warn('[gpt-live-1] Ephemeral session notice:', sessionRes.status, errData);
+          if (sessionRes.status === 401) {
+            throw new Error('OpenAI API 키가 올바르지 않습니다 (401 Unauthorized). 키를 다시 확인해주세요.');
+          } else if (sessionRes.status === 429) {
+            throw new Error('OpenAI API 사용량 한도 초과 또는 잔여 크레딧 부족 (429 Rate Limit/Quota Exceeded). 계정 크레딧을 확인해주세요.');
+          }
+        }
+      } catch (tokenErr: any) {
+        if (tokenErr.message?.includes('401') || tokenErr.message?.includes('429')) {
+          throw tokenErr;
+        }
+        console.warn('[gpt-live-1] Direct proxy fallback:', tokenErr);
+      }
+
+      // Send SDP Offer to Realtime WebRTC endpoint through local proxy
+      const sdpUrl = '/api/openai/v1/realtime?model=gpt-4o-realtime-preview';
+      const sdpResponse = await fetch(sdpUrl, {
         method: 'POST',
         body: offer.sdp,
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${activeBearer}`,
           'Content-Type': 'application/sdp'
         }
       });
 
-      // Fallback to gpt-4o-realtime-preview if gpt-live-1 alias is provisioned under preview route
-      if (!sdpResponse.ok && sdpResponse.status === 404) {
-        console.warn(`[gpt-live-1] model endpoint fallback: trying gpt-4o-realtime-preview`);
-        sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`, {
-          method: 'POST',
-          body: offer.sdp,
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/sdp'
-          }
-        });
-      }
-
       if (!sdpResponse.ok) {
         const errorText = await sdpResponse.text();
-        throw new Error(`OpenAI Realtime handshake failed (${sdpResponse.status}): ${errorText}`);
+        if (sdpResponse.status === 401) {
+          throw new Error('OpenAI 인증 실패 (401 Unauthorized): API 키 권한 또는 Realtime API 활성 여부를 확인하세요.');
+        } else if (sdpResponse.status === 429) {
+          throw new Error('OpenAI 크레딧 부족 또는 요청 제한 (429 Too Many Requests): 계정에 사용 가능한 결제 크레딧이 있는지 확인하세요.');
+        } else {
+          throw new Error(`OpenAI Realtime 연결 오류 (${sdpResponse.status}): ${errorText.slice(0, 150)}`);
+        }
       }
 
       const answerSdp = await sdpResponse.text();
@@ -115,7 +146,8 @@ export class GptLiveService {
       return true;
     } catch (err: any) {
       console.error('[gpt-live-1] Connection error:', err);
-      this.callbacks.onError(err?.message || 'Failed to connect to gpt-live-1');
+      const msg = err?.message || 'Failed to connect to gpt-live-1';
+      this.callbacks.onError(msg);
       this.callbacks.onStatusChange('error');
       this.disconnect();
       return false;

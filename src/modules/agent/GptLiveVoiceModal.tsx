@@ -36,8 +36,18 @@ export const GptLiveVoiceModal: React.FC<GptLiveVoiceModalProps> = ({
   ]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const transcriptContainerRef = useRef<HTMLDivElement | null>(null);
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const gptServiceRef = useRef<GptLiveService | null>(null);
   const videoOriginalMutedRef = useRef<boolean>(false);
+
+  // Auto-scroll transcript container so latest message is always in view at bottom
+  useEffect(() => {
+    if (transcriptContainerRef.current) {
+      transcriptContainerRef.current.scrollTop = transcriptContainerRef.current.scrollHeight;
+    }
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [transcripts]);
 
   // Dynamic Frequency Waveform Rendering
   useEffect(() => {
@@ -146,7 +156,7 @@ Rules:
       gptServiceRef.current = service;
       const success = await service.connect(apiKey.trim(), instructions, activeProduct?.id || 'prod-honey');
       if (!success) {
-        setErrorMessage('Failed to connect with the provided OpenAI API Key. You can verify the key or test interactive simulation below.');
+        setIsSimulated(true);
       }
     } else {
       // Prompt user to enter API key or run interactive test
@@ -351,7 +361,10 @@ Rules:
         </div>
 
         {/* Live Conversation Transcript Stream */}
-        <div className="flex-1 min-h-[160px] max-h-[240px] p-4 overflow-y-auto flex flex-col gap-2.5 bg-slate-900/60 border-t border-b border-slate-800/80">
+        <div
+          ref={transcriptContainerRef}
+          className="flex-1 min-h-[160px] max-h-[240px] p-4 overflow-y-auto flex flex-col gap-2.5 bg-slate-900/60 border-t border-b border-slate-800/80 scroll-smooth"
+        >
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Live Transcript Stream</p>
             <span className="text-[10px] text-purple-400 font-mono">Barge-in / Simultaneous Listen</span>
@@ -374,6 +387,7 @@ Rules:
               </div>
             </div>
           ))}
+          <div ref={transcriptEndRef} />
         </div>
 
         {/* Quick Instant Test Actions */}
