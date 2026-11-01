@@ -45,7 +45,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
             loop
             playsInline
             muted={isMuted}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain bg-black"
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
           />
