@@ -33,9 +33,9 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
   };
 
   return (
-    <div className="relative w-full h-full bg-slate-900/60 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col p-2 gap-2 group">
-      {/* Video Content Box */}
-      <div className="relative flex-1 min-h-0 w-full bg-black rounded-xl overflow-hidden flex items-center justify-center cursor-pointer select-none" onClick={togglePlay}>
+    <div className="relative w-full h-full flex flex-col gap-1.5 group select-none">
+      {/* 1. Video Content Box (화면을 최대한 채우도록 테두리/패딩 제거 및 확장) */}
+      <div className="relative flex-1 min-h-0 w-full bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center cursor-pointer" onClick={togglePlay}>
         {product ? (
           <video
             ref={videoRef}
@@ -79,11 +79,11 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
         )}
       </div>
 
-      {/* Dedicated Bottom Product & Action Card (동영상 화면 아래에 독립 분리 배치) */}
+      {/* 2. Dedicated Bottom Action Bar (사진 아래, 채팅창 'Kiroween Contextual Agent' 바로 윗선까지 위치) */}
       {product && (
-        <div className="w-full bg-slate-950 border border-slate-700/80 px-3 py-2 sm:py-2.5 rounded-xl flex items-center justify-between shadow-xl shrink-0">
+        <div className="w-full bg-slate-900/95 border border-slate-800 px-3 py-2 rounded-xl flex items-center justify-between shadow-xl shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <span className="text-2xl">{product.icon}</span>
+            <span className="text-xl sm:text-2xl">{product.icon}</span>
             <div className="truncate">
               <p className="text-xs font-bold text-white truncate">{product.name.en}</p>
               <p className="text-xs text-amber-400 font-extrabold">

@@ -145,17 +145,17 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Workspace (Modular Split View) */}
-      <main className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 p-2 sm:p-3 overflow-hidden">
-        {/* Left: Stream Player Module (모바일에서 약 1.8배 시원하게 확대: h-[72%], PC는 md:col-span-7) */}
-        <section className="h-[72%] sm:h-[70%] md:h-full md:col-span-7 flex flex-col min-h-0">
+      <main className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 p-1.5 sm:p-3 overflow-hidden">
+        {/* Left: Stream Player Module (모바일에서 비디오를 최대 크기로 키워 액션 바가 채팅창 바로 위에 밀착 배치: h-[76%]) */}
+        <section className="h-[76%] sm:h-[73%] md:h-full md:col-span-7 flex flex-col min-h-0">
           <StreamPlayer
             product={activeProduct}
             onSelectAction={() => setIsActionOpen(true)}
           />
         </section>
 
-        {/* Right: Agentic Chat Module (모바일 하단 잔여 공간 컴팩트 배치: flex-1) */}
-        <section className="flex-1 md:h-full md:col-span-5 flex flex-col min-h-0">
+        {/* Right: Agentic Chat Module (하단 채팅창) */}
+        <section className="flex-1 min-h-0 md:h-full md:col-span-5 flex flex-col">
           <AgentChat
             lang={lang}
             activeProduct={activeProduct}
