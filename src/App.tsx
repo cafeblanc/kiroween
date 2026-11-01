@@ -4,6 +4,7 @@ import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
 import { AdminStudioModal } from './modules/admin/AdminStudioModal';
 import { GptLiveVoiceModal } from './modules/agent/GptLiveVoiceModal';
+import { PayPalReceiptModal } from './modules/action/PayPalReceiptModal';
 import { ProductItem, ActionOrder, Language } from './types';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -29,7 +30,57 @@ const INITIAL_PRODUCTS: ProductItem[] = [
       zh: '采自杨平纯净山野的100%纯天然洋槐蜂蜜。',
       es: 'Miel de acacia 100% pura y natural recolectada en las montañas vírgenes.',
       fr: 'Miel d acacia 100% pur et naturel récolté dans la nature préservée.'
-    }
+    },
+    timelineMarkers: [
+      {
+        timeSeconds: 0,
+        icon: '🍯',
+        label: {
+          en: 'Product Intro: 100% Pure Acacia Honey (500g)',
+          ko: '라이브 소개: 100% 순수 아카시아 벌꿀 (500g)',
+          ja: '商品紹介：100％純粋アカシア蜂蜜（500g）',
+          zh: '商品介绍：100%纯天然洋槐蜂蜜 (500g)',
+          es: 'Presentación: Miel Pura de Acacia (500g)',
+          fr: 'Présentation: Miel Pur d Acacia (500g)'
+        }
+      },
+      {
+        timeSeconds: 7,
+        icon: '🏔️',
+        label: {
+          en: 'Pure Harvest: Sourced from Pristine Nature',
+          ko: '원산지 확인: 청정 양평 산지 직송 무첨가 생꿀',
+          ja: '原産地確認：楊平の清浄な山地直送',
+          zh: '产地认证：杨平清净高山直采无添加',
+          es: 'Cosecha de Origen: Montañas Vírgenes Sin Aditivos',
+          fr: 'Origine Certifiée: Récolte Sauvage Pure'
+        }
+      },
+      {
+        timeSeconds: 16,
+        icon: '📜',
+        label: {
+          en: 'Certified Lab Analysis: 1+ Premium Grade Quality',
+          ko: '품질 검증: 한국양봉협회 1+ 최고등급 공인 인증',
+          ja: '品質認証：韓国養蜂協会 1+最高等級認定',
+          zh: '权威检测：1+特级蜂产质检认证',
+          es: 'Certificación Oficial: Grado 1+ Premium',
+          fr: 'Analyse en Laboratoire: Qualité 1+ Supérieure'
+        }
+      },
+      {
+        timeSeconds: 28,
+        icon: '⚡',
+        label: {
+          en: 'Instant In-Stream Purchase via PayPal Active',
+          ko: '실시간 주문: 페이팔 원클릭 즉시 결제 활성',
+          ja: '即時注文：PayPalワンクリック決済利用可能',
+          zh: '即刻下单：支持PayPal一键极速结账',
+          es: 'Compra Instantánea: PayPal Express Activo',
+          fr: 'Paiement Immédiat: PayPal Express Disponible'
+        }
+      }
+    ]
   },
   {
     id: 'prod-tea',
@@ -53,7 +104,45 @@ const INITIAL_PRODUCTS: ProductItem[] = [
       zh: '精选传统原料精心烘焙的手工传统茶礼盒。',
       es: 'Set de té tradicional hecho a mano con ingredientes seleccionados.',
       fr: 'Coffret de thé traditionnel fait main préparé avec soin.'
-    }
+    },
+    timelineMarkers: [
+      {
+        timeSeconds: 0,
+        icon: '🍵',
+        label: {
+          en: 'Artisanal Herbal Tea Presentation',
+          ko: '장인 수제 전통차 기획 선물 세트',
+          ja: '職人手作り伝統茶ギフトセット',
+          zh: '手工传统养生茶礼盒呈现',
+          es: 'Presentación del Set de Té Artesanal',
+          fr: 'Coffret de Thé Artisanal'
+        }
+      },
+      {
+        timeSeconds: 12,
+        icon: '🌿',
+        label: {
+          en: 'Traditional Roasting: 9-times Steamed & Sun-dried',
+          ko: '구증구포 전통 덖음 기법 & 은은한 풍미',
+          ja: '九蒸九曝の伝統焙煎法と深い風味',
+          zh: '古法九蒸九晒慢焙工艺',
+          es: 'Tostado Tradicional Artesano',
+          fr: 'Torréfaction Traditionnelle Délicate'
+        }
+      },
+      {
+        timeSeconds: 24,
+        icon: '⚡',
+        label: {
+          en: 'Gift Box Wrapping & PayPal Express Available',
+          ko: '고급 비단 보자기 포장 & 페이팔 즉시 결제',
+          ja: '高級ギフト包装 ＆ PayPal即時決済',
+          zh: '附赠精美丝绸礼袋 ＆ 支持PayPal',
+          es: 'Envoltorio de Regalo y Pago PayPal',
+          fr: 'Emballage Cadeau & Paiement PayPal'
+        }
+      }
+    ]
   }
 ];
 
@@ -63,19 +152,18 @@ export const App: React.FC = () => {
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isGptVoiceOpen, setIsGptVoiceOpen] = useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
   const [lang, setLang] = useState<Language>('en');
 
   const handleActionSuccess = (order: ActionOrder) => {
     setLatestOrder(order);
+    setIsReceiptOpen(true);
     if (activeProduct) {
       setProducts(prev =>
         prev.map(p => (p.id === activeProduct.id ? { ...p, stock: Math.max(0, p.stock - 1) } : p))
       );
     }
-    setTimeout(() => {
-      setLatestOrder(null);
-    }, 4000);
   };
 
   const handleAddProduct = (newProd: ProductItem) => {
@@ -162,6 +250,7 @@ export const App: React.FC = () => {
           <StreamPlayer
             product={activeProduct}
             onSelectAction={() => setIsActionOpen(true)}
+            lang={lang}
           />
         </section>
 
@@ -206,6 +295,14 @@ export const App: React.FC = () => {
           setActiveProduct(prod);
           setIsActionOpen(true);
         }}
+      />
+
+      {/* Official PayPal Order Receipt & Logistics Tracking Modal */}
+      <PayPalReceiptModal
+        order={latestOrder}
+        isOpen={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+        lang={lang}
       />
 
       {/* Success Toast */}

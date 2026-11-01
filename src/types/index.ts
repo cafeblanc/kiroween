@@ -1,5 +1,11 @@
 export type Language = 'en' | 'ko' | 'ja' | 'zh' | 'es' | 'fr';
 
+export interface StreamTimelineMarker {
+  timeSeconds: number;
+  label: Record<Language, string>;
+  icon: string;
+}
+
 export interface ProductItem {
   id: string;
   name: Record<Language, string>;
@@ -9,6 +15,7 @@ export interface ProductItem {
   icon: string;
   videoUrl: string;
   description: Record<Language, string>;
+  timelineMarkers?: StreamTimelineMarker[];
 }
 
 export interface ChatMessage {

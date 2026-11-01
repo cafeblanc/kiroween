@@ -1,15 +1,20 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ProductItem } from '../../types';
+import { ProductItem, Language } from '../../types';
+import { LiveViewerOverlay } from './LiveViewerOverlay';
 
 interface StreamPlayerProps {
   product: ProductItem | null;
   onSelectAction: () => void;
+  lang: Language;
 }
 
-export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAction }) => {
+export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAction, lang }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const activeMarker = product?.timelineMarkers?.slice().reverse().find(m => currentTime >= m.timeSeconds) || product?.timelineMarkers?.[0];
 
   useEffect(() => {
     if (videoRef.current) {
@@ -50,26 +55,45 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
             className="w-full h-full object-contain bg-black"
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onTimeUpdate={(e) => setCurrentTime((e.target as HTMLVideoElement).currentTime)}
           />
         ) : (
           <div className="text-slate-500 text-sm">No Live Stream Feed Active</div>
         )}
 
         {/* Floating Top Controls */}
-        <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-20 pointer-events-none">
-          <div className="bg-red-600/90 backdrop-blur px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1.5 shadow">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-            LIVE STREAM
+        <div className="absolute top-3 left-3 right-3 flex flex-col gap-2 z-20 pointer-events-none">
+          <div className="flex justify-between items-center w-full">
+            <div className="bg-red-600/90 backdrop-blur px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1.5 shadow">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+              LIVE STREAM
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleSound}
+              className="pointer-events-auto bg-slate-900/80 hover:bg-slate-800 backdrop-blur text-white px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-700 transition cursor-pointer"
+            >
+              {isMuted ? '🔇 Unmute' : '🔊 Sound On'}
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleSound}
-            className="pointer-events-auto bg-slate-900/80 hover:bg-slate-800 backdrop-blur text-white px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-700 transition cursor-pointer"
-          >
-            {isMuted ? '🔇 Unmute' : '🔊 Sound On'}
-          </button>
+          {/* Smart Stream Context Marker (Timestamp Synchronized) */}
+          {activeMarker && (
+            <div className="self-start bg-slate-950/90 backdrop-blur-md border border-purple-500/50 text-white px-3 py-1.5 rounded-xl text-[11px] flex items-center gap-2 shadow-2xl animate-in fade-in duration-300">
+              <span className="text-base">{activeMarker.icon}</span>
+              <span className="font-semibold text-purple-200">
+                {activeMarker.label[lang] || activeMarker.label.en}
+              </span>
+              <span className="text-[9px] font-mono text-purple-400 bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-500/30">
+                LIVE {Math.floor(currentTime)}s
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* Live Viewer Comments & Reactions Overlay */}
+        <LiveViewerOverlay product={product} lang={lang} />
 
         {/* Center Play Overlay when paused */}
         {!isPlaying && (
