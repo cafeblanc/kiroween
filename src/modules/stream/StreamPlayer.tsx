@@ -33,9 +33,9 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
   };
 
   return (
-    <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col justify-between group">
-      {/* Video Content */}
-      <div className="relative w-full h-full flex items-center justify-center cursor-pointer" onClick={togglePlay}>
+    <div className="relative w-full h-full bg-slate-900/60 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col p-2 gap-2 group">
+      {/* Video Content Box */}
+      <div className="relative flex-1 min-h-0 w-full bg-black rounded-xl overflow-hidden flex items-center justify-center cursor-pointer select-none" onClick={togglePlay}>
         {product ? (
           <video
             ref={videoRef}
@@ -79,9 +79,9 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
         )}
       </div>
 
-      {/* Bottom Floating In-Stream Card */}
+      {/* Dedicated Bottom Product & Action Card (동영상 화면 아래에 독립 분리 배치) */}
       {product && (
-        <div className="absolute bottom-3 left-3 right-3 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 p-3 rounded-xl flex items-center justify-between z-20 shadow-xl">
+        <div className="w-full bg-slate-950 border border-slate-700/80 px-3 py-2 sm:py-2.5 rounded-xl flex items-center justify-between shadow-xl shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="text-2xl">{product.icon}</span>
             <div className="truncate">
@@ -94,9 +94,10 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
           <button
             type="button"
             onClick={onSelectAction}
-            className="bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs px-3 py-2 rounded-lg shadow-lg transition cursor-pointer shrink-0"
+            className="bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-lg transition cursor-pointer shrink-0 flex items-center gap-1"
           >
-            ⚡ Instant Action
+            <span>⚡</span>
+            <span>Instant Action</span>
           </button>
         </div>
       )}
