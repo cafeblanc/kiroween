@@ -5,9 +5,15 @@ interface AgentChatProps {
   lang: Language;
   onTriggerAction: (product: ProductItem) => void;
   activeProduct: ProductItem | null;
+  onOpenGeminiVoice: () => void;
 }
 
-export const AgentChat: React.FC<AgentChatProps> = ({ lang, onTriggerAction, activeProduct }) => {
+export const AgentChat: React.FC<AgentChatProps> = ({
+  lang,
+  onTriggerAction,
+  activeProduct,
+  onOpenGeminiVoice
+}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'init-1',
@@ -77,6 +83,15 @@ export const AgentChat: React.FC<AgentChatProps> = ({ lang, onTriggerAction, act
             <span className="text-[10px] text-emerald-400 font-medium">● Real-time Stream Hook Active</span>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={onOpenGeminiVoice}
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg shadow-purple-900/40 flex items-center gap-1.5 transition active:scale-95 cursor-pointer animate-pulse"
+        >
+          <span>🎙️</span>
+          <span>Gemini Live</span>
+        </button>
       </div>
 
       {/* Messages */}

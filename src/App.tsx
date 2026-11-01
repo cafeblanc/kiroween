@@ -3,6 +3,7 @@ import { StreamPlayer } from './modules/stream/StreamPlayer';
 import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
 import { AdminStudioModal } from './modules/admin/AdminStudioModal';
+import { GeminiLiveVoiceModal } from './modules/agent/GeminiLiveVoiceModal';
 import { ProductItem, ActionOrder, Language } from './types';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -61,6 +62,7 @@ export const App: React.FC = () => {
   const [activeProduct, setActiveProduct] = useState<ProductItem | null>(INITIAL_PRODUCTS[0]);
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isGeminiVoiceOpen, setIsGeminiVoiceOpen] = useState(false);
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
   const [lang, setLang] = useState<Language>('en');
 
@@ -102,8 +104,17 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Product Switcher, Admin Button & Language Switcher */}
+        {/* Product Switcher, Admin Button, Gemini Voice & Language Switcher */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsGeminiVoiceOpen(true)}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+          >
+            <span className="animate-pulse">🎙️</span>
+            <span className="hidden sm:inline">Gemini Live</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsAdminOpen(true)}
@@ -159,6 +170,7 @@ export const App: React.FC = () => {
           <AgentChat
             lang={lang}
             activeProduct={activeProduct}
+            onOpenGeminiVoice={() => setIsGeminiVoiceOpen(true)}
             onTriggerAction={prod => {
               setActiveProduct(prod);
               setIsActionOpen(true);
@@ -182,6 +194,18 @@ export const App: React.FC = () => {
         products={products}
         onAddProduct={handleAddProduct}
         onDeleteProduct={handleDeleteProduct}
+      />
+
+      {/* Gemini Multimodal Live Voice Modal */}
+      <GeminiLiveVoiceModal
+        isOpen={isGeminiVoiceOpen}
+        onClose={() => setIsGeminiVoiceOpen(false)}
+        activeProduct={activeProduct}
+        lang={lang}
+        onTriggerAction={prod => {
+          setActiveProduct(prod);
+          setIsActionOpen(true);
+        }}
       />
 
       {/* Success Toast */}

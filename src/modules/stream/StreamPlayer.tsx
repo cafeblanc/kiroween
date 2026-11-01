@@ -39,6 +39,8 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
         {product ? (
           <video
             ref={videoRef}
+            id="kiroween-live-video"
+            crossOrigin="anonymous"
             key={product.id + '-' + product.videoUrl}
             src={product.videoUrl}
             autoPlay
