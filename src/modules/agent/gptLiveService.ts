@@ -152,11 +152,7 @@ export class GptLiveService {
           type: 'realtime',
           model: 'gpt-4o-realtime-preview',
           instructions: instructions,
-          voice: 'verse',
-          modalities: ['audio', 'text'],
-          input_audio_transcription: {
-            model: 'whisper-1'
-          }
+          voice: 'verse'
         })
       );
 
