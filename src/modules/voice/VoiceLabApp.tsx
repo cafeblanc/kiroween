@@ -220,34 +220,45 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
     const alertMsg = `⚡ [결제창 즉시 표시]: ${targetProd.name.ko || targetProd.name.en} (${targetProd.price.toLocaleString()}원) 결제창이 열렸습니다.${reason ? ' (' + reason + ')' : ''}`;
     setToolAlert(alertMsg);
     addLog('tool', alertMsg);
+
+    // Also dispatch global event so App.tsx can open it anywhere
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kiroween:open_checkout', { detail: { product: targetProd } }));
+    }
   };
 
   // Robust checkout intent detector for Korean & English voice commands
   const isCheckoutIntent = (text: string): boolean => {
     const t = text.replace(/\s+/g, '').toLowerCase();
     return (
-      t.includes('결제창') ||
-      t.includes('결제해') ||
-      t.includes('결제진행') ||
-      t.includes('구매창') ||
-      t.includes('주문창') ||
-      t.includes('구매할래') ||
-      t.includes('구매할게') ||
-      t.includes('주문할래') ||
-      t.includes('주문할게') ||
-      t.includes('이거살래') ||
-      t.includes('이거살게') ||
-      t.includes('살게요') ||
+      t.includes('결제') ||
+      t.includes('결재') ||
+      t.includes('구매') ||
+      t.includes('주문') ||
       t.includes('살래') ||
+      t.includes('살게') ||
+      t.includes('살까') ||
+      t.includes('살게요') ||
+      t.includes('사겠') ||
+      t.includes('사고싶') ||
+      t.includes('계산') ||
       t.includes('checkout') ||
-      t.includes('buythis') ||
-      t.includes('orderthis')
+      t.includes('buy') ||
+      t.includes('order') ||
+      t.includes('pay')
     );
   };
 
   const handleTranscriptStream = (_sender: 'agent', _delta: string, fullText: string, domain?: DomainCategory) => {
     const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
     const formattedContent = `gpt-realtime: ${domText}${fullText}`;
+
+    // If AI voice response says "결제창" or "결제", trigger the checkout sheet immediately!
+    if (fullText.includes('결제') || fullText.includes('결재') || fullText.includes('구매창') || fullText.includes('주문창')) {
+      if (!isCheckoutOpen) {
+        triggerCheckout(selectedProduct, 'AI 실시간 음성 발화 감지');
+      }
+    }
 
     setLogs(prev => {
       if (prev.length > 0) {
@@ -277,11 +288,18 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
       addLog('user', `나(User): "${text}"`);
       // Zero-failure fallback: check if user speech explicitly asks for checkout
       if (isCheckoutIntent(text)) {
-        triggerCheckout(selectedProduct, `음성 키워드 인식 ("${text}")`);
+        triggerCheckout(selectedProduct, `사용자 음성 인식 ("${text}")`);
       }
     } else {
       const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
       const finalContent = `gpt-realtime: ${domText}${text}`;
+
+      // Zero-failure fallback: if AI response mentions checkout, guarantee checkout modal is open!
+      if (text.includes('결제') || text.includes('결재') || text.includes('구매창') || text.includes('주문창')) {
+        if (!isCheckoutOpen) {
+          triggerCheckout(selectedProduct, `AI 응답 확인`);
+        }
+      }
 
       setLogs(prev => {
         if (prev.length > 0) {

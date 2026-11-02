@@ -112,26 +112,25 @@ You are an expert who can seamlessly answer across 13 specialized domains:
 [Science, Math, Astronomy, Fortune/Divination, Philosophy, Psychology, Nature, Medicine/Health, Physics, Literature, History, Fashion, Accessories].
 When a specialized question is asked, analyze the core keywords, cite rigorous facts or cultural depth according to the field, and deliver articulate, concise spoken turns (1-2 sentences).`;
 
-  // Helper: check if speech has checkout/purchase intent
+  // Helper: check if speech has checkout/purchase intent (covers variations & typos)
   const isCheckoutSpeech = (str: string) => {
     const s = str.replace(/\s+/g, '').toLowerCase();
     return (
-      s.includes('결제창') ||
-      s.includes('결제해') ||
-      s.includes('결제진행') ||
-      s.includes('구매창') ||
-      s.includes('주문창') ||
-      s.includes('구매할래') ||
-      s.includes('구매할게') ||
-      s.includes('주문할래') ||
-      s.includes('주문할게') ||
-      s.includes('이거살래') ||
-      s.includes('이거살게') ||
-      s.includes('살게요') ||
+      s.includes('결제') ||
+      s.includes('결재') ||
+      s.includes('구매') ||
+      s.includes('주문') ||
       s.includes('살래') ||
+      s.includes('살게') ||
+      s.includes('살까') ||
+      s.includes('살게요') ||
+      s.includes('사겠') ||
+      s.includes('사고싶') ||
+      s.includes('계산') ||
       s.includes('checkout') ||
-      s.includes('buythis') ||
-      s.includes('orderthis')
+      s.includes('buy') ||
+      s.includes('order') ||
+      s.includes('pay')
     );
   };
 
@@ -148,9 +147,9 @@ When a specialized question is asked, analyze the core keywords, cite rigorous f
     const trimmed = text.trim();
     const formattedText = sender === 'user' ? `🎙️ ${displayPrefix}"${trimmed}"` : `🗣️ ${displayPrefix}${trimmed}`;
 
-    // Zero-failure fallback: If user speech expresses checkout intent, trigger active product checkout immediately!
-    if (sender === 'user' && isCheckoutSpeech(trimmed) && activeProduct) {
-      console.log('[AgentChat] Voice checkout command detected:', trimmed);
+    // Zero-failure fallback: If user speech OR AI voice mentions checkout, open checkout sheet immediately!
+    if (activeProduct && isCheckoutSpeech(trimmed)) {
+      console.log('[AgentChat] Voice checkout trigger fired:', sender, trimmed);
       onTriggerAction(activeProduct);
     }
 

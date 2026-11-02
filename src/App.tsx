@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StreamPlayer } from './modules/stream/StreamPlayer';
 import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
@@ -156,6 +156,21 @@ export const App: React.FC = () => {
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
   const [successToast, setSuccessToast] = useState<ActionOrder | null>(null);
   const [lang, setLang] = useState<Language>('en');
+
+  // Global listener for voice checkout events across all views
+  useEffect(() => {
+    const handleGlobalCheckout = (e: any) => {
+      const prod = e.detail?.product || activeProduct;
+      if (prod) {
+        setActiveProduct(prod);
+      }
+      setIsActionOpen(true);
+    };
+    window.addEventListener('kiroween:open_checkout', handleGlobalCheckout);
+    return () => {
+      window.removeEventListener('kiroween:open_checkout', handleGlobalCheckout);
+    };
+  }, [activeProduct]);
 
   const handleActionSuccess = (order: ActionOrder) => {
     setLatestOrder(order);
