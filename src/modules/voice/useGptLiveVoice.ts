@@ -207,27 +207,30 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       // 5. Authenticate via Official OpenAI GA /v1/realtime/client_secrets
       // Note: User key supports 'gpt-realtime' / 'gpt-realtime-1.5' / 'gpt-realtime-mini'
       const primaryModel = optionsRef.current.model || 'gpt-realtime';
-      const voice = optionsRef.current.voiceName || 'alloy';
       let activeBearer = targetKey;
+      let usedEphemeral = false;
 
       try {
-        const secretRes = await fetch('/api/openai/v1/realtime/sessions', {
+        const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${targetKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: primaryModel,
-            voice: voice
+            session: {
+              type: 'realtime',
+              model: primaryModel
+            }
           })
         });
 
         if (secretRes.ok) {
           const secretData = await secretRes.json();
-          const token = secretData.client_secret?.value || secretData.value;
+          const token = secretData.value || secretData.client_secret?.value;
           if (token) {
             activeBearer = token;
+            usedEphemeral = true;
             console.log('[useGptLiveVoice] Ephemeral token acquired successfully:', token.slice(0, 10) + '...');
           }
         } else if (secretRes.status === 401) {
@@ -244,10 +247,22 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         console.warn('[useGptLiveVoice] Direct call token fallback notice:', tokenErr);
       }
 
-      // 6. Send Multipart/form-data SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
-      // OpenAI multipart parser requires 'sdp' and 'session' as plain text form fields (NOT file blobs)
-      // Note: 'session' in /v1/realtime/calls strictly accepts type, model, instructions, and voice only
-      const createMultipartBody = (targetModel: string) => {
+      // 6. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      let sdpResponse: Response;
+
+      if (usedEphemeral) {
+        // Ephemeral token already bound to session; send SDP offer directly
+        sdpResponse = await fetch(gaCallsUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeBearer}`,
+            'Content-Type': 'application/sdp'
+          },
+          body: offer.sdp
+        });
+      } else {
+        // Direct master key call: send multipart/form-data with sdp and session
         const formData = new FormData();
         const sdpString = offer.sdp || pcRef.current?.localDescription?.sdp || '';
         formData.append('sdp', sdpString);
@@ -255,33 +270,39 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
           'session',
           JSON.stringify({
             type: 'realtime',
-            model: targetModel,
-            instructions: optionsRef.current.systemInstruction || 'You are an intelligent voice assistant.',
-            voice: voice
+            model: primaryModel
           })
         );
-        return formData;
-      };
 
-      const gaCallsUrl = '/api/openai/v1/realtime/calls';
-      let sdpResponse = await fetch(gaCallsUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${activeBearer}`
-        },
-        body: createMultipartBody(primaryModel)
-      });
+        sdpResponse = await fetch(gaCallsUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeBearer}`
+          },
+          body: formData
+        });
+      }
 
       // Model fallback: if current model fails with 400 or 404, fallback to alternative realtime model
       if (!sdpResponse.ok && (sdpResponse.status === 400 || sdpResponse.status === 404)) {
         const fallbackModel = primaryModel === 'gpt-realtime' ? 'gpt-4o-realtime-preview' : 'gpt-realtime';
         console.log(`[useGptLiveVoice] Retrying with ${fallbackModel} fallback...`);
+        const fallbackFormData = new FormData();
+        const sdpString = offer.sdp || pcRef.current?.localDescription?.sdp || '';
+        fallbackFormData.append('sdp', sdpString);
+        fallbackFormData.append(
+          'session',
+          JSON.stringify({
+            type: 'realtime',
+            model: fallbackModel
+          })
+        );
         const retryRes = await fetch(gaCallsUrl, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${activeBearer}`
           },
-          body: createMultipartBody(fallbackModel)
+          body: fallbackFormData
         });
         if (retryRes.ok) {
           sdpResponse = retryRes;
