@@ -55,6 +55,23 @@ const DOMAIN_TEST_PROMPTS: Array<{ domain: DomainCategory; label: string; prompt
   { domain: 'environment', label: '🌱 환경/생태', prompt: '환경 생태 관점에서 꿀벌 보호와 ESG 탄소 순환 경제의 연관성은?' }
 ];
 
+const speakKorean = (text: string) => {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.cancel();
+    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_]/g, '').trim();
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = 'ko-KR';
+    utter.rate = 1.05;
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang.startsWith('ko'));
+    if (koVoice) utter.voice = koVoice;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {
+    console.warn('TTS notice:', e);
+  }
+};
+
 export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   const [logs, setLogs] = useState<TestLog[]>([
     {
@@ -109,7 +126,8 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
     const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, prompt);
     setTimeout(() => {
       addLog('agent', `gpt-live: [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`);
-    }, 400);
+      speakKorean(expertAnswer);
+    }, 250);
   };
 
   const handleToolCall = (toolName: string, args: Record<string, any>) => {
@@ -124,31 +142,41 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-950 text-white font-sans overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-slate-950 text-white font-sans overflow-hidden">
       
-      {/* Top Header */}
-      <header className="px-5 py-3 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between z-30 shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🎙️</span>
+      {/* Top Voice Control Bar */}
+      <div className="px-4 py-2.5 border-b border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-2 z-30 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xl">🎙️</span>
           <div>
-            <h1 className="text-sm sm:text-base font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400">
-              gpt-live-1 Standalone Voice Module Test Lab
+            <h1 className="text-xs sm:text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400">
+              gpt-live-1 음성 대화 랩 (Voice Lab)
             </h1>
-            <p className="text-[11px] text-slate-400">
-              100% 완전 독립 음성 모듈 검증 · 13개 전문 도메인 최적화 검색 및 발화 테스트베드
+            <p className="text-[10px] text-slate-400">
+              실시간 WebRTC Full-Duplex · 20개 전문 도메인 자동 분석 & 양방향 자막 검증
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Center: Live Domain Indicator */}
+        {activeDomain !== 'general' && DOMAIN_REGISTRY[activeDomain] && (
+          <div className="flex items-center gap-1.5 bg-gradient-to-r from-purple-950 to-indigo-950 border border-purple-400/60 text-purple-200 px-3 py-1 rounded-full text-xs font-bold shadow animate-in fade-in">
+            <span>{DOMAIN_REGISTRY[activeDomain].icon}</span>
+            <span>분야: <strong className="text-white">{DOMAIN_REGISTRY[activeDomain].nameKo}</strong></span>
+            <span className="text-[10px] text-emerald-400 font-normal">· 최적화 답변 완료</span>
+          </div>
+        )}
+
+        {/* Right: Controls & Back button */}
+        <div className="flex items-center gap-2">
           {onBackToMain && (
             <button
               type="button"
               onClick={onBackToMain}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
             >
               <span>📺</span>
-              <span>메인 라이브 방송으로 복귀</span>
+              <span className="hidden sm:inline">라이브 방송 복귀</span>
             </button>
           )}
 
@@ -167,24 +195,24 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
             onError={handleError}
           />
         </div>
-      </header>
+      </div>
 
-      {/* Main Lab Workspace */}
-      <main className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 overflow-hidden">
+      {/* Main Lab Workspace: Responsive Side-by-Side Split */}
+      <main className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 p-3 overflow-hidden">
         
-        {/* Left: 13 Domain Quick-Test Panel (lg:col-span-5) */}
-        <section className="lg:col-span-5 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl min-h-0">
-          <div className="p-3 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        {/* Left: 20 Domain Quick-Test Panel (w-full md:w-5/12) */}
+        <section className="w-full md:w-5/12 h-[42%] md:h-full flex flex-col bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl min-h-0">
+          <div className="p-2.5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-1.5">
               <span className="text-base">🎯</span>
-              <h2 className="text-xs font-bold text-purple-300">13개 전문 분야 질문 테스트 세트</h2>
+              <h2 className="text-xs font-bold text-purple-300">20개 전문 분야 질문 세트</h2>
             </div>
-            <span className="text-[10px] text-slate-400">마이크로 직접 말하거나 클릭하여 테스트</span>
+            <span className="text-[10px] text-slate-400">클릭 시 즉시 질문 전송</span>
           </div>
 
-          <div className="flex-1 p-3 overflow-y-auto space-y-2">
-            <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
-              💡 아래의 질문들은 <span className="text-purple-300 font-bold">핵심어(과학, 의학, 역사, 운세 등)</span>에 따라 음성 모듈 내부의 <code className="bg-slate-800 px-1 py-0.5 rounded text-indigo-300 text-[10px]">DomainKnowledgeRouter</code>가 자동으로 최적화 검색을 분기 수행합니다.
+          <div className="flex-1 p-2.5 overflow-y-auto space-y-1.5 min-h-0">
+            <p className="text-[10px] text-slate-400 leading-snug mb-1">
+              💡 질문 클릭 시 <span className="text-purple-300 font-bold">DomainKnowledgeRouter</span>가 핵심어를 감지하여 우측 채팅창에 질문과 전문 답변을 즉시 글자로 표시합니다.
             </p>
 
             <div className="grid grid-cols-1 gap-1.5">
@@ -193,7 +221,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
                   key={item.domain}
                   type="button"
                   onClick={() => handleSimulateQuestion(item.prompt)}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer w-full hover:scale-[1.01] active:scale-[0.99] ${
+                  className={`p-2 rounded-xl border text-left transition flex flex-col gap-0.5 cursor-pointer w-full hover:scale-[1.01] active:scale-[0.99] ${
                     activeDomain === item.domain
                       ? 'bg-purple-950/90 border-purple-400 text-white ring-2 ring-purple-400/50 shadow-lg'
                       : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-purple-500/50 hover:bg-slate-900/90'
@@ -203,16 +231,16 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
                     <span className="font-bold text-xs text-purple-300 flex items-center gap-1.5">
                       <span>{item.label}</span>
                       {activeDomain === item.domain && (
-                        <span className="text-[10px] bg-purple-600 text-white px-1.5 py-0.2 rounded-full font-bold animate-pulse">
+                        <span className="text-[9px] bg-purple-600 text-white px-1.5 py-0.2 rounded-full font-bold animate-pulse">
                           현재 감지됨
                         </span>
                       )}
                     </span>
-                    <span className="text-[10px] bg-purple-900/40 border border-purple-500/30 text-purple-300 px-2 py-0.5 rounded font-bold hover:bg-purple-600 hover:text-white transition">
+                    <span className="text-[9px] bg-purple-900/50 border border-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded font-bold hover:bg-purple-600 hover:text-white transition">
                       질문 전송 🚀
                     </span>
                   </div>
-                  <p className="text-[11px] leading-snug text-slate-200 mt-0.5">
+                  <p className="text-[11px] leading-snug text-slate-300 truncate w-full">
                     "{item.prompt}"
                   </p>
                 </button>
@@ -221,25 +249,25 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
           </div>
 
           {/* Simulated Tool Action Call Card */}
-          <div className="p-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-[11px] text-slate-400">도구 호출 테스트: "액션 트리거해줘"</span>
+          <div className="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-xs shrink-0">
+            <span className="text-[10px] text-slate-400">도구 호출: "액션 트리거"</span>
             <button
               type="button"
               onClick={() => handleToolCall('test_action_trigger', { actionName: 'InstantLabTest', timestamp: Date.now() })}
-              className="bg-indigo-900/60 hover:bg-indigo-800 text-indigo-300 border border-indigo-500/40 px-2.5 py-1 rounded-lg text-xs font-semibold transition"
+              className="bg-indigo-900/60 hover:bg-indigo-800 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition cursor-pointer"
             >
               ⚡ 도구 수동 실행
             </button>
           </div>
         </section>
 
-        {/* Right: Live WebRTC & Transcript Stream Console (lg:col-span-7) */}
-        <section className="lg:col-span-7 flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl min-h-0">
+        {/* Right: Live WebRTC & Transcript Stream Console (w-full md:w-7/12) */}
+        <section className="w-full md:w-7/12 h-[58%] md:h-full flex flex-col bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl min-h-0">
           
           {/* Status & Active Domain Bar */}
-          <div className="p-3 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+          <div className="p-2.5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${
+              <span className={`w-2 h-2 rounded-full ${
                 voiceStatus === 'connected' || voiceStatus === 'speaking' || voiceStatus === 'listening'
                   ? 'bg-emerald-400 animate-ping'
                   : voiceStatus === 'connecting'
@@ -247,74 +275,80 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
                   : 'bg-slate-600'
               }`} />
               <span className="text-xs font-bold text-white">
-                실시간 WebRTC 상태: <span className="text-purple-400 uppercase font-mono">{voiceStatus}</span>
+                WebRTC 상태: <span className="text-purple-400 uppercase font-mono">{voiceStatus}</span>
               </span>
             </div>
 
-            {activeDomain !== 'general' && DOMAIN_REGISTRY[activeDomain] && (
-              <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 animate-in fade-in">
-                <span>{DOMAIN_REGISTRY[activeDomain].icon}</span>
-                <span>{DOMAIN_REGISTRY[activeDomain].nameKo} 최적화 엔진 동작 중</span>
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-400">실시간 대화 로그 & 음성 자막 창</span>
+              <button
+                type="button"
+                onClick={() => setLogs([])}
+                className="text-[10px] text-slate-500 hover:text-slate-300 transition"
+              >
+                지우기
+              </button>
+            </div>
           </div>
 
           {/* Action Alert Banner */}
           {toolAlert && (
-            <div className="bg-emerald-950/90 border-b border-emerald-500/50 p-2.5 text-xs text-emerald-300 flex items-center justify-between animate-in slide-in-from-top duration-200">
-              <div className="flex items-center gap-2">
+            <div className="bg-emerald-950/90 border-b border-emerald-500/50 p-2 text-xs text-emerald-300 flex items-center justify-between animate-in slide-in-from-top duration-200 shrink-0">
+              <div className="flex items-center gap-1.5 truncate">
                 <span>⚡</span>
-                <span className="font-mono font-bold">{toolAlert}</span>
+                <span className="font-mono font-bold truncate">{toolAlert}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setToolAlert(null)}
-                className="text-emerald-400 text-xs font-bold"
+                className="text-emerald-400 text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
           )}
 
-          {/* Live Transcript & Log Console Feed */}
-          <div className="flex-1 p-3.5 overflow-y-auto space-y-2.5 font-mono text-xs bg-slate-950/60 scroll-smooth">
+          {/* Live Transcript & Log Console Feed (Always Visible & Auto-scrolled) */}
+          <div className="flex-1 p-3 overflow-y-auto space-y-2 text-xs bg-slate-950/70 scroll-smooth min-h-0">
             {logs.map(log => (
               <div
                 key={log.id}
                 className={`p-2.5 rounded-xl border leading-relaxed animate-in fade-in duration-150 ${
                   log.type === 'user'
-                    ? 'bg-purple-950/70 border-purple-500/50 text-purple-200'
+                    ? 'bg-purple-950/80 border-purple-500/60 text-purple-100 shadow-md'
                     : log.type === 'agent'
-                    ? 'bg-slate-900 border-slate-700 text-slate-100'
+                    ? 'bg-slate-800/90 border-slate-700 text-slate-100 shadow-md'
                     : log.type === 'domain'
-                    ? 'bg-indigo-950/80 border-indigo-500/60 text-indigo-300 font-bold'
+                    ? 'bg-indigo-950/90 border-indigo-500/60 text-indigo-300 font-bold'
                     : log.type === 'tool'
-                    ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 font-bold'
+                    ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-300 font-bold'
                     : log.type === 'error'
-                    ? 'bg-red-950/80 border-red-500/60 text-red-300'
-                    : 'bg-slate-950 border-slate-800 text-slate-400'
+                    ? 'bg-red-950/90 border-red-500/60 text-red-300'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400'
                 }`}
               >
-                <div className="flex items-center justify-between text-[10px] opacity-60 mb-1">
-                  <span>[{log.type.toUpperCase()}]</span>
+                <div className="flex items-center justify-between text-[9px] opacity-70 mb-1">
+                  <span className="font-bold">
+                    {log.type === 'user'
+                      ? '👤 나 (User)'
+                      : log.type === 'agent'
+                      ? '🤖 gpt-live-1'
+                      : log.type === 'domain'
+                      ? '🎯 도메인 엔진'
+                      : log.type.toUpperCase()}
+                  </span>
                   <span>{log.time}</span>
                 </div>
-                <div className="font-sans text-xs break-words">{log.content}</div>
+                <div className="font-sans text-xs break-words leading-relaxed">{log.content}</div>
               </div>
             ))}
             <div ref={logEndRef} />
           </div>
 
           {/* Console Footer */}
-          <div className="p-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-xs text-slate-500">
-            <span>OpenAI Realtime GA Engine (/v1/realtime/calls)</span>
-            <button
-              type="button"
-              onClick={() => setLogs([])}
-              className="hover:text-slate-300 transition text-[11px]"
-            >
-              🗑️ 로그 지우기 (Clear)
-            </button>
+          <div className="px-3 py-1.5 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-[10px] text-slate-500 shrink-0">
+            <span>OpenAI Realtime GA Engine (gpt-realtime /v1/realtime/calls)</span>
+            <span>마이크로 말하거나 좌측 질문을 클릭하세요</span>
           </div>
         </section>
       </main>

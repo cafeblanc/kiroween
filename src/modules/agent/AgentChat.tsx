@@ -25,6 +25,23 @@ const VOICE_TOOLS: VoiceToolDefinition[] = [
   }
 ];
 
+const speakKorean = (text: string) => {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.cancel();
+    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_]/g, '').trim();
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = 'ko-KR';
+    utter.rate = 1.05;
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang.startsWith('ko'));
+    if (koVoice) utter.voice = koVoice;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {
+    console.warn('TTS notice:', e);
+  }
+};
+
 export const AgentChat: React.FC<AgentChatProps> = ({
   lang,
   onTriggerAction,
@@ -148,6 +165,7 @@ If user wants to buy or order, call 'execute_instant_action'.`;
     } else if (detected.domain !== 'general') {
       const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, query, activeProduct?.name[lang] || activeProduct?.name.en);
       replyText = `🗣️ [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`;
+      speakKorean(expertAnswer);
     } else if (activeProduct) {
       replyText = `🤖 [실시간 방송 컨텍스트] 현재 방송 상품: ${activeProduct.name[lang] || activeProduct.name.en}. ${activeProduct.description[lang] || activeProduct.description.en}`;
     }
