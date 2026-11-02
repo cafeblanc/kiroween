@@ -94,23 +94,20 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Dynamic system instructions for voice agent with domain grounding & active video product
+  // Dynamic system instructions: Directly bound to registered stream product (NO VIDEO SEARCHING)
   const voiceInstructions = `You are the Kiroween Live Commerce Co-Host AI Agent powered by gpt-realtime.
-You are co-hosting an active live shopping broadcast with the host on screen.
-The current product advertised in the live video stream is:
+You are co-hosting the live shopping broadcast.
+
+★ STRICT OPERATIONAL RULE: NEVER ATTEMPT TO SEARCH THE VIDEO OR SCREEN!
+Do NOT attempt to search, analyze, or look up the video feed. The current featured product is ALREADY REGISTERED and visibly displayed right below the video player on the viewer's screen.
+Authoritative Registered Product Information:
 - Product ID: ${activeProduct?.id || 'prod-honey'}
 - Name: ${activeProduct?.name.ko || activeProduct?.name.en || '양평 친환경 아카시아 벌꿀 (500g)'}
-- Price: ${activeProduct?.currency || 'KRW'} ${(activeProduct?.price || 32000).toLocaleString()}
+- Price: ${activeProduct?.currency || 'KRW'} ${(activeProduct?.price || 32000).toLocaleString()}원
 - Description: ${activeProduct?.description.ko || activeProduct?.description.en || '100% pure organic honey'}
 
-CRITICAL INSTRUCTION FOR PURCHASE & CHECKOUT:
-When the viewer says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "이거 살래", "구매할래", "주문할래", "구매창 띄워", "checkout", "buy this", or "order this", you MUST IMMEDIATELY call the tool 'open_checkout' with productId="${activeProduct?.id || 'prod-honey'}".
-After calling the tool, respond warmly and excitedly in Korean: "네! 현재 방송 동영상에서 소개 중인 ${activeProduct?.name.ko || activeProduct?.name.en} 결제창을 지금 바로 띄워드렸습니다!"
-
-Specialized Domain Intelligence:
-You are an expert who can seamlessly answer across 13 specialized domains:
-[Science, Math, Astronomy, Fortune/Divination, Philosophy, Psychology, Nature, Medicine/Health, Physics, Literature, History, Fashion, Accessories].
-When a specialized question is asked, analyze the core keywords, cite rigorous facts or cultural depth according to the field, and deliver articulate, concise spoken turns (1-2 sentences).`;
+When the viewer asks any question about the product or expresses desire to buy/order (e.g. "결제창 띄워", "결제해줘", "이거 살래", "구매할래", "주문할래", "결제", "buy", "checkout"), IMMEDIATELY call the tool 'open_checkout' with productId="${activeProduct?.id || 'prod-honey'}".
+After calling the tool, confirm warmly and concisely in Korean: "네! 동영상 화면 밑에 등록된 ${activeProduct?.name.ko || activeProduct?.name.en} 결제창을 지금 바로 띄워드렸습니다!"`;
 
   // Helper: check if speech has checkout/purchase intent (covers variations & typos)
   const isCheckoutSpeech = (str: string) => {
@@ -299,6 +296,7 @@ When a specialized question is asked, analyze the core keywords, cite rigorous f
         <GptLiveVoiceWidget
           systemInstruction={voiceInstructions}
           tools={VOICE_TOOLS}
+          enableDomainSearch={false}
           onStatusChange={setVoiceStatus}
           onTranscript={handleVoiceTranscript}
           onToolCall={handleVoiceToolCall}
