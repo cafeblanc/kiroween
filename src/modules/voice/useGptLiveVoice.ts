@@ -1,0 +1,386 @@
+// Headless Hook for gpt-live WebRTC Full-Duplex Voice Engine
+// Pure standalone implementation with zero dependencies on domain business logic.
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { VoiceStatus, VoiceToolDefinition } from './types';
+
+export interface UseGptLiveVoiceOptions {
+  apiKey?: string;
+  systemInstruction: string;
+  model?: string;
+  voiceName?: string;
+  tools?: VoiceToolDefinition[];
+  onTranscript?: (sender: 'user' | 'agent', text: string) => void;
+  onToolCall?: (toolName: string, args: Record<string, any>) => Promise<any> | void;
+  onStatusChange?: (status: VoiceStatus) => void;
+  onError?: (error: string) => void;
+  onAudioLevel?: (level: number) => void;
+}
+
+export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
+  const [status, setStatus] = useState<VoiceStatus>('idle');
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const dcRef = useRef<RTCDataChannel | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameIdRef = useRef<number | null>(null);
+
+  // Keep options in a ref to avoid stale closures in WebRTC callbacks
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
+
+  const updateStatus = useCallback((newStatus: VoiceStatus) => {
+    setStatus(newStatus);
+    if (newStatus === 'disconnected' as any || newStatus === 'idle') {
+      setIsVoiceActive(false);
+    } else if (newStatus === 'connected' || newStatus === 'speaking' || newStatus === 'listening') {
+      setIsVoiceActive(true);
+    }
+    optionsRef.current.onStatusChange?.(newStatus);
+  }, []);
+
+  const reportError = useCallback((errText: string) => {
+    setError(errText);
+    updateStatus('error');
+    optionsRef.current.onError?.(errText);
+  }, [updateStatus]);
+
+  // Visualizer loop for real-time audio wave
+  const setupVisualizer = (stream: MediaStream) => {
+    try {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 64;
+      source.connect(analyserRef.current);
+
+      const buffer = new Uint8Array(analyserRef.current.frequencyBinCount);
+      const loop = () => {
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(buffer);
+          let sum = 0;
+          for (let i = 0; i < buffer.length; i++) sum += buffer[i];
+          const avg = sum / buffer.length;
+          setAudioLevel(avg);
+          optionsRef.current.onAudioLevel?.(avg);
+        }
+        animFrameIdRef.current = requestAnimationFrame(loop);
+      };
+      animFrameIdRef.current = requestAnimationFrame(loop);
+    } catch (e) {
+      console.warn('[useGptLiveVoice] Visualizer init notice:', e);
+    }
+  };
+
+  const stopVoice = useCallback(() => {
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+
+    if (dcRef.current) {
+      dcRef.current.close();
+      dcRef.current = null;
+    }
+
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
+    }
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current = null;
+    }
+
+    setAudioLevel(0);
+    setIsVoiceActive(false);
+    updateStatus('idle');
+  }, [updateStatus]);
+
+  const startVoice = useCallback(async (explicitKey?: string): Promise<boolean> => {
+    try {
+      setError(null);
+      updateStatus('connecting');
+
+      const targetKey = (explicitKey || optionsRef.current.apiKey || localStorage.getItem('kiroween_openai_api_key') || '').trim();
+
+      if (!targetKey) {
+        throw new Error('OpenAI API Key가 설정되지 않았습니다. API 키를 입력해주세요.');
+      }
+
+      // 1. Capture user microphone
+      try {
+        localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      } catch (mediaErr: any) {
+        if (mediaErr?.name === 'NotAllowedError' || mediaErr?.message?.toLowerCase().includes('permission')) {
+          throw new Error('브라우저 마이크 권한이 차단되었습니다 (Permission denied). 크롬 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 [마이크] 권한을 [허용]으로 변경해주세요.');
+        }
+        throw new Error('마이크 장치 접근 실패: ' + (mediaErr?.message || '마이크 장치를 찾을 수 없습니다.'));
+      }
+
+      // 2. Setup frequency analyser
+      setupVisualizer(localStreamRef.current);
+
+      // 3. Initialize WebRTC PeerConnection
+      pcRef.current = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      remoteAudioRef.current = new Audio();
+      remoteAudioRef.current.autoplay = true;
+
+      pcRef.current.ontrack = (event) => {
+        if (remoteAudioRef.current && event.streams[0]) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+
+      for (const track of localStreamRef.current.getAudioTracks()) {
+        pcRef.current.addTrack(track, localStreamRef.current);
+      }
+
+      // 4. Create DataChannel
+      dcRef.current = pcRef.current.createDataChannel('oai-events');
+      setupDataChannel(dcRef.current, optionsRef.current);
+
+      // 5. Create local SDP Offer
+      const offer = await pcRef.current.createOffer();
+      await pcRef.current.setLocalDescription(offer);
+
+      // 6. Request Ephemeral Client Secret or GA Calls
+      let activeBearer = targetKey;
+      try {
+        const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${targetKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            session: {
+              type: 'realtime',
+              model: optionsRef.current.model || 'gpt-4o-realtime-preview',
+              voice: optionsRef.current.voiceName || 'verse'
+            }
+          })
+        });
+
+        if (secretRes.ok) {
+          const secretData = await secretRes.json();
+          const token = secretData.value || secretData.client_secret?.value;
+          if (token) activeBearer = token;
+        } else if (secretRes.status === 401) {
+          throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): API 키가 올바른지 확인해주세요.');
+        } else if (secretRes.status === 403) {
+          throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 접근 권한이 없거나 제한된 Project 키입니다.');
+        } else if (secretRes.status === 429) {
+          throw new Error('OpenAI 크레딧 부족 또는 요청 제한 (429 Rate Limit/Quota Exceeded): OpenAI 유료 크레딧 잔액을 확인해주세요.');
+        }
+      } catch (tokenErr: any) {
+        if (tokenErr.message?.includes('401') || tokenErr.message?.includes('403') || tokenErr.message?.includes('429')) {
+          throw tokenErr;
+        }
+        console.warn('[useGptLiveVoice] Proceeding with direct call token:', tokenErr);
+      }
+
+      // 7. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      const sdpResponse = await fetch(gaCallsUrl, {
+        method: 'POST',
+        body: offer.sdp,
+        headers: {
+          Authorization: `Bearer ${activeBearer}`,
+          'Content-Type': 'application/sdp'
+        }
+      });
+
+      if (!sdpResponse.ok) {
+        const errorText = await sdpResponse.text();
+        if (sdpResponse.status === 401) {
+          throw new Error('OpenAI 인증 실패 (401 Unauthorized): API 키가 올바른지 확인하세요.');
+        } else if (sdpResponse.status === 403) {
+          throw new Error('OpenAI 권한 거부 (403 Permission denied): Realtime 모델 권한이 없는 API 키입니다.');
+        } else if (sdpResponse.status === 429) {
+          throw new Error('OpenAI 크레딧 부족 (429 Too Many Requests): 계정의 유료 크레딧을 확인하세요.');
+        } else {
+          try {
+            const parsed = JSON.parse(errorText);
+            throw new Error(`OpenAI Realtime 연결 오류 (${sdpResponse.status}): ${parsed.error?.message || errorText}`);
+          } catch (_) {
+            throw new Error(`OpenAI Realtime 연결 오류 (${sdpResponse.status}): ${errorText.slice(0, 150)}`);
+          }
+        }
+      }
+
+      const answerSdp = await sdpResponse.text();
+      const answer: RTCSessionDescriptionInit = {
+        type: 'answer',
+        sdp: answerSdp
+      };
+
+      await pcRef.current.setRemoteDescription(answer);
+      updateStatus('connected');
+      return true;
+    } catch (err: any) {
+      console.error('[useGptLiveVoice] Connection error:', err);
+      const msg = err?.message || '실시간 음성 연결에 실패했습니다.';
+      reportError(msg);
+      stopVoice();
+      return false;
+    }
+  }, [reportError, stopVoice, updateStatus]);
+
+  // DataChannel configuration and event router
+  const setupDataChannel = (dc: RTCDataChannel, currentOpts: UseGptLiveVoiceOptions) => {
+    dc.onopen = () => {
+      console.log('[useGptLiveVoice] DataChannel opened, sending session config');
+
+      const toolsPayload = (currentOpts.tools || []).map(t => ({
+        type: 'function',
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters
+      }));
+
+      const sessionConfig = {
+        type: 'session.update',
+        session: {
+          modalities: ['audio', 'text'],
+          instructions: currentOpts.systemInstruction,
+          voice: currentOpts.voiceName || 'verse',
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: {
+            model: 'whisper-1'
+          },
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 400
+          },
+          tools: toolsPayload,
+          tool_choice: 'auto'
+        }
+      };
+
+      dc.send(JSON.stringify(sessionConfig));
+    };
+
+    dc.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+
+        switch (msg.type) {
+          // Native Barge-in
+          case 'input_audio_buffer.speech_started':
+            updateStatus('listening');
+            break;
+
+          case 'input_audio_buffer.speech_stopped':
+            updateStatus('connected');
+            break;
+
+          // Transcripts
+          case 'conversation.item.input_audio_transcription.completed':
+            if (msg.transcript) {
+              optionsRef.current.onTranscript?.('user', msg.transcript);
+            }
+            break;
+
+          case 'response.audio_transcript.done':
+          case 'response.output_text.done':
+            if (msg.transcript || msg.text) {
+              optionsRef.current.onTranscript?.('agent', msg.transcript || msg.text);
+            }
+            break;
+
+          // Audio states
+          case 'response.audio.delta':
+          case 'response.output_audio.delta':
+            updateStatus('speaking');
+            break;
+
+          case 'response.audio.done':
+          case 'response.output_audio.done':
+          case 'response.done':
+            updateStatus('listening');
+            break;
+
+          // Function Tool Calling
+          case 'response.function_call_arguments.done':
+            try {
+              const args = JSON.parse(msg.arguments || '{}');
+              optionsRef.current.onToolCall?.(msg.name, args);
+
+              dc.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'function_call_output',
+                  call_id: msg.call_id,
+                  output: JSON.stringify({ success: true })
+                }
+              }));
+
+              dc.send(JSON.stringify({ type: 'response.create' }));
+            } catch (fnErr) {
+              console.error('[useGptLiveVoice] Tool parsing failed:', fnErr);
+            }
+            break;
+
+          case 'error':
+            console.error('[useGptLiveVoice] Server error event:', msg.error);
+            optionsRef.current.onError?.(msg.error?.message || 'Server error event');
+            break;
+        }
+      } catch (parseErr) {
+        console.warn('[useGptLiveVoice] JSON parse notice:', event.data);
+      }
+    };
+
+    dc.onclose = () => {
+      stopVoice();
+    };
+  };
+
+  useEffect(() => {
+    return () => {
+      stopVoice();
+    };
+  }, [stopVoice]);
+
+  return {
+    status,
+    isVoiceActive,
+    error,
+    audioLevel,
+    startVoice,
+    stopVoice,
+    setError
+  };
+}
