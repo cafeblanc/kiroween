@@ -1,6 +1,6 @@
-// gpt-live-1 WebRTC Realtime API Client for Kiroween Live Commerce
+// gpt-live-1 WebRTC Realtime API (GA endpoint /v1/realtime/calls)
 // Provides: Full-Duplex Simultaneous Listen-and-Speak, Native Server VAD,
-// Instant Barge-in (Interruption), WebRTC Acoustic Echo Cancellation,
+// Instant Barge-in (Interruption), WebRTC Hardware Echo Cancellation,
 // and In-Stream Action Tool Calling.
 
 export interface GptLiveCallbacks {
@@ -34,7 +34,7 @@ export class GptLiveService {
     try {
       this.callbacks.onStatusChange('connecting');
 
-      // 1. Get User Media with WebRTC hardware echo cancellation
+      // 1. Check & Acquire Microphone stream with browser hardware AEC
       try {
         this.localStream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -45,7 +45,7 @@ export class GptLiveService {
         });
       } catch (mediaErr: any) {
         if (mediaErr?.name === 'NotAllowedError' || mediaErr?.message?.toLowerCase().includes('permission')) {
-          throw new Error('브라우저 마이크 권한이 차단되었습니다 (Permission denied). 브라우저 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 마이크 권한을 [허용]으로 변경한 후 다시 시도해주세요.');
+          throw new Error('브라우저 마이크 권한이 차단되었습니다 (Permission denied). 크롬 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 [마이크] 권한을 [허용]으로 변경해주세요.');
         }
         throw new Error('마이크 장치 접근 실패: ' + (mediaErr?.message || '장치를 확인할 수 없습니다.'));
       }
@@ -58,7 +58,7 @@ export class GptLiveService {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
 
-      // Setup remote audio playback
+      // Remote audio playback
       this.remoteAudio = new Audio();
       this.remoteAudio.autoplay = true;
 
@@ -73,57 +73,77 @@ export class GptLiveService {
         this.pc.addTrack(track, this.localStream);
       }
 
-      // 4. Create DataChannel for events and function calls
+      // 4. Create DataChannel for events and tool calls
       this.dc = this.pc.createDataChannel('oai-events');
       this.setupDataChannel(instructions, featuredProductId);
 
-      // 5. Create SDP Offer
+      // 5. Create local SDP Offer
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
 
-      // 6. Connect to OpenAI Realtime Endpoint via Vite Proxy (/api/openai) to bypass browser CORS
-      // First try to obtain an ephemeral token from sessions endpoint
+      // 6. Authenticate with OpenAI GA Realtime API
+      // Try generating ephemeral client secret first via /v1/realtime/client_secrets or /v1/realtime/sessions
       let activeBearer = apiKey.trim();
+
       try {
-        const sessionRes = await fetch('/api/openai/v1/realtime/sessions', {
+        // Attempt 1: /v1/realtime/client_secrets (GA endpoint)
+        const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${activeBearer}`,
+            Authorization: `Bearer ${apiKey.trim()}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'gpt-4o-realtime-preview',
-            voice: 'verse'
+            session: {
+              type: 'realtime',
+              model: 'gpt-4o-realtime-preview',
+              voice: 'verse'
+            }
           })
         });
 
-        if (sessionRes.ok) {
-          const sessionData = await sessionRes.json();
-          if (sessionData.client_secret?.value) {
-            activeBearer = sessionData.client_secret.value;
-            console.log('[gpt-live-1] Ephemeral session token obtained successfully');
+        if (secretRes.ok) {
+          const secretData = await secretRes.json();
+          const token = secretData.value || secretData.client_secret?.value;
+          if (token) {
+            activeBearer = token;
+            console.log('[gpt-live-1 GA] Ephemeral client_secret obtained successfully');
           }
+        } else if (secretRes.status === 401) {
+          throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): API 키가 올바른지 확인해주세요.');
+        } else if (secretRes.status === 403) {
+          throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 접근 권한이 없거나 제한된 Project 키입니다. platform.openai.com에서 Realtime 권한이 부여된 키인지 확인하세요.');
+        } else if (secretRes.status === 429) {
+          throw new Error('OpenAI 크레딧 부족 또는 요청 제한 (429 Rate Limit/Quota Exceeded): OpenAI 유료 크레딧 잔액을 확인해주세요.');
         } else {
-          const errData = await sessionRes.text();
-          console.warn('[gpt-live-1] Ephemeral session notice:', sessionRes.status, errData);
-          if (sessionRes.status === 401) {
-            throw new Error('OpenAI API 키가 올바르지 않습니다 (401 Unauthorized). 키를 다시 확인해주세요.');
-          } else if (sessionRes.status === 403) {
-            throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 권한이 없거나 제한된 Project 키입니다. platform.openai.com에서 Realtime 권한이 켜진 키인지 확인해주세요.');
-          } else if (sessionRes.status === 429) {
-            throw new Error('OpenAI API 사용량 한도 초과 또는 잔여 크레딧 부족 (429 Rate Limit/Quota Exceeded). 계정 크레딧을 확인해주세요.');
+          // Attempt 2 fallback: /v1/realtime/sessions
+          const sessionRes = await fetch('/api/openai/v1/realtime/sessions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey.trim()}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-realtime-preview',
+              voice: 'verse'
+            })
+          });
+          if (sessionRes.ok) {
+            const sessionData = await sessionRes.json();
+            const token = sessionData.client_secret?.value || sessionData.value;
+            if (token) activeBearer = token;
           }
         }
       } catch (tokenErr: any) {
-        if (tokenErr.message?.includes('401') || tokenErr.message?.includes('429')) {
+        if (tokenErr.message?.includes('401') || tokenErr.message?.includes('403') || tokenErr.message?.includes('429')) {
           throw tokenErr;
         }
-        console.warn('[gpt-live-1] Direct proxy fallback:', tokenErr);
+        console.warn('[gpt-live-1 GA] Client secret creation notice, proceeding to direct call:', tokenErr);
       }
 
-      // Send SDP Offer to Realtime WebRTC endpoint through local proxy
-      const sdpUrl = '/api/openai/v1/realtime?model=gpt-4o-realtime-preview';
-      const sdpResponse = await fetch(sdpUrl, {
+      // 7. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      const sdpResponse = await fetch(gaCallsUrl, {
         method: 'POST',
         body: offer.sdp,
         headers: {
@@ -134,12 +154,21 @@ export class GptLiveService {
 
       if (!sdpResponse.ok) {
         const errorText = await sdpResponse.text();
+        console.error('[gpt-live-1 GA Calls failed]:', sdpResponse.status, errorText);
+
         if (sdpResponse.status === 401) {
-          throw new Error('OpenAI 인증 실패 (401 Unauthorized): API 키 권한 또는 Realtime API 활성 여부를 확인하세요.');
+          throw new Error('OpenAI 인증 실패 (401 Unauthorized): API 키가 올바른지 확인하세요.');
+        } else if (sdpResponse.status === 403) {
+          throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime 모델 권한이 없습니다.');
         } else if (sdpResponse.status === 429) {
-          throw new Error('OpenAI 크레딧 부족 또는 요청 제한 (429 Too Many Requests): 계정에 사용 가능한 결제 크레딧이 있는지 확인하세요.');
+          throw new Error('OpenAI 크레딧 부족 (429 Too Many Requests): 계정에 유료 크레딧 잔액이 있는지 확인하세요.');
         } else {
-          throw new Error(`OpenAI Realtime 연결 오류 (${sdpResponse.status}): ${errorText.slice(0, 150)}`);
+          try {
+            const parsed = JSON.parse(errorText);
+            throw new Error(`OpenAI Realtime 연결 오류 (${sdpResponse.status}): ${parsed.error?.message || errorText}`);
+          } catch (_) {
+            throw new Error(`OpenAI Realtime 연결 오류 (${sdpResponse.status}): ${errorText.slice(0, 150)}`);
+          }
         }
       }
 
@@ -154,7 +183,7 @@ export class GptLiveService {
       this.callbacks.onStatusChange('connected');
       return true;
     } catch (err: any) {
-      console.error('[gpt-live-1] Connection error:', err);
+      console.error('[gpt-live-1 GA] Final Connection Error:', err);
       const msg = err?.message || 'Failed to connect to gpt-live-1';
       this.callbacks.onError(msg);
       this.callbacks.onStatusChange('error');
@@ -167,15 +196,14 @@ export class GptLiveService {
     if (!this.dc) return;
 
     this.dc.onopen = () => {
-      console.log('[gpt-live-1] DataChannel opened, sending session configuration');
+      console.log('[gpt-live-1 GA] DataChannel opened, configuring session');
 
-      // Configure session with Server VAD and In-stream Action Tool
       const sessionConfig = {
         type: 'session.update',
         session: {
           modalities: ['audio', 'text'],
           instructions: instructions,
-          voice: 'verse', // warm, natural conversational voice
+          voice: 'verse',
           input_audio_format: 'pcm16',
           output_audio_format: 'pcm16',
           input_audio_transcription: {
@@ -220,25 +248,24 @@ export class GptLiveService {
         const msg = JSON.parse(event.data);
         this.handleServerEvent(msg);
       } catch (e) {
-        console.warn('[gpt-live-1] Failed to parse message:', event.data);
+        console.warn('[gpt-live-1 GA] Message parse notice:', event.data);
       }
     };
 
     this.dc.onerror = (err) => {
-      console.error('[gpt-live-1] DataChannel error:', err);
+      console.error('[gpt-live-1 GA] DataChannel error:', err);
     };
 
     this.dc.onclose = () => {
-      console.log('[gpt-live-1] DataChannel closed');
+      console.log('[gpt-live-1 GA] DataChannel closed');
       this.callbacks.onStatusChange('disconnected');
     };
   }
 
   private handleServerEvent(msg: any) {
     switch (msg.type) {
-      // 1. User started speaking -> Native Barge-in (agent cuts off automatically)
+      // 1. User started speaking -> Native Barge-in
       case 'input_audio_buffer.speech_started':
-        console.log('[gpt-live-1] User speech detected (Barge-in active)');
         this.callbacks.onStatusChange('listening');
         break;
 
@@ -246,7 +273,7 @@ export class GptLiveService {
         this.callbacks.onStatusChange('connected');
         break;
 
-      // 2. Transcriptions
+      // 2. Transcriptions (Supports GA & Beta formats)
       case 'conversation.item.input_audio_transcription.completed':
         if (msg.transcript) {
           this.callbacks.onTranscript('user', msg.transcript);
@@ -254,29 +281,31 @@ export class GptLiveService {
         break;
 
       case 'response.audio_transcript.done':
-        if (msg.transcript) {
-          this.callbacks.onTranscript('agent', msg.transcript);
+      case 'response.output_text.done':
+        if (msg.transcript || msg.text) {
+          this.callbacks.onTranscript('agent', msg.transcript || msg.text);
         }
         break;
 
-      // 3. Agent Audio Speaking State
+      // 3. Audio speaking state
       case 'response.audio.delta':
+      case 'response.output_audio.delta':
         this.callbacks.onStatusChange('speaking');
         break;
 
       case 'response.audio.done':
+      case 'response.output_audio.done':
       case 'response.done':
         this.callbacks.onStatusChange('listening');
         break;
 
       // 4. In-Stream Action Tool Calling
       case 'response.function_call_arguments.done':
-        console.log('[gpt-live-1] Tool call received:', msg.name, msg.arguments);
+        console.log('[gpt-live-1 GA] Function call arguments received:', msg.name, msg.arguments);
         try {
           const args = JSON.parse(msg.arguments || '{}');
           this.callbacks.onToolCall(msg.name, args);
 
-          // Respond to tool call
           this.sendEvent({
             type: 'conversation.item.create',
             item: {
@@ -286,16 +315,15 @@ export class GptLiveService {
             }
           });
 
-          // Trigger continuation
           this.sendEvent({ type: 'response.create' });
         } catch (e) {
-          console.error('[gpt-live-1] Tool call parsing failed:', e);
+          console.error('[gpt-live-1 GA] Function call parse failed:', e);
         }
         break;
 
       case 'error':
-        console.error('[gpt-live-1] Server error:', msg.error);
-        this.callbacks.onError(msg.error?.message || 'Server error received');
+        console.error('[gpt-live-1 GA] Server error event:', msg.error);
+        this.callbacks.onError(msg.error?.message || 'Server error event received');
         break;
     }
   }
@@ -306,7 +334,6 @@ export class GptLiveService {
     }
   }
 
-  // Setup Web Audio Analyser for smooth waveform rendering
   private setupVisualizer(stream: MediaStream) {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -328,7 +355,7 @@ export class GptLiveService {
       };
       this.animFrameId = requestAnimationFrame(loop);
     } catch (e) {
-      console.warn('[gpt-live-1] Visualizer init failed:', e);
+      console.warn('[gpt-live-1 GA] Visualizer setup notice:', e);
     }
   }
 
