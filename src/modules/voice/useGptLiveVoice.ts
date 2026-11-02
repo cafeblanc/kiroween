@@ -209,29 +209,29 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       const primaryModel = optionsRef.current.model || 'gpt-realtime';
       const voice = optionsRef.current.voiceName || 'alloy';
       let activeBearer = targetKey;
-      let usedEphemeral = false;
 
       try {
-        const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
+        const secretRes = await fetch('/api/openai/v1/realtime/sessions', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${targetKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            session: {
-              type: 'realtime',
-              model: primaryModel
+            model: primaryModel,
+            voice: voice,
+            modalities: ['audio', 'text'],
+            input_audio_transcription: {
+              model: 'whisper-1'
             }
           })
         });
 
         if (secretRes.ok) {
           const secretData = await secretRes.json();
-          const token = secretData.value || secretData.client_secret?.value;
+          const token = secretData.client_secret?.value || secretData.value;
           if (token) {
             activeBearer = token;
-            usedEphemeral = true;
             console.log('[useGptLiveVoice] Ephemeral token acquired successfully:', token.slice(0, 10) + '...');
           }
         } else if (secretRes.status === 401) {
@@ -248,22 +248,8 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         console.warn('[useGptLiveVoice] Direct call token fallback notice:', tokenErr);
       }
 
-      // 6. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
-      const gaCallsUrl = '/api/openai/v1/realtime/calls';
-      let sdpResponse: Response;
-
-      if (usedEphemeral) {
-        // Ephemeral token already bound to session; send SDP offer directly
-        sdpResponse = await fetch(gaCallsUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${activeBearer}`,
-            'Content-Type': 'application/sdp'
-          },
-          body: offer.sdp
-        });
-      } else {
-        // Direct master key call: send multipart/form-data with sdp and session
+      // 6. Send Multipart/form-data SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      const createMultipartBody = (targetModel: string) => {
         const formData = new FormData();
         formData.append('sdp', new Blob([offer.sdp || ''], { type: 'application/sdp' }));
         formData.append(
@@ -272,22 +258,44 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
             [
               JSON.stringify({
                 type: 'realtime',
-                model: primaryModel,
+                model: targetModel,
                 instructions: optionsRef.current.systemInstruction || 'You are an intelligent voice assistant.',
-                voice: voice
+                voice: voice,
+                modalities: ['audio', 'text'],
+                input_audio_transcription: {
+                  model: 'whisper-1'
+                }
               })
             ],
             { type: 'application/json' }
           )
         );
+        return formData;
+      };
 
-        sdpResponse = await fetch(gaCallsUrl, {
+      const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      let sdpResponse = await fetch(gaCallsUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeBearer}`
+        },
+        body: createMultipartBody(primaryModel)
+      });
+
+      // Model fallback: if current model fails with 400 or 404, fallback to alternative realtime model
+      if (!sdpResponse.ok && (sdpResponse.status === 400 || sdpResponse.status === 404)) {
+        const fallbackModel = primaryModel === 'gpt-realtime' ? 'gpt-4o-realtime-preview' : 'gpt-realtime';
+        console.log(`[useGptLiveVoice] Retrying with ${fallbackModel} fallback...`);
+        const retryRes = await fetch(gaCallsUrl, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${activeBearer}`
           },
-          body: formData
+          body: createMultipartBody(fallbackModel)
         });
+        if (retryRes.ok) {
+          sdpResponse = retryRes;
+        }
       }
 
       if (!sdpResponse.ok) {
@@ -377,9 +385,9 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
           },
           turn_detection: {
             type: 'server_vad',
-            threshold: 0.65,
+            threshold: 0.5,
             prefix_padding_ms: 300,
-            silence_duration_ms: 600
+            silence_duration_ms: 500
           },
           tools: toolsPayload,
           tool_choice: 'auto'
@@ -390,8 +398,8 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
     };
 
     let pendingAgentText = '';
-    let lastEmittedAgentText = '';
-    let lastEmittedUserText = '';
+    let currentResponseEmitted = false;
+    let lastUserItemId = '';
 
     dc.onmessage = async (event) => {
       try {
@@ -406,20 +414,39 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             updateStatus('connected');
             break;
 
-          // User Speech Transcription with Immediate Domain Analysis & Deduplication
-          case 'conversation.item.input_audio_transcription.completed':
-            if (msg.transcript && msg.transcript.trim()) {
-              const cleanText = msg.transcript.trim();
-              if (cleanText !== lastEmittedUserText) {
-                lastEmittedUserText = cleanText;
-                const detected = DomainKnowledgeRouter.detectDomain(cleanText);
+          // User Speech Transcription:
+          case 'conversation.item.input_audio_transcription.completed': {
+            const userText = (msg.transcript || '').trim();
+            if (userText && msg.item_id !== lastUserItemId) {
+              lastUserItemId = msg.item_id;
+              const detected = DomainKnowledgeRouter.detectDomain(userText);
+              setActiveDomain(detected.domain);
+              if (detected.domain !== 'general') {
+                optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, userText);
+              }
+              optionsRef.current.onTranscript?.('user', userText, detected.domain);
+            }
+            break;
+          }
+
+          // Conversation item created (fallback for user transcription or system messages)
+          case 'conversation.item.created': {
+            if (msg.item?.role === 'user' && msg.item?.id && msg.item.id !== lastUserItemId) {
+              const audioContent = msg.item.content?.find((c: any) => c.type === 'input_audio' && c.transcript);
+              if (audioContent?.transcript?.trim()) {
+                lastUserItemId = msg.item.id;
+                const userText = audioContent.transcript.trim();
+                const detected = DomainKnowledgeRouter.detectDomain(userText);
                 setActiveDomain(detected.domain);
-                if (detected.domain !== 'general') {
-                  optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, cleanText);
-                }
-                optionsRef.current.onTranscript?.('user', cleanText, detected.domain);
+                optionsRef.current.onTranscript?.('user', userText, detected.domain);
               }
             }
+            break;
+          }
+
+          case 'response.created':
+            currentResponseEmitted = false;
+            pendingAgentText = '';
             break;
 
           // Agent Answer Transcription Streaming
@@ -437,11 +464,51 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
           case 'response.output_text.done':
           case 'response.text.done': {
             const agentAnswer = (msg.transcript || msg.text || pendingAgentText).trim();
-            if (agentAnswer && agentAnswer !== lastEmittedAgentText) {
-              lastEmittedAgentText = agentAnswer;
+            if (agentAnswer && !currentResponseEmitted) {
+              currentResponseEmitted = true;
               optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
             }
             pendingAgentText = '';
+            break;
+          }
+
+          // Safety net 1: output_item.done
+          case 'response.output_item.done': {
+            if (!currentResponseEmitted && msg.item?.role === 'assistant' && msg.item?.content) {
+              const part = msg.item.content.find((c: any) => c.transcript || c.text);
+              const agentAnswer = (part?.transcript || part?.text || pendingAgentText).trim();
+              if (agentAnswer) {
+                currentResponseEmitted = true;
+                optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
+                pendingAgentText = '';
+              }
+            }
+            break;
+          }
+
+          // Safety net 2: response.done
+          case 'response.done': {
+            if (!currentResponseEmitted && msg.response?.output) {
+              for (const outItem of msg.response.output) {
+                if (outItem.role === 'assistant' && outItem.content) {
+                  const part = outItem.content.find((c: any) => c.transcript || c.text);
+                  const agentAnswer = (part?.transcript || part?.text || pendingAgentText).trim();
+                  if (agentAnswer) {
+                    currentResponseEmitted = true;
+                    optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
+                    pendingAgentText = '';
+                    break;
+                  }
+                }
+              }
+            }
+            // Re-enable local mic immediately when AI finishes speaking so user can respond naturally
+            if (localStreamRef.current) {
+              localStreamRef.current.getAudioTracks().forEach(t => {
+                if (!t.enabled) t.enabled = true;
+              });
+            }
+            updateStatus('listening');
             break;
           }
 
@@ -459,7 +526,6 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
 
           case 'response.audio.done':
           case 'response.output_audio.done':
-          case 'response.done':
             // Re-enable local mic immediately when AI finishes speaking so user can respond naturally
             if (localStreamRef.current) {
               localStreamRef.current.getAudioTracks().forEach(t => {
@@ -534,6 +600,36 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
     };
   }, [stopVoice]);
 
+  const sendTextMessage = useCallback((text: string): boolean => {
+    if (!text.trim()) return false;
+    const cleanText = text.trim();
+    const detected = DomainKnowledgeRouter.detectDomain(cleanText);
+    setActiveDomain(detected.domain);
+    if (detected.domain !== 'general') {
+      optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, cleanText);
+    }
+    optionsRef.current.onTranscript?.('user', cleanText, detected.domain);
+
+    if (dcRef.current && dcRef.current.readyState === 'open') {
+      dcRef.current.send(JSON.stringify({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: cleanText
+            }
+          ]
+        }
+      }));
+      dcRef.current.send(JSON.stringify({ type: 'response.create' }));
+      return true;
+    }
+    return false;
+  }, []);
+
   return {
     status,
     isVoiceActive,
@@ -542,6 +638,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
     activeDomain,
     startVoice,
     stopVoice,
+    sendTextMessage,
     setError
   };
 }

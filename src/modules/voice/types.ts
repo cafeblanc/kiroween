@@ -76,3 +76,11 @@ export interface GptLiveVoiceOutCallbacks {
 }
 
 export type GptLiveVoiceWidgetProps = GptLiveVoiceInProps & GptLiveVoiceOutCallbacks;
+
+export interface GptLiveVoiceWidgetHandle {
+  startVoice: (key?: string) => Promise<boolean>;
+  stopVoice: () => void;
+  sendTextMessage: (text: string) => boolean;
+  isVoiceActive: boolean;
+  status: VoiceStatus;
+}

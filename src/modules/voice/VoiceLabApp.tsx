@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
 import { DomainCategory, DOMAIN_REGISTRY, DomainMeta, DomainKnowledgeRouter } from './domainRouter';
-import { VoiceStatus, VoiceToolDefinition } from './types';
+import { VoiceStatus, VoiceToolDefinition, GptLiveVoiceWidgetHandle } from './types';
 
 interface VoiceLabAppProps {
   onBackToMain?: () => void;
@@ -84,8 +84,10 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
   const [activeDomain, setActiveDomain] = useState<DomainCategory>('general');
   const [toolAlert, setToolAlert] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState('');
 
   const logEndRef = useRef<HTMLDivElement | null>(null);
+  const voiceWidgetRef = useRef<GptLiveVoiceWidgetHandle | null>(null);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -117,26 +119,34 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
       addLog('user', `나(User): "${text}"`);
     } else {
       const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
-      addLog('agent', `gpt-live: ${domText}${text}`);
+      addLog('agent', `gpt-realtime: ${domText}${text}`);
     }
   };
 
   const handleDomainDetected = (domain: DomainCategory, meta: DomainMeta, query: string) => {
     setActiveDomain(domain);
-    addLog('domain', `🎯 [분야 자동 감지]: ${meta.icon} ${meta.nameKo} (${meta.nameEn}) - 핵심어 분석 완료: "${query}" (최적화 답변 준비 중...)`);
+    addLog('domain', `🎯 [분야 자동 감지]: ${meta.icon} ${meta.nameKo} (${meta.nameEn}) - 핵심어 분석 완료: "${query}"`);
   };
 
   const handleSimulateQuestion = (prompt: string) => {
     addLog('user', `나(User): "${prompt}"`);
     const detected = DomainKnowledgeRouter.detectDomain(prompt);
     setActiveDomain(detected.domain);
-    addLog('domain', `🎯 [파악된 분야]: ${detected.meta.icon} ${detected.meta.nameKo} - 질문 핵심어 자동 분리 완료 (답변 생성 중...)`);
+    addLog('domain', `🎯 [파악된 분야]: ${detected.meta.icon} ${detected.meta.nameKo} - 질문 분석 완료`);
 
     const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, prompt);
     setTimeout(() => {
-      addLog('agent', `gpt-live: [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`);
+      addLog('agent', `gpt-realtime: [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`);
       speakKorean(expertAnswer);
     }, 250);
+  };
+
+  const handleQuestionClick = (prompt: string) => {
+    if (voiceWidgetRef.current?.isVoiceActive) {
+      voiceWidgetRef.current.sendTextMessage(prompt);
+    } else {
+      handleSimulateQuestion(prompt);
+    }
   };
 
   const handleToolCall = (toolName: string, args: Record<string, any>) => {
@@ -159,7 +169,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
           <span className="text-xl">🎙️</span>
           <div>
             <h1 className="text-xs sm:text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400">
-              gpt-live-1 음성 대화 랩 (Voice Lab)
+              gpt-realtime 음성 대화 랩 (Voice Lab)
             </h1>
             <p className="text-[10px] text-slate-400">
               실시간 WebRTC Full-Duplex · 20개 전문 도메인 자동 분석 & 양방향 자막 검증
@@ -191,12 +201,17 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
 
           {/* Standalone Voice Widget Injected */}
           <GptLiveVoiceWidget
-            systemInstruction="You are an omni-expert AI voice consultant in a standalone test lab. You answer questions across science, math, astronomy, fortune, philosophy, psychology, nature, medicine, physics, literature, history, fashion, and accessories with high intellectual depth, clarity, and lively spoken turns. Call test_action_trigger when requested."
+            ref={voiceWidgetRef}
+            systemInstruction="You are an omni-expert AI voice consultant in a standalone test lab powered by gpt-realtime. You answer questions across science, math, astronomy, fortune, philosophy, psychology, nature, medicine, physics, literature, history, fashion, and accessories with high intellectual depth, clarity, and lively spoken turns. Call test_action_trigger when requested."
             tools={TEST_TOOLS}
             enableDomainSearch={true}
             onStatusChange={status => {
               setVoiceStatus(status);
-              addLog('info', `상태 변경: ${status}`);
+              if (status === 'connected') {
+                addLog('info', '✅ gpt-realtime WebRTC 음성 세션이 연결되었습니다. 마이크로 말씀하시거나 질문을 전송하세요.');
+              } else if (status === 'idle') {
+                addLog('info', '⏹️ gpt-realtime 세션이 종료되었습니다.');
+              }
             }}
             onTranscript={handleTranscript}
             onDomainDetected={handleDomainDetected}
@@ -229,7 +244,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
                 <button
                   key={item.domain}
                   type="button"
-                  onClick={() => handleSimulateQuestion(item.prompt)}
+                  onClick={() => handleQuestionClick(item.prompt)}
                   className={`p-2 rounded-xl border text-left transition flex flex-col gap-0.5 cursor-pointer w-full hover:scale-[1.01] active:scale-[0.99] ${
                     activeDomain === item.domain
                       ? 'bg-purple-950/90 border-purple-400 text-white ring-2 ring-purple-400/50 shadow-lg'
@@ -341,7 +356,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
                     {log.type === 'user'
                       ? '👤 나 (User)'
                       : log.type === 'agent'
-                      ? '🤖 gpt-live-1'
+                      ? '🤖 gpt-realtime'
                       : log.type === 'domain'
                       ? '🎯 도메인 엔진'
                       : log.type.toUpperCase()}
@@ -353,6 +368,37 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
             ))}
             <div ref={logEndRef} />
           </div>
+
+          {/* Text Question Input Bar for gpt-realtime */}
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              if (!textInput.trim()) return;
+              const q = textInput.trim();
+              setTextInput('');
+              if (voiceWidgetRef.current?.isVoiceActive) {
+                voiceWidgetRef.current.sendTextMessage(q);
+              } else {
+                handleSimulateQuestion(q);
+              }
+            }}
+            className="p-2 border-t border-slate-800 bg-slate-950/90 flex items-center gap-2 shrink-0"
+          >
+            <input
+              type="text"
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              placeholder="gpt-realtime과 대화할 질문을 입력하세요 (엔터 또는 전송 클릭)..."
+              className="flex-1 bg-slate-900 border border-slate-700 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none transition"
+            />
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer shadow-md flex items-center gap-1 shrink-0"
+            >
+              <span>전송</span>
+              <span>🚀</span>
+            </button>
+          </form>
 
           {/* Console Footer */}
           <div className="px-3 py-1.5 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-[10px] text-slate-500 shrink-0">

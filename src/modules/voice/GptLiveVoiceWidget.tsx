@@ -1,11 +1,11 @@
 // Standalone UI Widget for gpt-live WebRTC Voice Call with Domain-Optimized Intelligence
 // Pure In/Out contract: accepts systemInstruction & tools in, emits onTranscript & onToolCall out.
 
-import React, { useState, useEffect } from 'react';
-import { GptLiveVoiceWidgetProps, DOMAIN_REGISTRY, AudioDeviceOption } from './types';
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { GptLiveVoiceWidgetProps, GptLiveVoiceWidgetHandle, DOMAIN_REGISTRY, AudioDeviceOption } from './types';
 import { useGptLiveVoice, enumerateHearingDevices } from './useGptLiveVoice';
 
-export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
+export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVoiceWidgetProps>(({
   apiKey,
   systemInstruction,
   model,
@@ -20,7 +20,7 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
   onDomainDetected,
   onError,
   onAudioLevel
-}) => {
+}, ref) => {
   const [localKey, setLocalKey] = useState(() => apiKey || localStorage.getItem('kiroween_openai_api_key') || '');
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [showDeviceModal, setShowDeviceModal] = useState(false);
@@ -63,6 +63,7 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
     activeDomain,
     startVoice,
     stopVoice,
+    sendTextMessage,
     setError
   } = useGptLiveVoice({
     apiKey: localKey,
@@ -81,6 +82,14 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
     onError,
     onAudioLevel
   });
+
+  useImperativeHandle(ref, () => ({
+    startVoice,
+    stopVoice,
+    sendTextMessage,
+    isVoiceActive,
+    status
+  }), [startVoice, stopVoice, sendTextMessage, isVoiceActive, status]);
 
   const handleToggle = () => {
     if (isVoiceActive) {
@@ -343,5 +352,6 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
       )}
     </div>
   );
-};
+});
+GptLiveVoiceWidget.displayName = 'GptLiveVoiceWidget';
 export default GptLiveVoiceWidget;
