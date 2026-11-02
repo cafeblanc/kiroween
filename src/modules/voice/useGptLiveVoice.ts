@@ -175,11 +175,12 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       const offer = await pcRef.current.createOffer();
       await pcRef.current.setLocalDescription(offer);
 
-      // 5. Authenticate and build multipart/form-data payload for /v1/realtime/calls
-      // Official GA WebRTC endpoint requires multipart/form-data containing 'sdp' and 'session' (with model parameter)
-      const primaryModel = optionsRef.current.model || 'gpt-4o-realtime-preview';
-      const voice = optionsRef.current.voiceName || 'verse';
+      // 5. Authenticate via Official OpenAI GA /v1/realtime/client_secrets
+      // Note: User key supports 'gpt-realtime' / 'gpt-realtime-1.5' / 'gpt-realtime-mini'
+      const primaryModel = optionsRef.current.model || 'gpt-realtime';
+      const voice = optionsRef.current.voiceName || 'alloy';
       let activeBearer = targetKey;
+      let usedEphemeral = false;
 
       try {
         const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
@@ -191,8 +192,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
           body: JSON.stringify({
             session: {
               type: 'realtime',
-              model: primaryModel,
-              voice: voice
+              model: primaryModel
             }
           })
         });
@@ -200,7 +200,11 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         if (secretRes.ok) {
           const secretData = await secretRes.json();
           const token = secretData.value || secretData.client_secret?.value;
-          if (token) activeBearer = token;
+          if (token) {
+            activeBearer = token;
+            usedEphemeral = true;
+            console.log('[useGptLiveVoice] Ephemeral token acquired successfully:', token.slice(0, 10) + '...');
+          }
         } else if (secretRes.status === 401) {
           throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): 입력하신 API 키가 유효하지 않습니다. 올바른 키를 입력해주세요.');
         } else if (secretRes.status === 403) {
@@ -212,11 +216,25 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         if (tokenErr.message?.includes('401') || tokenErr.message?.includes('403') || tokenErr.message?.includes('429')) {
           throw tokenErr;
         }
-        console.warn('[useGptLiveVoice] Proceeding with direct call token:', tokenErr);
+        console.warn('[useGptLiveVoice] Direct call token fallback notice:', tokenErr);
       }
 
-      // 6. Send Multipart/form-data SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
-      const createMultipartBody = (targetModel: string) => {
+      // 6. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      let sdpResponse: Response;
+
+      if (usedEphemeral) {
+        // Ephemeral token already bound to session; send SDP offer directly
+        sdpResponse = await fetch(gaCallsUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeBearer}`,
+            'Content-Type': 'application/sdp'
+          },
+          body: offer.sdp
+        });
+      } else {
+        // Direct master key call: send multipart/form-data with sdp and session
         const formData = new FormData();
         formData.append('sdp', new Blob([offer.sdp || ''], { type: 'application/sdp' }));
         formData.append(
@@ -225,7 +243,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
             [
               JSON.stringify({
                 type: 'realtime',
-                model: targetModel,
+                model: primaryModel,
                 instructions: optionsRef.current.systemInstruction || 'You are an intelligent voice assistant.',
                 voice: voice
               })
@@ -233,32 +251,14 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
             { type: 'application/json' }
           )
         );
-        return formData;
-      };
 
-      const gaCallsUrl = '/api/openai/v1/realtime/calls';
-      let sdpResponse = await fetch(gaCallsUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${activeBearer}`
-          // Browser will automatically generate Content-Type with multipart boundary
-        },
-        body: createMultipartBody(primaryModel)
-      });
-
-      // Model fallback: If gpt-4o-realtime-preview is rejected with 400/404, fallback to gpt-realtime
-      if (!sdpResponse.ok && sdpResponse.status === 400 && primaryModel !== 'gpt-realtime') {
-        console.log('[useGptLiveVoice] Retrying with gpt-realtime model fallback...');
-        const retryRes = await fetch(gaCallsUrl, {
+        sdpResponse = await fetch(gaCallsUrl, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${activeBearer}`
           },
-          body: createMultipartBody('gpt-realtime')
+          body: formData
         });
-        if (retryRes.ok) {
-          sdpResponse = retryRes;
-        }
       }
 
       if (!sdpResponse.ok) {
@@ -340,7 +340,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
         session: {
           modalities: ['audio', 'text'],
           instructions: currentOpts.systemInstruction + domainInstructions,
-          voice: currentOpts.voiceName || 'verse',
+          voice: currentOpts.voiceName || 'alloy',
           input_audio_format: 'pcm16',
           output_audio_format: 'pcm16',
           input_audio_transcription: {
@@ -360,6 +360,8 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
       dc.send(JSON.stringify(sessionConfig));
     };
 
+    let pendingAgentText = '';
+
     dc.onmessage = async (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -373,24 +375,37 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             updateStatus('connected');
             break;
 
-          // User Speech Transcription with Domain Detection
+          // User Speech Transcription with Immediate Domain Analysis
           case 'conversation.item.input_audio_transcription.completed':
-            if (msg.transcript) {
-              const detected = DomainKnowledgeRouter.detectDomain(msg.transcript);
+            if (msg.transcript && msg.transcript.trim()) {
+              const cleanText = msg.transcript.trim();
+              const detected = DomainKnowledgeRouter.detectDomain(cleanText);
               setActiveDomain(detected.domain);
               if (detected.domain !== 'general') {
-                optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, msg.transcript);
+                optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, cleanText);
               }
-              optionsRef.current.onTranscript?.('user', msg.transcript, detected.domain);
+              optionsRef.current.onTranscript?.('user', cleanText, detected.domain);
             }
             break;
 
-          // Agent Answer Transcription
+          // Agent Answer Transcription Streaming & Completion
+          case 'response.audio_transcript.delta':
+          case 'response.output_text.delta':
+          case 'response.text.delta':
+            if (msg.delta) {
+              pendingAgentText += msg.delta;
+            }
+            updateStatus('speaking');
+            break;
+
           case 'response.audio_transcript.done':
           case 'response.output_text.done':
-            if (msg.transcript || msg.text) {
-              optionsRef.current.onTranscript?.('agent', msg.transcript || msg.text, activeDomain);
+          case 'response.text.done':
+            const agentAnswer = (msg.transcript || msg.text || pendingAgentText).trim();
+            if (agentAnswer) {
+              optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
             }
+            pendingAgentText = '';
             break;
 
           // Audio playback status

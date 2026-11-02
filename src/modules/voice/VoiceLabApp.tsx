@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
-import { DomainCategory, DOMAIN_REGISTRY, DomainMeta } from './domainRouter';
+import { DomainCategory, DOMAIN_REGISTRY, DomainMeta, DomainKnowledgeRouter } from './domainRouter';
 import { VoiceStatus, VoiceToolDefinition } from './types';
 
 interface VoiceLabAppProps {
@@ -45,7 +45,14 @@ const DOMAIN_TEST_PROMPTS: Array<{ domain: DomainCategory; label: string; prompt
   { domain: 'literature', label: '📚 문학', prompt: '문학적으로 고전 문학에서 달콤함과 은유가 지닌 상징성을 분석해줘' },
   { domain: 'history', label: '📜 역사', prompt: '역사적으로 조선시대 왕실 진상품과 민간 교역의 유래를 알려줘' },
   { domain: 'fashion', label: '👗 패션', prompt: '올가을 트렌드에 어울리는 톤온톤 패션 코디와 원단 매칭을 추천해줘' },
-  { domain: 'accessories', label: '💍 악세서리', prompt: '악세서리와 소품 스타일링에서 전통 보자기 매듭의 포인트 연출법은?' }
+  { domain: 'accessories', label: '💍 악세서리', prompt: '악세서리와 소품 스타일링에서 전통 보자기 매듭의 포인트 연출법은?' },
+  { domain: 'legal', label: '⚖️ 법률/특허', prompt: '법률적으로 전자상거래 원산지 표시 규정과 특허 보호 요건은?' },
+  { domain: 'finance', label: '📈 금융/투자', prompt: '경제 금융 관점에서 인플레이션 시기 실물 자산 가치 방어 전략은?' },
+  { domain: 'tech', label: '💻 IT/AI', prompt: 'IT 기술 관점에서 WebRTC 초저지연 오디오 스트리밍과 VAD 원리는?' },
+  { domain: 'culinary', label: '🍳 요리/미식', prompt: '요리 미식 관점에서 마이야르 반응과 천연 꿀의 고메 페어링 비법은?' },
+  { domain: 'pets', label: '🐾 반려동물', prompt: '수의학적으로 강아지나 고양이에게 천연 꿀을 급여할 때 주의사항은?' },
+  { domain: 'travel', label: '✈️ 여행/문화', prompt: '여행 문화 관점에서 양평 두물머리와 용문산 힐링 투어 코스 추천해줘' },
+  { domain: 'environment', label: '🌱 환경/생태', prompt: '환경 생태 관점에서 꿀벌 보호와 ESG 탄소 순환 경제의 연관성은?' }
 ];
 
 export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
@@ -90,7 +97,19 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
 
   const handleDomainDetected = (domain: DomainCategory, meta: DomainMeta, query: string) => {
     setActiveDomain(domain);
-    addLog('domain', `🎯 [도메인 자동 분리 감지]: ${meta.icon} ${meta.nameKo} (${meta.nameEn}) - 핵심어 질의 매칭: "${query}"`);
+    addLog('domain', `🎯 [분야 자동 감지]: ${meta.icon} ${meta.nameKo} (${meta.nameEn}) - 핵심어 분석 완료: "${query}" (최적화 답변 준비 중...)`);
+  };
+
+  const handleSimulateQuestion = (prompt: string) => {
+    addLog('user', `나(User): "${prompt}"`);
+    const detected = DomainKnowledgeRouter.detectDomain(prompt);
+    setActiveDomain(detected.domain);
+    addLog('domain', `🎯 [파악된 분야]: ${detected.meta.icon} ${detected.meta.nameKo} - 질문 핵심어 자동 분리 완료 (답변 생성 중...)`);
+
+    const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, prompt);
+    setTimeout(() => {
+      addLog('agent', `gpt-live: [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`);
+    }, 400);
   };
 
   const handleToolCall = (toolName: string, args: Record<string, any>) => {
@@ -170,22 +189,33 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
 
             <div className="grid grid-cols-1 gap-1.5">
               {DOMAIN_TEST_PROMPTS.map(item => (
-                <div
+                <button
                   key={item.domain}
-                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 ${
+                  type="button"
+                  onClick={() => handleSimulateQuestion(item.prompt)}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-1 cursor-pointer w-full hover:scale-[1.01] active:scale-[0.99] ${
                     activeDomain === item.domain
-                      ? 'bg-purple-950/80 border-purple-500 text-white ring-1 ring-purple-400/50'
-                      : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                      ? 'bg-purple-950/90 border-purple-400 text-white ring-2 ring-purple-400/50 shadow-lg'
+                      : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-purple-500/50 hover:bg-slate-900/90'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-purple-300">{item.label}</span>
-                    <span className="text-[9px] text-slate-500 font-mono">domain: {item.domain}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-bold text-xs text-purple-300 flex items-center gap-1.5">
+                      <span>{item.label}</span>
+                      {activeDomain === item.domain && (
+                        <span className="text-[10px] bg-purple-600 text-white px-1.5 py-0.2 rounded-full font-bold animate-pulse">
+                          현재 감지됨
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[10px] bg-purple-900/40 border border-purple-500/30 text-purple-300 px-2 py-0.5 rounded font-bold hover:bg-purple-600 hover:text-white transition">
+                      질문 전송 🚀
+                    </span>
                   </div>
-                  <p className="text-[11px] leading-snug text-slate-300">
+                  <p className="text-[11px] leading-snug text-slate-200 mt-0.5">
                     "{item.prompt}"
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           </div>

@@ -113,23 +113,25 @@ If user wants to buy or order, call 'execute_instant_action'.`;
   const handleDomainDetected = (domain: DomainCategory) => {
     const meta = DOMAIN_REGISTRY[domain];
     if (meta && domain !== 'general') {
-      setActiveDomainNotice(`${meta.icon} ${meta.nameKo} 전문 최적화 검색 활성화`);
-      setTimeout(() => setActiveDomainNotice(null), 3000);
+      setActiveDomainNotice(`${meta.icon} 파악된 분야: [${meta.nameKo}] - 질문 분석 및 최적화 답변 준비 중...`);
+      setTimeout(() => setActiveDomainNotice(null), 4000);
     }
   };
 
-  // Text message submit with domain classification & expert answering
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  // Unified Query execution (for text submission and quick chips)
+  const sendQuery = (queryText: string) => {
+    const query = queryText.trim();
+    if (!query) return;
 
-    const query = input.trim();
     const detected = DomainKnowledgeRouter.detectDomain(query);
+    if (detected.domain !== 'general') {
+      handleDomainDetected(detected.domain);
+    }
 
     const userMsg: ChatMessage = {
       id: Date.now() + '-user',
       sender: 'user',
-      text: detected.domain !== 'general' ? `[${detected.meta.icon} ${detected.meta.nameKo}] ${query}` : query,
+      text: detected.domain !== 'general' ? `[${detected.meta.icon} ${detected.meta.nameKo}] "${query}"` : `"${query}"`,
       timestamp: new Date().toLocaleTimeString()
     };
 
@@ -144,23 +146,8 @@ If user wants to buy or order, call 'execute_instant_action'.`;
         onTriggerAction(activeProduct);
       }
     } else if (detected.domain !== 'general') {
-      // Domain-specific optimized response
-      const meta = detected.meta;
-      if (detected.domain === 'medicine') {
-        replyText = `🩺 [의학/건강 전문 분석]: 100% 천연 아카시아 벌꿀은 포도당 대비 과당 비율이 높아 당 흡수 속도(GI 지수)가 상대적으로 완만하며, 플라보노이드 항산화 성분과 프로폴리스 미량 원소가 풍부하여 면역력 및 피로 회복에 우수한 약리적 이점을 지닙니다.`;
-      } else if (detected.domain === 'physics') {
-        replyText = `⚛️ [물리학/유체역학 분석]: 벌꿀의 점성(Viscosity)은 고농도 당류 분자 간의 수소 결합과 유변학적(Rheology) 비뉴턴 유체 특성에 기인하며, 온도에 따른 분자 운동에너지 변화로 유동성이 제어됩니다.`;
-      } else if (detected.domain === 'history') {
-        replyText = `📜 [역사/문화 사료 분석]: 조선왕조실록 및 동의보감에 따르면 천연 봉밀(蜂蜜)은 왕실의 귀한 진상품이자 자양강장제로 기록되어 있으며, 양평 지역은 예로부터 청정 수계와 밀원지가 발달하여 명품 꿀로 명성을 이어왔습니다.`;
-      } else if (detected.domain === 'fortune') {
-        replyText = `🔮 [운세/명리 분석]: 꿀(달콤함과 황금빛)은 오행 중 토(土)의 기운과 금(金)의 재물운을 상징합니다. 오늘 이 황금 벌꿀을 곁들이시면 화합의 기운과 뜻밖의 재물 인연이 트이는 길한 기운을 얻으실 수 있습니다!`;
-      } else if (detected.domain === 'science') {
-        replyText = `🔬 [과학/생물학 분석]: 꿀벌이 아카시아 꽃꿀을 채집한 후 인베르타아제(Invertase) 효소 분해 과정을 거쳐 자당이 포도당과 과당으로 완벽히 전화된 자연 효소 활성 복합체입니다.`;
-      } else if (detected.domain === 'fashion' || detected.domain === 'accessories') {
-        replyText = `👗 [패션/소품 스타일링]: 고급 전통 수제 보자기 매듭과 단아한 노리개 장식은 전통과 모던함이 어우러져 격식 있는 명절 선물이나 홈카페 인테리어 소품으로 완벽한 조화를 이룹니다.`;
-      } else {
-        replyText = `${meta.icon} [${meta.nameKo} 최적화 분석]: "${query}"에 대해 ${meta.systemGuidance.slice(0, 80)}...`;
-      }
+      const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, query, activeProduct?.name[lang] || activeProduct?.name.en);
+      replyText = `🗣️ [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`;
     } else if (activeProduct) {
       replyText = `🤖 [실시간 방송 컨텍스트] 현재 방송 상품: ${activeProduct.name[lang] || activeProduct.name.en}. ${activeProduct.description[lang] || activeProduct.description.en}`;
     }
@@ -175,6 +162,11 @@ If user wants to buy or order, call 'execute_instant_action'.`;
 
     setMessages(prev => [...prev, userMsg, aiMsg]);
     setInput('');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendQuery(input);
   };
 
   return (
@@ -271,36 +263,50 @@ If user wants to buy or order, call 'execute_instant_action'.`;
         <div ref={chatEndRef} />
       </div>
 
-      {/* Quick Domain Suggestion Chips */}
+      {/* Quick Domain One-Click Question & Test Chips */}
       <div className="px-2 py-1.5 bg-slate-950/70 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto text-[10px] shrink-0">
-        <span className="text-slate-500 font-bold shrink-0">도메인 질문 예시:</span>
+        <span className="text-purple-400 font-bold shrink-0">원클릭 테스트:</span>
         <button
           type="button"
-          onClick={() => { setInput('의학적으로 아카시아 꿀의 효능과 혈당 영향은?'); }}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition"
+          onClick={() => sendQuery('의학적으로 아카시아 꿀의 효능과 혈당 영향은?')}
+          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
         >
           🩺 의학적 효능
         </button>
         <button
           type="button"
-          onClick={() => { setInput('물리학 관점에서 꿀의 점성과 유체역학 원리는?'); }}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition"
+          onClick={() => sendQuery('오늘 내 일진과 황금빛 기운의 재물운을 점쳐줘')}
+          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
         >
-          ⚛️ 물리학적 점성
+          🔮 운세/재물운
         </button>
         <button
           type="button"
-          onClick={() => { setInput('역사적으로 조선시대에도 벌꿀을 약재로 썼나요?'); }}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition"
+          onClick={() => sendQuery('과학적으로 효소의 기질 특이성과 분해 메커니즘을 설명해줘')}
+          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
         >
-          📜 역사적 유래
+          🔬 과학적 효소
         </button>
         <button
           type="button"
-          onClick={() => { setInput('오늘 운세 관점에서 꿀을 먹으면 어떤 기운이 좋은가요?'); }}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition"
+          onClick={() => sendQuery('법률적으로 전자상거래 원산지 표시 규정과 품질 보증은?')}
+          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
         >
-          🔮 운세/풍수
+          ⚖️ 법률/품질보증
+        </button>
+        <button
+          type="button"
+          onClick={() => sendQuery('요리 미식 관점에서 마이야르 반응과 꿀의 고메 페어링 비법은?')}
+          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
+        >
+          🍳 요리/미식
+        </button>
+        <button
+          type="button"
+          onClick={() => sendQuery('이 꿀 바로 주문해줘')}
+          className="bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/40 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer font-bold"
+        >
+          ⚡ 꿀 바로 주문
         </button>
       </div>
 
