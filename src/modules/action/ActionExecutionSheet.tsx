@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ProductItem, ActionOrder } from '../../types';
+import { ProductItem, ActionOrder, Language } from '../../types';
 
 interface ActionExecutionSheetProps {
   product: ProductItem | null;
   isOpen: boolean;
+  lang?: Language;
   onClose: () => void;
   onSuccess: (order: ActionOrder) => void;
 }
@@ -11,6 +12,7 @@ interface ActionExecutionSheetProps {
 export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
   product,
   isOpen,
+  lang = 'ko',
   onClose,
   onSuccess
 }) => {
@@ -41,7 +43,7 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
       setLoading(false);
       const newOrder: ActionOrder = {
         orderId: 'PAYPAL-' + Math.floor(100000 + Math.random() * 900000),
-        productName: `${product.name.ko || product.name.en} (${quantity}개)`,
+        productName: `${product.name[lang] || product.name.ko || product.name.en} (${quantity}개)`,
         quantity,
         amount: totalAmount,
         currency: 'KRW',
@@ -137,7 +139,7 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-white truncate">{product.name.ko || product.name.en}</p>
+              <p className="text-xs font-bold text-white truncate">{product.name[lang] || product.name.ko || product.name.en}</p>
               <span className="text-[10px] text-emerald-400 font-semibold shrink-0">재고 {product.stock}개</span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, ProductItem, Language } from '../../types';
 import { GptLiveVoiceWidget, VoiceToolDefinition, VoiceStatus, DomainCategory, DOMAIN_REGISTRY, DomainKnowledgeRouter } from '../voice';
+import { buildVoiceInstructions } from '../voice/voicePromptBuilder';
 
 interface AgentChatProps {
   lang: Language;
@@ -94,20 +95,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Dynamic system instructions: Directly bound to registered stream product (NO VIDEO SEARCHING)
-  const voiceInstructions = `You are the Kiroween Live Commerce Co-Host AI Agent powered by gpt-realtime.
-You are co-hosting the live shopping broadcast.
-
-★ STRICT OPERATIONAL RULE: NEVER ATTEMPT TO SEARCH THE VIDEO OR SCREEN!
-Do NOT attempt to search, analyze, or look up the video feed. The current featured product is ALREADY REGISTERED and visibly displayed right below the video player on the viewer's screen.
-Authoritative Registered Product Information:
-- Product ID: ${activeProduct?.id || 'prod-honey'}
-- Name: ${activeProduct?.name.ko || activeProduct?.name.en || '양평 친환경 아카시아 벌꿀 (500g)'}
-- Price: ${activeProduct?.currency || 'KRW'} ${(activeProduct?.price || 32000).toLocaleString()}원
-- Description: ${activeProduct?.description.ko || activeProduct?.description.en || '100% pure organic honey'}
-
-When the viewer asks any question about the product or expresses desire to buy/order (e.g. "결제창 띄워", "결제해줘", "이거 살래", "구매할래", "주문할래", "결제", "buy", "checkout"), IMMEDIATELY call the tool 'open_checkout' with productId="${activeProduct?.id || 'prod-honey'}".
-After calling the tool, confirm warmly and concisely in Korean: "네! 동영상 화면 밑에 등록된 ${activeProduct?.name.ko || activeProduct?.name.en} 결제창을 지금 바로 띄워드렸습니다!"`;
+  // Dynamic localized system instructions: Strictly bound to UI language and registered stream product (NO VIDEO SEARCHING)
+  const voiceInstructions = buildVoiceInstructions(lang, activeProduct);
 
   // Helper: check if speech has checkout/purchase intent (covers variations & typos)
   const isCheckoutSpeech = (str: string) => {

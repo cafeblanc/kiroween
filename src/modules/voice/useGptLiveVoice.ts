@@ -45,6 +45,24 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     optionsRef.current = options;
   }, [options]);
 
+  // Dynamic instruction hot-update: If systemInstruction changes while connected, push session.update over DataChannel
+  useEffect(() => {
+    if (dcRef.current && dcRef.current.readyState === 'open' && options.systemInstruction) {
+      try {
+        const updatePayload = {
+          type: 'session.update',
+          session: {
+            instructions: options.systemInstruction
+          }
+        };
+        dcRef.current.send(JSON.stringify(updatePayload));
+        console.log('[useGptLiveVoice] Dynamically pushed updated session instructions');
+      } catch (e) {
+        console.warn('[useGptLiveVoice] session.update dynamic push failed:', e);
+      }
+    }
+  }, [options.systemInstruction]);
+
   const updateStatus = useCallback((newStatus: VoiceStatus) => {
     setStatus(newStatus);
     if (newStatus === 'disconnected' as any || newStatus === 'idle') {
@@ -382,8 +400,10 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         });
       }
 
-      const domainInstructions = `\n[Specialized Domain Knowledge Optimization]:
-You are equipped with 'domain_optimized_search'. When the user asks domain-specific or expert questions across science, math, astronomy, fortune/divination, philosophy, psychology, nature, medicine/health, physics, literature, history, fashion, or accessories, call 'domain_optimized_search' to retrieve authoritative domain insights before speaking. Tailor your terminology, rigor, and depth according to the domain.`;
+      const domainInstructions = currentOpts.enableDomainSearch
+        ? `\n[Specialized Domain Knowledge Optimization]:
+You are equipped with 'domain_optimized_search'. When the user asks domain-specific or expert questions across science, math, astronomy, fortune/divination, philosophy, psychology, nature, medicine/health, physics, literature, history, fashion, or accessories, call 'domain_optimized_search' to retrieve authoritative domain insights before speaking. Tailor your terminology, rigor, and depth according to the domain.`
+        : '';
 
       const sessionConfig = {
         type: 'session.update',

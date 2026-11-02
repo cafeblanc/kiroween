@@ -5,15 +5,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
 import { DomainCategory, DOMAIN_REGISTRY, DomainMeta, DomainKnowledgeRouter } from './domainRouter';
 import { VoiceStatus, VoiceToolDefinition, GptLiveVoiceWidgetHandle } from './types';
-import { ProductItem, ActionOrder } from '../../types';
+import { ProductItem, ActionOrder, Language } from '../../types';
 import { ActionExecutionSheet } from '../action/ActionExecutionSheet';
 import { PayPalReceiptModal } from '../action/PayPalReceiptModal';
 import { executeVoiceButtonCommand } from './voiceButtonController';
+import { buildVoiceInstructions } from './voicePromptBuilder';
 
 interface VoiceLabAppProps {
   onBackToMain?: () => void;
   activeProduct?: ProductItem | null;
   products?: ProductItem[];
+  lang?: Language;
 }
 
 interface TestLog {
@@ -161,7 +163,8 @@ const speakKorean = (text: string) => {
 export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
   onBackToMain,
   activeProduct,
-  products
+  products,
+  lang = 'ko'
 }) => {
   const availableProducts = products && products.length > 0 ? products : DEFAULT_PRODUCTS;
   const [selectedProduct, setSelectedProduct] = useState<ProductItem>(() => activeProduct || availableProducts[0]);
@@ -517,23 +520,8 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
     }, 2500);
   };
 
-  // Build specialized real-time prompt injecting current product & checkout command rules
-  const systemInstruction = `You are an omni-expert AI voice co-host & consultant in a live shopping test lab powered by gpt-realtime.
-Current Featured Live Sale Products:
-1. [prod-honey] 양평 친환경 아카시아 벌꿀 (500g) - 32,000원 (★ 현재 선택된 메인 상품)
-2. [prod-tea] 핸드메이드 전통차 선물 세트 - 48,000원
-
-Currently Selected Product for Purchase:
-- Product ID: ${selectedProduct.id}
-- Name: ${selectedProduct.name.ko || selectedProduct.name.en}
-- Price: ${selectedProduct.price.toLocaleString()}원 (${selectedProduct.currency})
-- Description: ${selectedProduct.description.ko || selectedProduct.description.en}
-
-CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
-1. When the user says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "이거 살래", "구매할래", "주문할래", "구매창 띄워", "checkout", "buy this", or "order this" without specifying a product, IMMEDIATELY call the tool 'open_checkout' with productId="${selectedProduct.id}".
-2. If the user mentions "전통차" or "차", call 'open_checkout' with productId="prod-tea". If the user mentions "벌꿀" or "꿀", call 'open_checkout' with productId="prod-honey".
-3. After invoking the tool, immediately speak warmly and energetically in Korean: "네! 현재 판매 중인 ${selectedProduct.name.ko || selectedProduct.name.en} 결제창을 지금 바로 화면에 띄워드렸습니다! 결제를 진행해 주세요."
-4. For questions across science, math, astronomy, fortune, philosophy, psychology, nature, medicine, physics, literature, history, fashion, and accessories, call 'domain_optimized_search' when needed and answer with intellectual rigor and conciseness.`;
+  // Build localized real-time prompt injecting current product, language & checkout command rules
+  const systemInstruction = buildVoiceInstructions(lang, selectedProduct);
 
   return (
     <div className="flex flex-col h-full w-full bg-slate-950 text-white font-sans overflow-hidden">

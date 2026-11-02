@@ -4,7 +4,7 @@ import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
 import { AdminStudioModal } from './modules/admin/AdminStudioModal';
 import { PayPalReceiptModal } from './modules/action/PayPalReceiptModal';
-import { VoiceLabApp } from './modules/voice';
+import { VoiceLabApp, executeVoiceButtonCommand, setCheckoutModalState } from './modules/voice';
 import { ProductItem, ActionOrder, Language } from './types';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -155,8 +155,73 @@ export const App: React.FC = () => {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
   const [successToast, setSuccessToast] = useState<ActionOrder | null>(null);
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>('ko');
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+
+  // Sync checkout modal open state with voice button controller
+  useEffect(() => {
+    setCheckoutModalState(isActionOpen);
+  }, [isActionOpen]);
+
+  // Native Web Speech recognition fallback for instant zero-latency button command execution
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    let recognition: any = null;
+    let isStoppedManually = false;
+
+    try {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      const langMap: Record<Language, string> = {
+        ko: 'ko-KR',
+        en: 'en-US',
+        ja: 'ja-JP',
+        zh: 'zh-CN',
+        es: 'es-ES',
+        fr: 'fr-FR'
+      };
+      recognition.lang = langMap[lang] || 'ko-KR';
+
+      recognition.onresult = (event: any) => {
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult && lastResult[0]) {
+          const transcript = (lastResult[0].transcript || '').trim();
+          console.log('[NativeSpeechRecognition] Heard voice command:', transcript);
+          executeVoiceButtonCommand(transcript);
+        }
+      };
+
+      recognition.onerror = (e: any) => {
+        if (e.error !== 'no-speech') {
+          console.log('[NativeSpeechRecognition] Notice:', e.error);
+        }
+      };
+
+      recognition.onend = () => {
+        if (!isStoppedManually) {
+          try {
+            recognition.start();
+          } catch (_) {}
+        }
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.log('[NativeSpeechRecognition] Init notice:', e);
+    }
+
+    return () => {
+      isStoppedManually = true;
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch (_) {}
+      }
+    };
+  }, [lang]);
 
   // Global listener for voice button commands across all views
   useEffect(() => {
@@ -356,6 +421,7 @@ export const App: React.FC = () => {
             onBackToMain={() => setCurrentView('main')}
             activeProduct={activeProduct}
             products={products}
+            lang={lang}
           />
         </div>
       ) : (
@@ -387,6 +453,7 @@ export const App: React.FC = () => {
       <ActionExecutionSheet
         product={activeProduct}
         isOpen={isActionOpen}
+        lang={lang}
         onClose={() => setIsActionOpen(false)}
         onSuccess={handleActionSuccess}
       />

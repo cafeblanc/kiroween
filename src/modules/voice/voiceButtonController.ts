@@ -8,88 +8,158 @@ export interface VoiceButtonMatch {
   payload?: any;
 }
 
+let isCheckoutModalOpen = false;
+let lastExecutedTime = 0;
+let lastCommandType = '';
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('kiroween:open_checkout', () => {
+    isCheckoutModalOpen = true;
+  });
+  window.addEventListener('kiroween:close_modal', () => {
+    isCheckoutModalOpen = false;
+  });
+}
+
+export const setCheckoutModalState = (isOpen: boolean) => {
+  isCheckoutModalOpen = isOpen;
+};
+
 export const executeVoiceButtonCommand = (spokenText: string): VoiceButtonMatch | null => {
   if (!spokenText || !spokenText.trim()) return null;
   const t = spokenText.replace(/\s+/g, '').toLowerCase();
+  const now = Date.now();
 
-  // 1. In-Checkout Sheet Action Buttons (최우선 처리)
-  if (t === '더하기' || t === '하나더' || t.includes('더하기') || t.includes('하나더') || t === '플러스' || t === '+1') {
-    dispatch('kiroween:checkout_action', { action: 'increase' });
-    return { matched: true, buttonName: '더하기', commandType: 'checkout_increase' };
+  const isDebounced = (cmd: string) => {
+    if (cmd === lastCommandType && now - lastExecutedTime < 600) {
+      return true;
+    }
+    lastCommandType = cmd;
+    lastExecutedTime = now;
+    return false;
+  };
+
+  // 1. If Checkout Sheet is ALREADY OPEN: Handle In-Modal Buttons First
+  if (isCheckoutModalOpen) {
+    // A. Quantity Increase
+    if (
+      t === '더하기' || t === '하나더' || t.includes('더하기') || t.includes('하나더') ||
+      t === '플러스' || t === '+1' || t === '추가' || t.includes('수량추가') || t === 'add'
+    ) {
+      if (isDebounced('checkout_increase')) return null;
+      dispatch('kiroween:checkout_action', { action: 'increase' });
+      return { matched: true, buttonName: '더하기', commandType: 'checkout_increase' };
+    }
+
+    // B. Quantity Decrease
+    if (
+      t === '빼기' || t === '하나빼' || t.includes('빼기') || t.includes('하나빼') ||
+      t === '마이너스' || t === '-1' || t === '줄여' || t.includes('수량감소') || t === 'minus'
+    ) {
+      if (isDebounced('checkout_decrease')) return null;
+      dispatch('kiroween:checkout_action', { action: 'decrease' });
+      return { matched: true, buttonName: '빼기', commandType: 'checkout_decrease' };
+    }
+
+    // C. Confirm Payment
+    if (
+      t === '결제' || t === '결제하기' || t === '구매' || t === '구매하기' ||
+      t.includes('결제하기') || t.includes('구매하기') || t.includes('결제진행') ||
+      t === 'pay' || t === 'paynow'
+    ) {
+      if (isDebounced('checkout_pay')) return null;
+      dispatch('kiroween:checkout_action', { action: 'pay' });
+      return { matched: true, buttonName: '결제', commandType: 'checkout_pay' };
+    }
+
+    // D. Cancel / Close Checkout
+    if (
+      t === '취소' || t === '취소하기' || t === '닫기' || t.includes('취소') ||
+      t.includes('닫기') || t.includes('그만') || t.includes('안살래') || t === 'cancel' || t === 'close'
+    ) {
+      if (isDebounced('checkout_cancel')) return null;
+      isCheckoutModalOpen = false;
+      dispatch('kiroween:checkout_action', { action: 'cancel' });
+      dispatch('kiroween:close_modal', {});
+      return { matched: true, buttonName: '취소', commandType: 'checkout_cancel' };
+    }
   }
 
-  if (t === '빼기' || t === '하나빼' || t.includes('빼기') || t.includes('하나빼') || t === '마이너스' || t === '-1') {
-    dispatch('kiroween:checkout_action', { action: 'decrease' });
-    return { matched: true, buttonName: '빼기', commandType: 'checkout_decrease' };
-  }
-
-  if (t === '결제' || t === '결제하기' || t === '구매' || t === '구매하기' || t.includes('결제하기') || t.includes('구매하기')) {
-    dispatch('kiroween:checkout_action', { action: 'pay' });
-    return { matched: true, buttonName: '결제', commandType: 'checkout_pay' };
-  }
-
-  if (t === '취소' || t === '취소하기' || t === '닫기' || t.includes('취소') || t.includes('닫기')) {
-    dispatch('kiroween:checkout_action', { action: 'cancel' });
-    dispatch('kiroween:close_modal', {});
-    return { matched: true, buttonName: '취소', commandType: 'checkout_cancel' };
-  }
-
-  // 2. Open Checkout Sheet Button ("결제창", "구매창")
-  if (t === '결제창' || t === '구매창' || t.includes('결제창') || t.includes('구매창')) {
+  // 2. Open Checkout Sheet (Works when modal is closed, or user explicitly asks for checkout)
+  if (
+    t.includes('결제창') || t.includes('구매창') || t.includes('주문창') ||
+    t === '결제' || t === '결제하기' || t === '구매' || t === '구매하기' ||
+    t.includes('결제해') || t.includes('구매해') || t.includes('주문해') ||
+    t.includes('살래') || t.includes('살게요') || t.includes('살게') ||
+    t.includes('사고싶') || t.includes('사겠') ||
+    t === 'checkout' || t.includes('checkout') || t === 'buy' || t === 'order' ||
+    t.includes('opencheckout') || t.includes('buythis')
+  ) {
+    if (isDebounced('open_checkout')) return null;
+    isCheckoutModalOpen = true;
     dispatch('kiroween:open_checkout', {});
     return { matched: true, buttonName: '결제창', commandType: 'open_checkout' };
   }
 
   // 3. View Switcher Buttons ("방송", "음성랩")
-  if (t === '방송' || t === '라이브' || t === '메인' || t.includes('방송복귀') || t.includes('라이브방송')) {
+  if (t === '방송' || t === '라이브' || t === '메인' || t.includes('방송복귀') || t.includes('라이브방송') || t === 'live') {
+    if (isDebounced('switch_view_main')) return null;
     dispatch('kiroween:switch_view', { view: 'main' });
     return { matched: true, buttonName: '방송', commandType: 'switch_view_main' };
   }
 
-  if (t === '음성랩' || t === '보이스랩' || t === '랩' || t.includes('음성랩') || t.includes('보이스랩')) {
+  if (t === '음성랩' || t === '보이스랩' || t === '랩' || t.includes('음성랩') || t.includes('보이스랩') || t === 'voicelab') {
+    if (isDebounced('switch_view_voicelab')) return null;
     dispatch('kiroween:switch_view', { view: 'voicelab' });
     return { matched: true, buttonName: '음성랩', commandType: 'switch_view_voicelab' };
   }
 
   // 4. Admin Studio Button ("관리자", "어드민")
-  if (t === '관리자' || t === '어드민' || t.includes('관리자') || t.includes('어드민')) {
+  if (t === '관리자' || t === '어드민' || t.includes('관리자') || t.includes('어드민') || t === 'admin') {
+    if (isDebounced('open_admin')) return null;
     dispatch('kiroween:open_admin', {});
     return { matched: true, buttonName: '관리자', commandType: 'open_admin' };
   }
 
   // 5. Product Switcher Buttons ("벌꿀", "전통차")
-  if (t === '벌꿀' || t === '꿀' || t.includes('벌꿀') || t.includes('아카시아')) {
+  if (t === '벌꿀' || t === '꿀' || t.includes('벌꿀') || t.includes('아카시아') || t === 'honey') {
+    if (isDebounced('select_product_honey')) return null;
     dispatch('kiroween:select_product', { productId: 'prod-honey' });
     return { matched: true, buttonName: '벌꿀', commandType: 'select_product_honey' };
   }
 
-  if (t === '전통차' || t === '차' || t.includes('전통차') || t.includes('차세트')) {
+  if (t === '전통차' || t === '차' || t.includes('전통차') || t.includes('차세트') || t === 'tea') {
+    if (isDebounced('select_product_tea')) return null;
     dispatch('kiroween:select_product', { productId: 'prod-tea' });
     return { matched: true, buttonName: '전통차', commandType: 'select_product_tea' };
   }
 
   // 6. Action Utility Buttons ("지우기", "도구", "오디오", "키설정")
-  if (t === '지우기' || t === '삭제' || t.includes('로그지우기') || t.includes('대화지우기')) {
+  if (t === '지우기' || t === '삭제' || t.includes('로그지우기') || t.includes('대화지우기') || t === 'clear') {
+    if (isDebounced('clear_logs')) return null;
     dispatch('kiroween:clear_logs', {});
     return { matched: true, buttonName: '지우기', commandType: 'clear_logs' };
   }
 
-  if (t === '도구' || t === '도구실행' || t.includes('도구실행') || t.includes('도구수동')) {
+  if (t === '도구' || t === '도구실행' || t.includes('도구실행') || t.includes('도구수동') || t === 'tool') {
+    if (isDebounced('trigger_tool')) return null;
     dispatch('kiroween:trigger_tool', {});
     return { matched: true, buttonName: '도구', commandType: 'trigger_tool' };
   }
 
-  if (t === '오디오' || t === '마이크' || t === '보청기' || t.includes('오디오설정') || t.includes('마이크설정')) {
+  if (t === '오디오' || t === '마이크' || t === '보청기' || t.includes('오디오설정') || t.includes('마이크설정') || t === 'audio') {
+    if (isDebounced('open_audio_modal')) return null;
     dispatch('kiroween:open_audio_modal', {});
     return { matched: true, buttonName: '오디오', commandType: 'open_audio_modal' };
   }
 
-  if (t === '키' || t === '키설정' || t === 'api키' || t.includes('키설정')) {
+  if (t === '키' || t === '키설정' || t === 'api키' || t.includes('키설정') || t === 'key') {
+    if (isDebounced('open_key_modal')) return null;
     dispatch('kiroween:open_key_modal', {});
     return { matched: true, buttonName: '키설정', commandType: 'open_key_modal' };
   }
 
-  // 7. 20 Specialized Domain Query Buttons (단어 하나로 즉시 질문 실행!)
+  // 7. 20 Specialized Domain Query Buttons
   const domainShortMap: Array<{ key: string; name: string; domain: string }> = [
     { key: '과학', name: '과학', domain: 'science' },
     { key: '수학', name: '수학', domain: 'math' },
@@ -115,6 +185,7 @@ export const executeVoiceButtonCommand = (spokenText: string): VoiceButtonMatch 
 
   for (const item of domainShortMap) {
     if (t === item.key || t.includes(item.key)) {
+      if (isDebounced(`domain_${item.domain}`)) return null;
       dispatch('kiroween:select_domain_prompt', { domain: item.domain, name: item.name });
       return { matched: true, buttonName: item.name, commandType: `select_domain_${item.domain}`, payload: item.domain };
     }
@@ -126,7 +197,6 @@ export const executeVoiceButtonCommand = (spokenText: string): VoiceButtonMatch 
 const dispatch = (eventName: string, detail: any) => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(eventName, { detail }));
-    // Also broadcast a visual toast notification event
     window.dispatchEvent(new CustomEvent('kiroween:voice_button_toast', { detail: { eventName, detail } }));
   }
 };

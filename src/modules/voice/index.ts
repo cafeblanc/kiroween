@@ -5,5 +5,5 @@
 export { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
 export { VoiceLabApp } from './VoiceLabApp';
 export { useGptLiveVoice } from './useGptLiveVoice';
-export { executeVoiceButtonCommand } from './voiceButtonController';
+export { executeVoiceButtonCommand, setCheckoutModalState } from './voiceButtonController';
 export * from './types';
