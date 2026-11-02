@@ -61,8 +61,10 @@ export interface GptLiveVoiceInProps {
 }
 
 export interface GptLiveVoiceOutCallbacks {
-  /** Emitted whenever the user or agent transcript updates */
+  /** Emitted whenever the user or agent transcript updates (final turn result) */
   onTranscript?: (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => void;
+  /** Emitted during agent voice response streaming in real time (chunk by chunk) */
+  onTranscriptStream?: (sender: 'agent', delta: string, fullText: string, domain?: DomainCategory) => void;
   /** Emitted when the voice agent calls a registered tool */
   onToolCall?: (toolName: string, args: Record<string, any>) => Promise<any> | void;
   /** Emitted whenever the connection or speaking status changes */

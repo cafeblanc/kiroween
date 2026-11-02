@@ -15,6 +15,7 @@ interface TestLog {
   time: string;
   type: 'info' | 'user' | 'agent' | 'domain' | 'tool' | 'error';
   content: string;
+  isStreaming?: boolean;
 }
 
 const TEST_TOOLS: VoiceToolDefinition[] = [
@@ -114,12 +115,64 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
     });
   };
 
+  const handleTranscriptStream = (_sender: 'agent', _delta: string, fullText: string, domain?: DomainCategory) => {
+    const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
+    const formattedContent = `gpt-realtime: ${domText}${fullText}`;
+
+    setLogs(prev => {
+      if (prev.length > 0) {
+        const last = prev[prev.length - 1];
+        if (last.type === 'agent' && last.isStreaming) {
+          return [
+            ...prev.slice(0, -1),
+            { ...last, content: formattedContent }
+          ];
+        }
+      }
+      return [
+        ...prev,
+        {
+          id: 'stream-' + Date.now(),
+          time: new Date().toLocaleTimeString(),
+          type: 'agent',
+          content: formattedContent,
+          isStreaming: true
+        }
+      ];
+    });
+  };
+
   const handleTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
     if (sender === 'user') {
       addLog('user', `나(User): "${text}"`);
     } else {
       const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
-      addLog('agent', `gpt-realtime: ${domText}${text}`);
+      const finalContent = `gpt-realtime: ${domText}${text}`;
+
+      setLogs(prev => {
+        if (prev.length > 0) {
+          const last = prev[prev.length - 1];
+          if (last.type === 'agent' && last.isStreaming) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: finalContent, isStreaming: false }
+            ];
+          }
+        }
+        if (prev.length > 0 && prev[prev.length - 1].content.trim() === finalContent.trim()) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: Date.now() + Math.random().toString(),
+            time: new Date().toLocaleTimeString(),
+            type: 'agent',
+            content: finalContent,
+            isStreaming: false
+          }
+        ];
+      });
     }
   };
 
@@ -143,6 +196,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
 
   const handleQuestionClick = (prompt: string) => {
     if (voiceWidgetRef.current?.isVoiceActive) {
+      addLog('user', `나(User): "${prompt}"`);
       voiceWidgetRef.current.sendTextMessage(prompt);
     } else {
       handleSimulateQuestion(prompt);
@@ -214,6 +268,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
               }
             }}
             onTranscript={handleTranscript}
+            onTranscriptStream={handleTranscriptStream}
             onDomainDetected={handleDomainDetected}
             onToolCall={handleToolCall}
             onError={handleError}
@@ -363,7 +418,12 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
                   </span>
                   <span>{log.time}</span>
                 </div>
-                <div className="font-sans text-xs break-words leading-relaxed">{log.content}</div>
+                <div className="font-sans text-xs break-words leading-relaxed">
+                  {log.content}
+                  {log.type === 'agent' && log.isStreaming && (
+                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 animate-pulse align-middle" />
+                  )}
+                </div>
               </div>
             ))}
             <div ref={logEndRef} />
@@ -377,6 +437,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
               const q = textInput.trim();
               setTextInput('');
               if (voiceWidgetRef.current?.isVoiceActive) {
+                addLog('user', `나(User): "${q}"`);
                 voiceWidgetRef.current.sendTextMessage(q);
               } else {
                 handleSimulateQuestion(q);

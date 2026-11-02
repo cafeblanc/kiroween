@@ -16,6 +16,7 @@ export interface UseGptLiveVoiceOptions {
   outputDeviceId?: string;
   onDomainSearch?: (domain: DomainCategory, query: string) => Promise<string> | string;
   onTranscript?: (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => void;
+  onTranscriptStream?: (sender: 'agent', delta: string, fullText: string, domain?: DomainCategory) => void;
   onToolCall?: (toolName: string, args: Record<string, any>) => Promise<any> | void;
   onStatusChange?: (status: VoiceStatus) => void;
   onDomainDetected?: (domain: DomainCategory, meta: DomainMeta, query: string) => void;
@@ -458,14 +459,17 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
           case 'response.created':
             currentResponseEmitted = false;
             pendingAgentText = '';
+            // Trigger start of agent voice turn immediately
+            optionsRef.current.onTranscriptStream?.('agent', '', '', activeDomain);
             break;
 
-          // Agent Answer Transcription Streaming
+          // Agent Answer Transcription Streaming: emit chunks in real time as the AI speaks
           case 'response.audio_transcript.delta':
           case 'response.output_text.delta':
           case 'response.text.delta':
             if (msg.delta) {
               pendingAgentText += msg.delta;
+              optionsRef.current.onTranscriptStream?.('agent', msg.delta, pendingAgentText, activeDomain);
             }
             updateStatus('speaking');
             break;
