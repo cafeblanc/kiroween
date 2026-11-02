@@ -92,15 +92,24 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   }, [logs]);
 
   const addLog = (type: TestLog['type'], content: string) => {
-    setLogs(prev => [
-      ...prev,
-      {
-        id: Date.now() + Math.random().toString(),
-        time: new Date().toLocaleTimeString(),
-        type,
-        content
+    setLogs(prev => {
+      // Deduplication: prevent exact or redundant consecutive duplicate entries
+      if (prev.length > 0) {
+        const last = prev[prev.length - 1];
+        if (last.type === type && (last.content === content || last.content.trim() === content.trim())) {
+          return prev;
+        }
       }
-    ]);
+      return [
+        ...prev,
+        {
+          id: Date.now() + Math.random().toString(),
+          time: new Date().toLocaleTimeString(),
+          type,
+          content
+        }
+      ];
+    });
   };
 
   const handleTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {

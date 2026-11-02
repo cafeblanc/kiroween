@@ -92,7 +92,7 @@ You are an expert who can seamlessly answer across 13 specialized domains:
 When a specialized question is asked, analyze the core keywords, cite rigorous facts or cultural depth according to the field, and deliver articulate, concise spoken turns (1-2 sentences).
 If user wants to buy or order, call 'execute_instant_action'.`;
 
-  // Handle incoming transcripts from the independent Voice Module
+  // Handle incoming transcripts from the independent Voice Module with strict deduplication
   const handleVoiceTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
     if (!text || !text.trim()) return;
 
@@ -102,13 +102,27 @@ If user wants to buy or order, call 'execute_instant_action'.`;
       displayPrefix = `[${meta.icon} ${meta.nameKo} 최적화] `;
     }
 
-    const msg: ChatMessage = {
-      id: Date.now() + '-' + sender,
-      sender: sender === 'user' ? 'user' : 'ai',
-      text: sender === 'user' ? `🎙️ ${displayPrefix}"${text.trim()}"` : `🗣️ ${displayPrefix}${text.trim()}`,
-      timestamp: new Date().toLocaleTimeString()
-    };
-    setMessages(prev => [...prev, msg]);
+    const trimmed = text.trim();
+    const formattedText = sender === 'user' ? `🎙️ ${displayPrefix}"${trimmed}"` : `🗣️ ${displayPrefix}${trimmed}`;
+
+    setMessages(prev => {
+      // Prevent duplicate messages from OpenAI audio/text multiple event fires
+      if (prev.length > 0) {
+        const last = prev[prev.length - 1];
+        const lastText = typeof last.text === 'string' ? last.text : '';
+        if (last.sender === (sender === 'user' ? 'user' : 'ai') && (lastText === formattedText || lastText.includes(trimmed))) {
+          return prev;
+        }
+      }
+
+      const msg: ChatMessage = {
+        id: Date.now() + '-' + sender,
+        sender: sender === 'user' ? 'user' : 'ai',
+        text: formattedText,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      return [...prev, msg];
+    });
   };
 
   // Handle tool execution triggered by the independent Voice Module

@@ -348,9 +348,9 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
           },
           turn_detection: {
             type: 'server_vad',
-            threshold: 0.5,
+            threshold: 0.65,
             prefix_padding_ms: 300,
-            silence_duration_ms: 400
+            silence_duration_ms: 600
           },
           tools: toolsPayload,
           tool_choice: 'auto'
@@ -361,6 +361,8 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
     };
 
     let pendingAgentText = '';
+    let lastEmittedAgentText = '';
+    let lastEmittedUserText = '';
 
     dc.onmessage = async (event) => {
       try {
@@ -375,20 +377,23 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             updateStatus('connected');
             break;
 
-          // User Speech Transcription with Immediate Domain Analysis
+          // User Speech Transcription with Immediate Domain Analysis & Deduplication
           case 'conversation.item.input_audio_transcription.completed':
             if (msg.transcript && msg.transcript.trim()) {
               const cleanText = msg.transcript.trim();
-              const detected = DomainKnowledgeRouter.detectDomain(cleanText);
-              setActiveDomain(detected.domain);
-              if (detected.domain !== 'general') {
-                optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, cleanText);
+              if (cleanText !== lastEmittedUserText) {
+                lastEmittedUserText = cleanText;
+                const detected = DomainKnowledgeRouter.detectDomain(cleanText);
+                setActiveDomain(detected.domain);
+                if (detected.domain !== 'general') {
+                  optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, cleanText);
+                }
+                optionsRef.current.onTranscript?.('user', cleanText, detected.domain);
               }
-              optionsRef.current.onTranscript?.('user', cleanText, detected.domain);
             }
             break;
 
-          // Agent Answer Transcription Streaming & Completion
+          // Agent Answer Transcription Streaming
           case 'response.audio_transcript.delta':
           case 'response.output_text.delta':
           case 'response.text.delta':
@@ -398,25 +403,40 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             updateStatus('speaking');
             break;
 
+          // Agent Complete Answer: Deduplicated strictly once per response turn
           case 'response.audio_transcript.done':
           case 'response.output_text.done':
-          case 'response.text.done':
+          case 'response.text.done': {
             const agentAnswer = (msg.transcript || msg.text || pendingAgentText).trim();
-            if (agentAnswer) {
+            if (agentAnswer && agentAnswer !== lastEmittedAgentText) {
+              lastEmittedAgentText = agentAnswer;
               optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
             }
             pendingAgentText = '';
             break;
+          }
 
-          // Audio playback status
+          // Audio playback status with Acoustic Echo Shield
           case 'response.audio.delta':
           case 'response.output_audio.delta':
+            // Acoustic Echo Shield: Mute local mic while AI speaks to prevent speaker-to-mic feedback loop & stuttering
+            if (localStreamRef.current) {
+              localStreamRef.current.getAudioTracks().forEach(t => {
+                if (t.enabled) t.enabled = false;
+              });
+            }
             updateStatus('speaking');
             break;
 
           case 'response.audio.done':
           case 'response.output_audio.done':
           case 'response.done':
+            // Re-enable local mic immediately when AI finishes speaking so user can respond naturally
+            if (localStreamRef.current) {
+              localStreamRef.current.getAudioTracks().forEach(t => {
+                if (!t.enabled) t.enabled = true;
+              });
+            }
             updateStatus('listening');
             break;
 
