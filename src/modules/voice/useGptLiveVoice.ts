@@ -249,26 +249,23 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       }
 
       // 6. Send Multipart/form-data SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      // OpenAI multipart parser requires 'sdp' and 'session' as plain text form fields (NOT file blobs)
       const createMultipartBody = (targetModel: string) => {
         const formData = new FormData();
-        formData.append('sdp', new Blob([offer.sdp || ''], { type: 'application/sdp' }));
+        const sdpString = offer.sdp || pcRef.current?.localDescription?.sdp || '';
+        formData.append('sdp', sdpString);
         formData.append(
           'session',
-          new Blob(
-            [
-              JSON.stringify({
-                type: 'realtime',
-                model: targetModel,
-                instructions: optionsRef.current.systemInstruction || 'You are an intelligent voice assistant.',
-                voice: voice,
-                modalities: ['audio', 'text'],
-                input_audio_transcription: {
-                  model: 'whisper-1'
-                }
-              })
-            ],
-            { type: 'application/json' }
-          )
+          JSON.stringify({
+            type: 'realtime',
+            model: targetModel,
+            instructions: optionsRef.current.systemInstruction || 'You are an intelligent voice assistant.',
+            voice: voice,
+            modalities: ['audio', 'text'],
+            input_audio_transcription: {
+              model: 'whisper-1'
+            }
+          })
         );
         return formData;
       };

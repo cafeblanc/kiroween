@@ -144,20 +144,20 @@ export class GptLiveService {
       // 7. Send Multipart FormData SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
       const gaCallsUrl = '/api/openai/v1/realtime/calls';
       const formData = new FormData();
-      formData.append('sdp', new Blob([offer.sdp || ''], { type: 'application/sdp' }));
+      const sdpString = offer.sdp || this.pc?.localDescription?.sdp || '';
+      formData.append('sdp', sdpString);
       formData.append(
         'session',
-        new Blob(
-          [
-            JSON.stringify({
-              type: 'realtime',
-              model: 'gpt-4o-realtime-preview',
-              instructions: instructions,
-              voice: 'verse'
-            })
-          ],
-          { type: 'application/json' }
-        )
+        JSON.stringify({
+          type: 'realtime',
+          model: 'gpt-4o-realtime-preview',
+          instructions: instructions,
+          voice: 'verse',
+          modalities: ['audio', 'text'],
+          input_audio_transcription: {
+            model: 'whisper-1'
+          }
+        })
       );
 
       const sdpResponse = await fetch(gaCallsUrl, {

@@ -15,7 +15,7 @@
 
 ### 3. OpenAI Realtime WebRTC (/v1/realtime/calls) 규격 엄수 (절대 회귀 금지)
 - **OpenAI `/v1/realtime/calls` WebRTC 엔드포인트는 원시 SDP(`Content-Type: application/sdp`) 본문 전송을 거부하며, 반드시 `multipart/form-data`의 `"sdp"` 폼 필드로 패키징하여 전송해야 한다.**
-- `client_secret` 임시 세션 토큰 사용 여부와 무관하게 **예외 없이 항상 `FormData`에 `sdp` (`Blob([offer.sdp], { type: 'application/sdp' })`) 및 `session` 필드를 담아 전송**해야 한다.
+- `client_secret` 임시 세션 토큰 사용 여부와 무관하게 **예외 없이 항상 `FormData`에 순수 텍스트 문자열 `sdp` (`formData.append('sdp', offer.sdp)`) 및 `session` 필드를 담아 전송**해야 한다. (`Blob` 객체로 감싸서 보내면 브라우저가 `filename="blob"`을 붙여 파일 업로드로 전송하므로 OpenAI 서버가 `"sdp" 폼 필드가 없다`며 400 에러를 뱉게 되니 절대 Blob을 쓰지 않는다)
 - 이미 해결된 버그(`Invalid multipart form, field "sdp" is required`)를 원시 SDP 전송 분기로 되돌리는 실수를 절대 반복하지 않는다.
 - 모델 지원은 `gpt-realtime`과 `gpt-4o-realtime-preview` 간의 자동 폴백(Fallback) 구조를 항시 유지한다.
 
