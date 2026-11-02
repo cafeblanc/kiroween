@@ -5,9 +5,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
 import { DomainCategory, DOMAIN_REGISTRY, DomainMeta, DomainKnowledgeRouter } from './domainRouter';
 import { VoiceStatus, VoiceToolDefinition, GptLiveVoiceWidgetHandle } from './types';
+import { ProductItem, ActionOrder } from '../../types';
+import { ActionExecutionSheet } from '../action/ActionExecutionSheet';
+import { PayPalReceiptModal } from '../action/PayPalReceiptModal';
 
 interface VoiceLabAppProps {
   onBackToMain?: () => void;
+  activeProduct?: ProductItem | null;
+  products?: ProductItem[];
 }
 
 interface TestLog {
@@ -18,7 +23,81 @@ interface TestLog {
   isStreaming?: boolean;
 }
 
+const DEFAULT_PRODUCTS: ProductItem[] = [
+  {
+    id: 'prod-honey',
+    name: {
+      en: 'Organic Acacia Honey (500g)',
+      ko: '양평 친환경 아카시아 벌꿀 (500g)',
+      ja: '有機栽培アカシア蜂蜜 (500g)',
+      zh: '有机洋槐蜂蜜 (500g)',
+      es: 'Miel Orgánica de Acacia (500g)',
+      fr: 'Miel d Acacia Biologique (500g)'
+    },
+    price: 32000,
+    currency: 'KRW',
+    stock: 24,
+    icon: '🍯',
+    videoUrl: '/videos/honey_demo.mp4',
+    description: {
+      en: '100% Pure natural organic honey harvested from Yangpyeong mountains.',
+      ko: '맑은 물 양평 청정 자연에서 채밀한 100% 순수 천연 아카시아 벌꿀입니다.',
+      ja: '楊平の清らかな自然の中で採取された100%純粋な天然アカシア蜂蜜です。',
+      zh: '采自杨平纯净山野的100%纯天然洋槐蜂蜜。',
+      es: 'Miel de acacia 100% pura y natural recolectada en las montañas vírgenes.',
+      fr: 'Miel d acacia 100% pur et naturel récolté dans la nature préservée.'
+    },
+    timelineMarkers: []
+  },
+  {
+    id: 'prod-tea',
+    name: {
+      en: 'Handmade Traditional Herbal Tea Set',
+      ko: '핸드메이드 전통차 선물 세트',
+      ja: 'ハンドメイド伝統茶ギフトセット',
+      zh: '手工传统茶礼盒',
+      es: 'Set de Té Herbal Tradicional Hecho a Mano',
+      fr: 'Coffret de Thé Traditionnel Fait Main'
+    },
+    price: 48000,
+    currency: 'KRW',
+    stock: 15,
+    icon: '🍵',
+    videoUrl: '/videos/tea_demo.mp4',
+    description: {
+      en: 'Handmade traditional herbal tea set crafted with carefully selected ingredients.',
+      ko: '엄선된 전통 원료를 정성껏 덖아 만든 수제 전통차 선물 세트입니다.',
+      ja: '厳選された伝統原料を丁寧に焙煎して作った手作り伝統茶ギフトセットです。',
+      zh: '精选传统原料精心烘焙的手工传统茶礼盒。',
+      es: 'Set de té tradicional hecho a mano con ingredientes seleccionados.',
+      fr: 'Coffret de thé traditionnel fait main préparé avec soin.'
+    },
+    timelineMarkers: []
+  }
+];
+
 const TEST_TOOLS: VoiceToolDefinition[] = [
+  {
+    name: 'open_checkout',
+    description: 'Trigger and immediately open the in-stream checkout payment sheet modal for the featured product when the user says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "구매창 띄워", "이거 살래", "구매할래", "주문할래", "checkout", "buy this", "order this".',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string', description: 'ID of the product to checkout' },
+        reason: { type: 'string', description: 'User intent or checkout phrase' }
+      }
+    }
+  },
+  {
+    name: 'execute_instant_action',
+    description: 'Autonomous execution of instant in-stream checkout action sheet when user expresses intent to buy, order or checkout.',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string', description: 'Product ID to checkout' }
+      }
+    }
+  },
   {
     name: 'test_action_trigger',
     description: 'Trigger a test action or simulated reservation/order for verification',
@@ -34,6 +113,7 @@ const TEST_TOOLS: VoiceToolDefinition[] = [
 ];
 
 const DOMAIN_TEST_PROMPTS: Array<{ domain: DomainCategory; label: string; prompt: string }> = [
+  { domain: 'general', label: '🛍️ 결제창 띄우기 (음성 구매)', prompt: '결제창 띄워줘! 양평 아카시아 벌꿀 지금 결제할래' },
   { domain: 'science', label: '🔬 과학', prompt: '과학적으로 효소의 기질 특이성과 분해 메커니즘을 설명해줘' },
   { domain: 'math', label: '📐 수학', prompt: '수학적으로 황금비와 피보나치 수열의 관계를 증명해줘' },
   { domain: 'astronomy', label: '🌌 천문', prompt: '천문학 관점에서 블랙홀 사건의 지평선과 강착원반을 설명해줘' },
@@ -73,13 +153,24 @@ const speakKorean = (text: string) => {
   }
 };
 
-export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
+export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
+  onBackToMain,
+  activeProduct,
+  products
+}) => {
+  const availableProducts = products && products.length > 0 ? products : DEFAULT_PRODUCTS;
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem>(() => activeProduct || availableProducts[0]);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
+  const [successToast, setSuccessToast] = useState<ActionOrder | null>(null);
+
   const [logs, setLogs] = useState<TestLog[]>([
     {
       id: 'init',
       time: new Date().toLocaleTimeString(),
       type: 'info',
-      content: '🎙️ Voice Module Standalone Test Lab initialized. Ready for domain queries & WebRTC testing.'
+      content: '🎙️ Voice Module Standalone Test Lab initialized. Ready for domain queries, instant checkout & WebRTC testing.'
     }
   ]);
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
@@ -89,6 +180,12 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
 
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const voiceWidgetRef = useRef<GptLiveVoiceWidgetHandle | null>(null);
+
+  useEffect(() => {
+    if (activeProduct) {
+      setSelectedProduct(activeProduct);
+    }
+  }, [activeProduct]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,6 +210,39 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
         }
       ];
     });
+  };
+
+  // Immediate checkout sheet trigger
+  const triggerCheckout = (prod?: ProductItem | null, reason?: string) => {
+    const targetProd = prod || selectedProduct;
+    if (!targetProd) return;
+    setIsCheckoutOpen(true);
+    const alertMsg = `⚡ [결제창 즉시 표시]: ${targetProd.name.ko || targetProd.name.en} (${targetProd.price.toLocaleString()}원) 결제창이 열렸습니다.${reason ? ' (' + reason + ')' : ''}`;
+    setToolAlert(alertMsg);
+    addLog('tool', alertMsg);
+  };
+
+  // Robust checkout intent detector for Korean & English voice commands
+  const isCheckoutIntent = (text: string): boolean => {
+    const t = text.replace(/\s+/g, '').toLowerCase();
+    return (
+      t.includes('결제창') ||
+      t.includes('결제해') ||
+      t.includes('결제진행') ||
+      t.includes('구매창') ||
+      t.includes('주문창') ||
+      t.includes('구매할래') ||
+      t.includes('구매할게') ||
+      t.includes('주문할래') ||
+      t.includes('주문할게') ||
+      t.includes('이거살래') ||
+      t.includes('이거살게') ||
+      t.includes('살게요') ||
+      t.includes('살래') ||
+      t.includes('checkout') ||
+      t.includes('buythis') ||
+      t.includes('orderthis')
+    );
   };
 
   const handleTranscriptStream = (_sender: 'agent', _delta: string, fullText: string, domain?: DomainCategory) => {
@@ -145,6 +275,10 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   const handleTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
     if (sender === 'user') {
       addLog('user', `나(User): "${text}"`);
+      // Zero-failure fallback: check if user speech explicitly asks for checkout
+      if (isCheckoutIntent(text)) {
+        triggerCheckout(selectedProduct, `음성 키워드 인식 ("${text}")`);
+      }
     } else {
       const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
       const finalContent = `gpt-realtime: ${domText}${text}`;
@@ -183,6 +317,18 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
 
   const handleSimulateQuestion = (prompt: string) => {
     addLog('user', `나(User): "${prompt}"`);
+
+    // Handle checkout intent in simulated/offline mode as well
+    if (isCheckoutIntent(prompt)) {
+      triggerCheckout(selectedProduct, prompt);
+      const reply = `네! 현재 판매 중인 ${selectedProduct.name.ko || selectedProduct.name.en} 결제창을 지금 바로 화면에 띄워드렸습니다! 결제를 진행해 주세요.`;
+      setTimeout(() => {
+        addLog('agent', `gpt-realtime: [🛍️ 결제창 즉시 호출] ${reply}`);
+        speakKorean(reply);
+      }, 200);
+      return;
+    }
+
     const detected = DomainKnowledgeRouter.detectDomain(prompt);
     setActiveDomain(detected.domain);
     addLog('domain', `🎯 [파악된 분야]: ${detected.meta.icon} ${detected.meta.nameKo} - 질문 분석 완료`);
@@ -195,6 +341,10 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   };
 
   const handleQuestionClick = (prompt: string) => {
+    if (isCheckoutIntent(prompt)) {
+      triggerCheckout(selectedProduct, prompt);
+    }
+
     if (voiceWidgetRef.current?.isVoiceActive) {
       addLog('user', `나(User): "${prompt}"`);
       voiceWidgetRef.current.sendTextMessage(prompt);
@@ -204,6 +354,12 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   };
 
   const handleToolCall = (toolName: string, args: Record<string, any>) => {
+    if (toolName === 'open_checkout' || toolName === 'execute_instant_action') {
+      const targetProd = (args.productId && availableProducts.find(p => p.id === args.productId)) || selectedProduct;
+      triggerCheckout(targetProd, args.reason || 'OpenAI Realtime 도구 호출 (open_checkout)');
+      return;
+    }
+
     const alertMsg = `⚡ [Tool Triggered]: ${toolName} -> ${JSON.stringify(args)}`;
     setToolAlert(alertMsg);
     addLog('tool', alertMsg);
@@ -213,6 +369,34 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
   const handleError = (error: string) => {
     addLog('error', `⚠️ 에러 발생: ${error}`);
   };
+
+  const handleOrderSuccess = (order: ActionOrder) => {
+    setLatestOrder(order);
+    setSuccessToast(order);
+    setIsReceiptOpen(true);
+    addLog('tool', `🎉 [결제 완료 성공]: 주문번호 ${order.orderId} 결제가 정상 완료되었습니다! (송장: ${order.trackingNumber})`);
+    setTimeout(() => {
+      setSuccessToast(null);
+    }, 2500);
+  };
+
+  // Build specialized real-time prompt injecting current product & checkout command rules
+  const systemInstruction = `You are an omni-expert AI voice co-host & consultant in a live shopping test lab powered by gpt-realtime.
+Current Featured Live Sale Products:
+1. [prod-honey] 양평 친환경 아카시아 벌꿀 (500g) - 32,000원 (★ 현재 선택된 메인 상품)
+2. [prod-tea] 핸드메이드 전통차 선물 세트 - 48,000원
+
+Currently Selected Product for Purchase:
+- Product ID: ${selectedProduct.id}
+- Name: ${selectedProduct.name.ko || selectedProduct.name.en}
+- Price: ${selectedProduct.price.toLocaleString()}원 (${selectedProduct.currency})
+- Description: ${selectedProduct.description.ko || selectedProduct.description.en}
+
+CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
+1. When the user says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "이거 살래", "구매할래", "주문할래", "구매창 띄워", "checkout", "buy this", or "order this" without specifying a product, IMMEDIATELY call the tool 'open_checkout' with productId="${selectedProduct.id}".
+2. If the user mentions "전통차" or "차", call 'open_checkout' with productId="prod-tea". If the user mentions "벌꿀" or "꿀", call 'open_checkout' with productId="prod-honey".
+3. After invoking the tool, immediately speak warmly and energetically in Korean: "네! 현재 판매 중인 ${selectedProduct.name.ko || selectedProduct.name.en} 결제창을 지금 바로 화면에 띄워드렸습니다! 결제를 진행해 주세요."
+4. For questions across science, math, astronomy, fortune, philosophy, psychology, nature, medicine, physics, literature, history, fashion, and accessories, call 'domain_optimized_search' when needed and answer with intellectual rigor and conciseness.`;
 
   return (
     <div className="flex flex-col h-full w-full bg-slate-950 text-white font-sans overflow-hidden">
@@ -226,19 +410,44 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
               gpt-realtime 음성 대화 랩 (Voice Lab)
             </h1>
             <p className="text-[10px] text-slate-400">
-              실시간 WebRTC Full-Duplex · 20개 전문 도메인 자동 분석 & 양방향 자막 검증
+              실시간 WebRTC Full-Duplex · 현재 판매 상품 음성 결제창 연동 & 20개 도메인 AI
             </p>
           </div>
         </div>
 
-        {/* Center: Live Domain Indicator */}
-        {activeDomain !== 'general' && DOMAIN_REGISTRY[activeDomain] && (
-          <div className="flex items-center gap-1.5 bg-gradient-to-r from-purple-950 to-indigo-950 border border-purple-400/60 text-purple-200 px-3 py-1 rounded-full text-xs font-bold shadow animate-in fade-in">
-            <span>{DOMAIN_REGISTRY[activeDomain].icon}</span>
-            <span>분야: <strong className="text-white">{DOMAIN_REGISTRY[activeDomain].nameKo}</strong></span>
-            <span className="text-[10px] text-emerald-400 font-normal">· 최적화 답변 완료</span>
+        {/* Center: Live Product Switcher & Domain Indicator */}
+        <div className="flex items-center gap-2">
+          {/* Active Product Badge / Switcher */}
+          <div className="flex bg-slate-950 border border-purple-500/40 rounded-xl p-1 items-center gap-1 shadow-inner">
+            <span className="text-[10px] text-purple-300 font-bold px-1.5 hidden sm:inline">🛒 판매 상품:</span>
+            {availableProducts.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setSelectedProduct(p);
+                  addLog('info', `📌 현재 결제 대상 상품이 [${p.name.ko || p.name.en}] (${p.price.toLocaleString()}원)으로 설정되었습니다.`);
+                }}
+                className={`px-2 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                  selectedProduct.id === p.id
+                    ? 'bg-purple-600 text-white font-bold shadow-md ring-1 ring-purple-300'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <span>{p.icon}</span>
+                <span className="truncate max-w-[120px]">{p.name.ko || p.name.en}</span>
+                <span className="text-[10px] opacity-80">({p.price.toLocaleString()}원)</span>
+              </button>
+            ))}
           </div>
-        )}
+
+          {activeDomain !== 'general' && DOMAIN_REGISTRY[activeDomain] && (
+            <div className="hidden lg:flex items-center gap-1.5 bg-gradient-to-r from-purple-950 to-indigo-950 border border-purple-400/60 text-purple-200 px-3 py-1 rounded-full text-xs font-bold shadow animate-in fade-in">
+              <span>{DOMAIN_REGISTRY[activeDomain].icon}</span>
+              <span>분야: <strong className="text-white">{DOMAIN_REGISTRY[activeDomain].nameKo}</strong></span>
+            </div>
+          )}
+        </div>
 
         {/* Right: Controls & Back button */}
         <div className="flex items-center gap-2">
@@ -256,13 +465,13 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
           {/* Standalone Voice Widget Injected */}
           <GptLiveVoiceWidget
             ref={voiceWidgetRef}
-            systemInstruction="You are an omni-expert AI voice consultant in a standalone test lab powered by gpt-realtime. You answer questions across science, math, astronomy, fortune, philosophy, psychology, nature, medicine, physics, literature, history, fashion, and accessories with high intellectual depth, clarity, and lively spoken turns. Call test_action_trigger when requested."
+            systemInstruction={systemInstruction}
             tools={TEST_TOOLS}
             enableDomainSearch={true}
             onStatusChange={status => {
               setVoiceStatus(status);
               if (status === 'connected') {
-                addLog('info', '✅ gpt-realtime WebRTC 음성 세션이 연결되었습니다. 마이크로 말씀하시거나 질문을 전송하세요.');
+                addLog('info', '✅ gpt-realtime WebRTC 음성 세션이 연결되었습니다. 마이크로 "결제창 띄워줘"라고 말씀해 보세요!');
               } else if (status === 'idle') {
                 addLog('info', '⏹️ gpt-realtime 세션이 종료되었습니다.');
               }
@@ -284,14 +493,47 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
           <div className="p-2.5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-1.5">
               <span className="text-base">🎯</span>
-              <h2 className="text-xs font-bold text-purple-300">20개 전문 분야 질문 세트</h2>
+              <h2 className="text-xs font-bold text-purple-300">현재 판매 상품 & 음성 질문 세트</h2>
             </div>
             <span className="text-[10px] text-slate-400">클릭 시 즉시 질문 전송</span>
           </div>
 
-          <div className="flex-1 p-2.5 overflow-y-auto space-y-1.5 min-h-0">
-            <p className="text-[10px] text-slate-400 leading-snug mb-1">
-              💡 질문 클릭 시 <span className="text-purple-300 font-bold">DomainKnowledgeRouter</span>가 핵심어를 감지하여 우측 채팅창에 질문과 전문 답변을 즉시 글자로 표시합니다.
+          <div className="flex-1 p-2.5 overflow-y-auto space-y-2 min-h-0">
+            {/* Featured Active Sale Product Card */}
+            <div className="bg-gradient-to-r from-purple-950/90 via-indigo-950/90 to-pink-950/80 border border-purple-500/50 p-3 rounded-xl shadow-lg flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-3xl shrink-0 p-1 bg-purple-900/40 rounded-xl border border-purple-500/30">
+                  {selectedProduct.icon}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] bg-pink-500/30 text-pink-300 border border-pink-400/40 px-1.5 py-0.2 rounded font-bold animate-pulse">
+                      🔴 라이브 판매 중
+                    </span>
+                    <h3 className="text-xs font-bold text-white truncate">
+                      {selectedProduct.name.ko || selectedProduct.name.en}
+                    </h3>
+                  </div>
+                  <p className="text-[12px] text-purple-200 font-mono font-bold mt-0.5">
+                    {selectedProduct.price.toLocaleString()}원
+                    <span className="text-[10px] text-slate-400 font-normal ml-1.5">
+                      · 재고 {selectedProduct.stock}개 한정
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => triggerCheckout(selectedProduct, '결제창 띄우기 버튼 클릭')}
+                className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer shadow-lg shrink-0 flex items-center gap-1 active:scale-95"
+              >
+                <span>⚡</span>
+                <span>결제창 띄우기</span>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-snug px-0.5">
+              💡 음성으로 <span className="text-emerald-300 font-bold">"결제창 띄워"</span> 또는 <span className="text-emerald-300 font-bold">"이거 결제해줘"</span>라고 말하면 아래 상품의 PayPal/카드 결제창이 즉시 화면에 열립니다.
             </p>
 
             <div className="grid grid-cols-1 gap-1.5">
@@ -468,6 +710,33 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({ onBackToMain }) => {
           </div>
         </section>
       </main>
+
+      {/* Instant Action Checkout Sheet Modal for Currently Advertised Product */}
+      <ActionExecutionSheet
+        product={selectedProduct}
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        onSuccess={handleOrderSuccess}
+      />
+
+      {/* Official PayPal Order Receipt & Tracking Modal */}
+      <PayPalReceiptModal
+        order={latestOrder}
+        isOpen={isReceiptOpen}
+        onClose={() => setIsReceiptOpen(false)}
+        lang="ko"
+      />
+
+      {/* Success Toast */}
+      {successToast && (
+        <div className="fixed top-14 right-4 bg-emerald-600 border border-emerald-400 text-white p-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-in fade-in duration-200">
+          <span className="text-2xl">🎉</span>
+          <div>
+            <p className="text-xs font-bold">결제 및 주문이 성공적으로 완료되었습니다!</p>
+            <p className="text-[11px] opacity-90">주문번호: {successToast.orderId} · 송장번호: {successToast.trackingNumber}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

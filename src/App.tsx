@@ -272,7 +272,11 @@ export const App: React.FC = () => {
       {/* Main Workspace: Modular Split View vs Standalone Voice Lab */}
       {currentView === 'voicelab' ? (
         <div className="flex-1 min-h-0 overflow-hidden">
-          <VoiceLabApp onBackToMain={() => setCurrentView('main')} />
+          <VoiceLabApp
+            onBackToMain={() => setCurrentView('main')}
+            activeProduct={activeProduct}
+            products={products}
+          />
         </div>
       ) : (
         <main className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 p-1.5 sm:p-3 overflow-hidden">

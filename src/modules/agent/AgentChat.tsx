@@ -10,6 +10,23 @@ interface AgentChatProps {
 
 const VOICE_TOOLS: VoiceToolDefinition[] = [
   {
+    name: 'open_checkout',
+    description: 'Trigger and immediately open the in-stream checkout payment sheet modal for the featured product currently being advertised in the live video stream when the user says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "구매창 띄워", "이거 살래", "구매할래", "주문할래", "checkout", "buy this", "order this".',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'Product ID currently advertised in video'
+        },
+        reason: {
+          type: 'string',
+          description: 'User intent phrase'
+        }
+      }
+    }
+  },
+  {
     name: 'execute_instant_action',
     description: 'Trigger instant in-stream checkout action sheet when the user expresses desire to buy, order, or purchase the current live stream item.',
     parameters: {
@@ -77,20 +94,46 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Dynamic system instructions for voice agent with domain grounding
-  const voiceInstructions = `You are the Kiroween Live Commerce Co-Host AI Agent powered by gpt-live-1.
+  // Dynamic system instructions for voice agent with domain grounding & active video product
+  const voiceInstructions = `You are the Kiroween Live Commerce Co-Host AI Agent powered by gpt-realtime.
 You are co-hosting an active live shopping broadcast with the host on screen.
-The current featured stream product is:
+The current product advertised in the live video stream is:
 - Product ID: ${activeProduct?.id || 'prod-honey'}
-- Name: ${activeProduct?.name.en || 'Organic Acacia Honey (500g)'}
-- Price: ${activeProduct?.currency || 'KRW'} ${activeProduct?.price || 32000}
-- Description: ${activeProduct?.description.en || '100% pure organic honey'}
+- Name: ${activeProduct?.name.ko || activeProduct?.name.en || '양평 친환경 아카시아 벌꿀 (500g)'}
+- Price: ${activeProduct?.currency || 'KRW'} ${(activeProduct?.price || 32000).toLocaleString()}
+- Description: ${activeProduct?.description.ko || activeProduct?.description.en || '100% pure organic honey'}
+
+CRITICAL INSTRUCTION FOR PURCHASE & CHECKOUT:
+When the viewer says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "이거 살래", "구매할래", "주문할래", "구매창 띄워", "checkout", "buy this", or "order this", you MUST IMMEDIATELY call the tool 'open_checkout' with productId="${activeProduct?.id || 'prod-honey'}".
+After calling the tool, respond warmly and excitedly in Korean: "네! 현재 방송 동영상에서 소개 중인 ${activeProduct?.name.ko || activeProduct?.name.en} 결제창을 지금 바로 띄워드렸습니다!"
 
 Specialized Domain Intelligence:
 You are an expert who can seamlessly answer across 13 specialized domains:
 [Science, Math, Astronomy, Fortune/Divination, Philosophy, Psychology, Nature, Medicine/Health, Physics, Literature, History, Fashion, Accessories].
-When a specialized question is asked, analyze the core keywords, cite rigorous facts or cultural depth according to the field, and deliver articulate, concise spoken turns (1-2 sentences).
-If user wants to buy or order, call 'execute_instant_action'.`;
+When a specialized question is asked, analyze the core keywords, cite rigorous facts or cultural depth according to the field, and deliver articulate, concise spoken turns (1-2 sentences).`;
+
+  // Helper: check if speech has checkout/purchase intent
+  const isCheckoutSpeech = (str: string) => {
+    const s = str.replace(/\s+/g, '').toLowerCase();
+    return (
+      s.includes('결제창') ||
+      s.includes('결제해') ||
+      s.includes('결제진행') ||
+      s.includes('구매창') ||
+      s.includes('주문창') ||
+      s.includes('구매할래') ||
+      s.includes('구매할게') ||
+      s.includes('주문할래') ||
+      s.includes('주문할게') ||
+      s.includes('이거살래') ||
+      s.includes('이거살게') ||
+      s.includes('살게요') ||
+      s.includes('살래') ||
+      s.includes('checkout') ||
+      s.includes('buythis') ||
+      s.includes('orderthis')
+    );
+  };
 
   // Handle incoming transcripts from the independent Voice Module with strict deduplication
   const handleVoiceTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
@@ -104,6 +147,12 @@ If user wants to buy or order, call 'execute_instant_action'.`;
 
     const trimmed = text.trim();
     const formattedText = sender === 'user' ? `🎙️ ${displayPrefix}"${trimmed}"` : `🗣️ ${displayPrefix}${trimmed}`;
+
+    // Zero-failure fallback: If user speech expresses checkout intent, trigger active product checkout immediately!
+    if (sender === 'user' && isCheckoutSpeech(trimmed) && activeProduct) {
+      console.log('[AgentChat] Voice checkout command detected:', trimmed);
+      onTriggerAction(activeProduct);
+    }
 
     setMessages(prev => {
       // Prevent duplicate messages from OpenAI audio/text multiple event fires
@@ -127,11 +176,11 @@ If user wants to buy or order, call 'execute_instant_action'.`;
 
   // Handle tool execution triggered by the independent Voice Module
   const handleVoiceToolCall = (toolName: string) => {
-    if (toolName === 'execute_instant_action' && activeProduct) {
+    if ((toolName === 'execute_instant_action' || toolName === 'open_checkout') && activeProduct) {
       const actionMsg: ChatMessage = {
         id: Date.now() + '-action',
         sender: 'ai',
-        text: `⚡ [gpt-live-1] ${activeProduct.name[lang] || activeProduct.name.en} 결제창을 화면 앞에 열었습니다!`,
+        text: `⚡ [gpt-realtime] 현재 방송 중인 ${activeProduct.name[lang] || activeProduct.name.en} 결제창을 화면 앞에 열었습니다!`,
         suggestedProduct: activeProduct,
         timestamp: new Date().toLocaleTimeString()
       };
