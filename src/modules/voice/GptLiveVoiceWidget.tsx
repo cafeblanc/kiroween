@@ -1,8 +1,8 @@
-// Standalone UI Widget for gpt-live WebRTC Voice Call
+// Standalone UI Widget for gpt-live WebRTC Voice Call with Domain-Optimized Intelligence
 // Pure In/Out contract: accepts systemInstruction & tools in, emits onTranscript & onToolCall out.
 
 import React, { useState } from 'react';
-import { GptLiveVoiceWidgetProps } from './types';
+import { GptLiveVoiceWidgetProps, DOMAIN_REGISTRY } from './types';
 import { useGptLiveVoice } from './useGptLiveVoice';
 
 export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
@@ -11,20 +11,25 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
   model,
   voiceName,
   tools,
+  enableDomainSearch = true,
   className = '',
+  onDomainSearch,
   onTranscript,
   onToolCall,
   onStatusChange,
+  onDomainDetected,
   onError,
   onAudioLevel
 }) => {
   const [localKey, setLocalKey] = useState(() => apiKey || localStorage.getItem('kiroween_openai_api_key') || '');
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [selectedDomainFilter, setSelectedDomainFilter] = useState<string | null>(null);
 
   const {
     status,
     isVoiceActive,
     error,
+    activeDomain,
     startVoice,
     stopVoice,
     setError
@@ -34,9 +39,12 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
     model,
     voiceName,
     tools,
+    enableDomainSearch,
+    onDomainSearch,
     onTranscript,
     onToolCall,
     onStatusChange,
+    onDomainDetected,
     onError,
     onAudioLevel
   });
@@ -60,15 +68,25 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
     startVoice(localKey.trim());
   };
 
+  const currentDomainMeta = activeDomain && activeDomain !== 'general' ? DOMAIN_REGISTRY[activeDomain] : null;
+
   return (
     <div className={`flex flex-col select-none ${className}`}>
       {/* Control Strip */}
       <div className="flex items-center gap-1.5">
+        {/* Active Domain Indicator Pill */}
+        {currentDomainMeta && (
+          <span className="text-[10px] bg-indigo-950/90 text-indigo-300 border border-indigo-500/50 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow animate-in fade-in duration-200">
+            <span>{currentDomainMeta.icon}</span>
+            <span>{currentDomainMeta.nameKo} 최적화</span>
+          </span>
+        )}
+
         <button
           type="button"
           onClick={() => setShowKeyModal(prev => !prev)}
           className="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 px-2 py-1 rounded-lg transition cursor-pointer"
-          title="OpenAI API Key 설정"
+          title="OpenAI API Key 및 전문 도메인 설정"
         >
           🔑 {localKey ? 'Key' : 'Key 등록'}
         </button>
@@ -103,11 +121,11 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
         </button>
       </div>
 
-      {/* Floating Key Drawer */}
+      {/* Floating Settings & Domain Drawer */}
       {showKeyModal && (
-        <div className="absolute top-12 right-2 bg-slate-950 border border-purple-500/50 p-3 rounded-xl shadow-2xl z-30 w-72 flex flex-col gap-2 animate-in slide-in-from-top duration-150">
+        <div className="absolute top-12 right-2 bg-slate-950 border border-purple-500/50 p-3.5 rounded-xl shadow-2xl z-30 w-80 flex flex-col gap-3 animate-in slide-in-from-top duration-150">
           <div className="flex items-center justify-between text-xs font-bold text-purple-300">
-            <span>OpenAI API Key (GA Calls)</span>
+            <span>OpenAI API Key & 전문 도메인 최적화</span>
             <button
               type="button"
               onClick={() => setShowKeyModal(false)}
@@ -116,17 +134,53 @@ export const GptLiveVoiceWidget: React.FC<GptLiveVoiceWidgetProps> = ({
               ✕
             </button>
           </div>
-          <input
-            type="password"
-            value={localKey}
-            onChange={e => setLocalKey(e.target.value)}
-            placeholder="sk-proj-..."
-            className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
-          />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] text-slate-400 font-bold">API Key (GA /v1/realtime/calls):</label>
+            <input
+              type="password"
+              value={localKey}
+              onChange={e => setLocalKey(e.target.value)}
+              placeholder="sk-proj-..."
+              className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
+            />
+          </div>
+
+          {/* Specialized Domain Categories (13개 핵심 전문 분야) */}
+          <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-2">
+            <span className="text-[10px] font-bold text-indigo-300 flex items-center justify-between">
+              <span>🎯 전문 질문 최적화 검색 지원 (13개 분야):</span>
+              <span className="text-[9px] text-slate-400">키워드 자동 분리</span>
+            </span>
+            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
+              {Object.values(DOMAIN_REGISTRY).filter(d => d.id !== 'general').map(d => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setSelectedDomainFilter(selectedDomainFilter === d.id ? null : d.id)}
+                  className={`text-[9px] px-1.5 py-0.5 rounded border transition flex items-center gap-1 ${
+                    selectedDomainFilter === d.id
+                      ? 'bg-purple-600 border-purple-400 text-white font-bold'
+                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{d.icon}</span>
+                  <span>{d.nameKo}</span>
+                </button>
+              ))}
+            </div>
+
+            {selectedDomainFilter && DOMAIN_REGISTRY[selectedDomainFilter as keyof typeof DOMAIN_REGISTRY] && (
+              <p className="text-[9px] text-indigo-200/90 bg-indigo-950/60 p-1.5 rounded border border-indigo-500/30">
+                💡 핵심어: {DOMAIN_REGISTRY[selectedDomainFilter as keyof typeof DOMAIN_REGISTRY].keywords.slice(0, 6).join(', ')}...
+              </p>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={handleSaveKey}
-            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-1.5 rounded-lg transition"
+            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-2 rounded-lg transition shadow-md"
           >
             저장 및 즉시 연결 (Connect)
           </button>

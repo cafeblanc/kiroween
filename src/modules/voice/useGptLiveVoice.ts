@@ -1,8 +1,9 @@
-// Headless Hook for gpt-live WebRTC Full-Duplex Voice Engine
+// Headless Hook for gpt-live WebRTC Full-Duplex Voice Engine with Specialized Domain Optimization
 // Pure standalone implementation with zero dependencies on domain business logic.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { VoiceStatus, VoiceToolDefinition } from './types';
+import { VoiceStatus, VoiceToolDefinition, DomainCategory, DomainMeta } from './types';
+import { DomainKnowledgeRouter } from './domainRouter';
 
 export interface UseGptLiveVoiceOptions {
   apiKey?: string;
@@ -10,9 +11,12 @@ export interface UseGptLiveVoiceOptions {
   model?: string;
   voiceName?: string;
   tools?: VoiceToolDefinition[];
-  onTranscript?: (sender: 'user' | 'agent', text: string) => void;
+  enableDomainSearch?: boolean;
+  onDomainSearch?: (domain: DomainCategory, query: string) => Promise<string> | string;
+  onTranscript?: (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => void;
   onToolCall?: (toolName: string, args: Record<string, any>) => Promise<any> | void;
   onStatusChange?: (status: VoiceStatus) => void;
+  onDomainDetected?: (domain: DomainCategory, meta: DomainMeta, query: string) => void;
   onError?: (error: string) => void;
   onAudioLevel?: (level: number) => void;
 }
@@ -22,6 +26,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [activeDomain, setActiveDomain] = useState<DomainCategory>('general');
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -31,7 +36,6 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
 
-  // Keep options in a ref to avoid stale closures in WebRTC callbacks
   const optionsRef = useRef(options);
   useEffect(() => {
     optionsRef.current = options;
@@ -53,7 +57,6 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     optionsRef.current.onError?.(errText);
   }, [updateStatus]);
 
-  // Visualizer loop for real-time audio wave
   const setupVisualizer = (stream: MediaStream) => {
     try {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -113,6 +116,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
 
     setAudioLevel(0);
     setIsVoiceActive(false);
+    setActiveDomain('general');
     updateStatus('idle');
   }, [updateStatus]);
 
@@ -127,7 +131,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         throw new Error('OpenAI API Key가 설정되지 않았습니다. API 키를 입력해주세요.');
       }
 
-      // 1. Capture user microphone
+      // 1. Capture microphone
       try {
         localStreamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -143,10 +147,9 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         throw new Error('마이크 장치 접근 실패: ' + (mediaErr?.message || '마이크 장치를 찾을 수 없습니다.'));
       }
 
-      // 2. Setup frequency analyser
       setupVisualizer(localStreamRef.current);
 
-      // 3. Initialize WebRTC PeerConnection
+      // 2. Initialize WebRTC
       pcRef.current = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
@@ -164,15 +167,15 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         pcRef.current.addTrack(track, localStreamRef.current);
       }
 
-      // 4. Create DataChannel
+      // 3. Create DataChannel
       dcRef.current = pcRef.current.createDataChannel('oai-events');
       setupDataChannel(dcRef.current, optionsRef.current);
 
-      // 5. Create local SDP Offer
+      // 4. Create local SDP Offer
       const offer = await pcRef.current.createOffer();
       await pcRef.current.setLocalDescription(offer);
 
-      // 6. Request Ephemeral Client Secret or GA Calls
+      // 5. Request client secret or GA Calls
       let activeBearer = targetKey;
       try {
         const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
@@ -208,7 +211,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         console.warn('[useGptLiveVoice] Proceeding with direct call token:', tokenErr);
       }
 
-      // 7. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      // 6. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
       const gaCallsUrl = '/api/openai/v1/realtime/calls';
       const sdpResponse = await fetch(gaCallsUrl, {
         method: 'POST',
@@ -255,10 +258,10 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     }
   }, [reportError, stopVoice, updateStatus]);
 
-  // DataChannel configuration and event router
+  // DataChannel configuration with Domain-Optimized Tool
   const setupDataChannel = (dc: RTCDataChannel, currentOpts: UseGptLiveVoiceOptions) => {
     dc.onopen = () => {
-      console.log('[useGptLiveVoice] DataChannel opened, sending session config');
+      console.log('[useGptLiveVoice] DataChannel opened, sending session config with domain search');
 
       const toolsPayload = (currentOpts.tools || []).map(t => ({
         type: 'function',
@@ -267,11 +270,37 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         parameters: t.parameters
       }));
 
+      // Automatically inject Domain-Optimized Search tool
+      if (currentOpts.enableDomainSearch !== false) {
+        toolsPayload.push({
+          type: 'function',
+          name: 'domain_optimized_search',
+          description: 'Perform deep domain-specific optimized knowledge retrieval for specialized fields: science, math, astronomy, fortune, philosophy, psychology, nature, medicine, physics, literature, history, fashion, accessories.',
+          parameters: {
+            type: 'object',
+            properties: {
+              domain: {
+                type: 'string',
+                description: 'The specialized domain category (e.g. science, math, medicine, astronomy, fortune, philosophy, fashion, etc.)'
+              },
+              query: {
+                type: 'string',
+                description: 'The specific specialized question to research'
+              }
+            },
+            required: ['domain', 'query']
+          }
+        });
+      }
+
+      const domainInstructions = `\n[Specialized Domain Knowledge Optimization]:
+You are equipped with 'domain_optimized_search'. When the user asks domain-specific or expert questions across science, math, astronomy, fortune/divination, philosophy, psychology, nature, medicine/health, physics, literature, history, fashion, or accessories, call 'domain_optimized_search' to retrieve authoritative domain insights before speaking. Tailor your terminology, rigor, and depth according to the domain.`;
+
       const sessionConfig = {
         type: 'session.update',
         session: {
           modalities: ['audio', 'text'],
-          instructions: currentOpts.systemInstruction,
+          instructions: currentOpts.systemInstruction + domainInstructions,
           voice: currentOpts.voiceName || 'verse',
           input_audio_format: 'pcm16',
           output_audio_format: 'pcm16',
@@ -292,12 +321,11 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       dc.send(JSON.stringify(sessionConfig));
     };
 
-    dc.onmessage = (event) => {
+    dc.onmessage = async (event) => {
       try {
         const msg = JSON.parse(event.data);
 
         switch (msg.type) {
-          // Native Barge-in
           case 'input_audio_buffer.speech_started':
             updateStatus('listening');
             break;
@@ -306,21 +334,27 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
             updateStatus('connected');
             break;
 
-          // Transcripts
+          // User Speech Transcription with Domain Detection
           case 'conversation.item.input_audio_transcription.completed':
             if (msg.transcript) {
-              optionsRef.current.onTranscript?.('user', msg.transcript);
+              const detected = DomainKnowledgeRouter.detectDomain(msg.transcript);
+              setActiveDomain(detected.domain);
+              if (detected.domain !== 'general') {
+                optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, msg.transcript);
+              }
+              optionsRef.current.onTranscript?.('user', msg.transcript, detected.domain);
             }
             break;
 
+          // Agent Answer Transcription
           case 'response.audio_transcript.done':
           case 'response.output_text.done':
             if (msg.transcript || msg.text) {
-              optionsRef.current.onTranscript?.('agent', msg.transcript || msg.text);
+              optionsRef.current.onTranscript?.('agent', msg.transcript || msg.text, activeDomain);
             }
             break;
 
-          // Audio states
+          // Audio playback status
           case 'response.audio.delta':
           case 'response.output_audio.delta':
             updateStatus('speaking');
@@ -332,22 +366,45 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
             updateStatus('listening');
             break;
 
-          // Function Tool Calling
+          // Tool Calling (including domain_optimized_search)
           case 'response.function_call_arguments.done':
             try {
               const args = JSON.parse(msg.arguments || '{}');
-              optionsRef.current.onToolCall?.(msg.name, args);
 
-              dc.send(JSON.stringify({
-                type: 'conversation.item.create',
-                item: {
-                  type: 'function_call_output',
-                  call_id: msg.call_id,
-                  output: JSON.stringify({ success: true })
+              if (msg.name === 'domain_optimized_search') {
+                // Execute domain search
+                let searchResult = '';
+                if (optionsRef.current.onDomainSearch) {
+                  searchResult = await optionsRef.current.onDomainSearch(args.domain, args.query);
+                } else {
+                  searchResult = DomainKnowledgeRouter.resolveDomainKnowledge(args.domain, args.query);
                 }
-              }));
 
-              dc.send(JSON.stringify({ type: 'response.create' }));
+                dc.send(JSON.stringify({
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'function_call_output',
+                    call_id: msg.call_id,
+                    output: JSON.stringify({ success: true, knowledge: searchResult })
+                  }
+                }));
+
+                dc.send(JSON.stringify({ type: 'response.create' }));
+              } else {
+                // Application-level tools (e.g. execute_instant_action)
+                optionsRef.current.onToolCall?.(msg.name, args);
+
+                dc.send(JSON.stringify({
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'function_call_output',
+                    call_id: msg.call_id,
+                    output: JSON.stringify({ success: true })
+                  }
+                }));
+
+                dc.send(JSON.stringify({ type: 'response.create' }));
+              }
             } catch (fnErr) {
               console.error('[useGptLiveVoice] Tool parsing failed:', fnErr);
             }
@@ -379,6 +436,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     isVoiceActive,
     error,
     audioLevel,
+    activeDomain,
     startVoice,
     stopVoice,
     setError
