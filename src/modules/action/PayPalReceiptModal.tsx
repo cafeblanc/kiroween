@@ -70,7 +70,7 @@ export const PayPalReceiptModal: React.FC<PayPalReceiptModalProps> = ({
           <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex flex-col gap-2">
             <div className="flex justify-between items-center text-slate-400 text-[11px]">
               <span>Purchased Item</span>
-              <span>Qty: 1</span>
+              <span>Qty: {order.quantity || 1}개</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-bold text-white text-xs truncate max-w-[200px]">{order.productName}</span>

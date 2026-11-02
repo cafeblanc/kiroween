@@ -147,6 +147,26 @@ When a specialized question is asked, analyze the core keywords, cite rigorous f
     const trimmed = text.trim();
     const formattedText = sender === 'user' ? `🎙️ ${displayPrefix}"${trimmed}"` : `🗣️ ${displayPrefix}${trimmed}`;
 
+    // Handle In-Modal Button Voice Commands ("하나 더", "하나 빼", "결제하기", "취소")
+    const t = trimmed.replace(/\s+/g, '').toLowerCase();
+    if (t.includes('취소') || t.includes('닫기') || t.includes('안살래') || t.includes('그만')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'cancel' } }));
+      }
+    } else if (t.includes('결제하기') || t.includes('구매하기') || t.includes('결제진행') || t.includes('구매완료')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'pay' } }));
+      }
+    } else if (t.includes('하나더') || t.includes('더하기') || t.includes('플러스') || t.includes('수량추가') || t.includes('올려')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'increase' } }));
+      }
+    } else if (t.includes('하나빼') || t.includes('빼기') || t.includes('마이너스') || t.includes('수량빼') || t.includes('줄여')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'decrease' } }));
+      }
+    }
+
     // Zero-failure fallback: If user speech OR AI voice mentions checkout, open checkout sheet immediately!
     if (activeProduct && isCheckoutSpeech(trimmed)) {
       console.log('[AgentChat] Voice checkout trigger fired:', sender, trimmed);

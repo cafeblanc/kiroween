@@ -114,6 +114,10 @@ const TEST_TOOLS: VoiceToolDefinition[] = [
 
 const DOMAIN_TEST_PROMPTS: Array<{ domain: DomainCategory; label: string; prompt: string }> = [
   { domain: 'general', label: '🛍️ 결제창 띄우기 (음성 구매)', prompt: '결제창 띄워줘! 양평 아카시아 벌꿀 지금 결제할래' },
+  { domain: 'general', label: '➕ 버튼 음성: "하나 더" (수량 +1)', prompt: '하나 더' },
+  { domain: 'general', label: '➖ 버튼 음성: "하나 빼" (수량 -1)', prompt: '하나 빼' },
+  { domain: 'general', label: '🚀 버튼 음성: "결제하기" (구매 완료)', prompt: '결제하기' },
+  { domain: 'general', label: '✕ 버튼 음성: "취소" (결제창 닫기)', prompt: '취소' },
   { domain: 'science', label: '🔬 과학', prompt: '과학적으로 효소의 기질 특이성과 분해 메커니즘을 설명해줘' },
   { domain: 'math', label: '📐 수학', prompt: '수학적으로 황금비와 피보나치 수열의 관계를 증명해줘' },
   { domain: 'astronomy', label: '🌌 천문', prompt: '천문학 관점에서 블랙홀 사건의 지평선과 강착원반을 설명해줘' },
@@ -249,6 +253,64 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
     );
   };
 
+  // Voice Command Router for In-Modal Buttons ("하나 더", "하나 빼", "결제하기", "취소")
+  const handleVoiceButtonCommand = (rawText: string): boolean => {
+    const t = rawText.replace(/\s+/g, '').toLowerCase();
+
+    // 1. Cancel / Close command
+    if (t.includes('취소') || t.includes('닫기') || t.includes('안살래') || t.includes('그만')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'cancel' } }));
+      }
+      setIsCheckoutOpen(false);
+      addLog('info', '🛑 음성 명령: "취소" 버튼이 작동되어 결제창이 닫혔습니다.');
+      return true;
+    }
+
+    // 2. Pay Now / Confirm Purchase command
+    if (t.includes('결제하기') || t.includes('구매하기') || t.includes('결제진행') || t.includes('구매완료') || t.includes('paynow')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'pay' } }));
+      }
+      addLog('info', '🚀 음성 명령: "결제하기" 버튼이 작동되었습니다.');
+      return true;
+    }
+
+    // 3. Increase Quantity command ("하나 더", "더하기", "플러스", "추가")
+    if (t.includes('하나더') || t.includes('더하기') || t.includes('플러스') || t.includes('수량추가') || t.includes('올려') || t.includes('+1')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'increase' } }));
+      }
+      addLog('info', '➕ 음성 명령: "하나 더" (수량 +1) 버튼이 작동되었습니다.');
+      return true;
+    }
+
+    // 4. Decrease Quantity command ("하나 빼", "빼기", "마이너스", "줄여")
+    if (t.includes('하나빼') || t.includes('빼기') || t.includes('마이너스') || t.includes('수량빼') || t.includes('줄여') || t.includes('-1')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'decrease' } }));
+      }
+      addLog('info', '➖ 음성 명령: "하나 빼" (수량 -1) 버튼이 작동되었습니다.');
+      return true;
+    }
+
+    // 5. Specific quantity like "2개", "3개", "두개", "세개"
+    const match = rawText.match(/(\d+)\s*개/) || rawText.match(/(두|세|네|다섯)\s*개/);
+    if (match) {
+      const numMap: Record<string, number> = { 두: 2, 세: 3, 네: 4, 다섯: 5 };
+      const q = numMap[match[1]] || parseInt(match[1], 10);
+      if (q > 0) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'set_quantity', quantity: q } }));
+        }
+        addLog('info', `📦 음성 명령: 수량이 ${q}개로 설정되었습니다.`);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const handleTranscriptStream = (_sender: 'agent', _delta: string, fullText: string, domain?: DomainCategory) => {
     const domText = domain && domain !== 'general' ? `[${domain}] ` : '';
     const formattedContent = `gpt-realtime: ${domText}${fullText}`;
@@ -286,6 +348,13 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
   const handleTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
     if (sender === 'user') {
       addLog('user', `나(User): "${text}"`);
+
+      // If checkout sheet is open, check if user said button names ("하나 더", "하나 빼", "결제하기", "취소")
+      if (isCheckoutOpen) {
+        const handled = handleVoiceButtonCommand(text);
+        if (handled) return;
+      }
+
       // Zero-failure fallback: check if user speech explicitly asks for checkout
       if (isCheckoutIntent(text)) {
         triggerCheckout(selectedProduct, `사용자 음성 인식 ("${text}")`);
@@ -359,6 +428,12 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
   };
 
   const handleQuestionClick = (prompt: string) => {
+    // If checkout sheet is open, check button name commands first
+    if (isCheckoutOpen) {
+      const handled = handleVoiceButtonCommand(prompt);
+      if (handled) return;
+    }
+
     if (isCheckoutIntent(prompt)) {
       triggerCheckout(selectedProduct, prompt);
     }
@@ -696,6 +771,13 @@ CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
               if (!textInput.trim()) return;
               const q = textInput.trim();
               setTextInput('');
+
+              // If checkout sheet is open, check button name command first
+              if (isCheckoutOpen) {
+                const handled = handleVoiceButtonCommand(q);
+                if (handled) return;
+              }
+
               if (voiceWidgetRef.current?.isVoiceActive) {
                 addLog('user', `나(User): "${q}"`);
                 voiceWidgetRef.current.sendTextMessage(q);

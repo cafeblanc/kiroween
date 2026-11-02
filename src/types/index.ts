@@ -29,6 +29,7 @@ export interface ChatMessage {
 export interface ActionOrder {
   orderId: string;
   productName: string;
+  quantity?: number;
   amount: number;
   currency: string;
   trackingNumber: string;

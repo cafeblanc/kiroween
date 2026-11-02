@@ -182,8 +182,9 @@ export const App: React.FC = () => {
 
     setIsReceiptOpen(true);
     if (activeProduct) {
+      const deductQty = order.quantity || 1;
       setProducts(prev =>
-        prev.map(p => (p.id === activeProduct.id ? { ...p, stock: Math.max(0, p.stock - 1) } : p))
+        prev.map(p => (p.id === activeProduct.id ? { ...p, stock: Math.max(0, p.stock - deductQty) } : p))
       );
     }
   };
