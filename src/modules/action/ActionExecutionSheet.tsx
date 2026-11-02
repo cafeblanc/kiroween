@@ -165,10 +165,10 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
               type="button"
               onClick={() => setQuantity(q => Math.max(1, q - 1))}
               disabled={quantity <= 1}
-              className="flex-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-700 text-slate-200 py-2 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95"
+              className="flex-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-700 text-slate-200 py-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95"
             >
-              <span className="text-sm">➖ 하나 빼</span>
-              <span className="text-[9px] text-slate-400 font-normal">음성: "하나 빼" / "빼기"</span>
+              <span className="text-sm font-extrabold">➖ 빼기</span>
+              <span className="text-[10px] text-amber-300 font-mono">음성: "빼기"</span>
             </button>
 
             {/* Display quantity */}
@@ -181,10 +181,10 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
             <button
               type="button"
               onClick={() => setQuantity(q => q + 1)}
-              className="flex-1 bg-purple-900/40 hover:bg-purple-900/60 border border-purple-500/50 text-purple-200 py-2 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95"
+              className="flex-1 bg-purple-900/40 hover:bg-purple-900/60 border border-purple-500/50 text-purple-200 py-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95"
             >
-              <span className="text-sm">➕ 하나 더</span>
-              <span className="text-[9px] text-purple-300 font-normal">음성: "하나 더" / "더하기"</span>
+              <span className="text-sm font-extrabold">➕ 더하기</span>
+              <span className="text-[10px] text-amber-300 font-mono">음성: "더하기"</span>
             </button>
           </div>
         </div>
@@ -249,8 +249,8 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
             disabled={loading}
             className="col-span-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold py-3 rounded-xl text-xs border border-slate-700 transition flex flex-col items-center justify-center cursor-pointer shadow"
           >
-            <span className="text-xs font-extrabold">✕ 취소하기</span>
-            <span className="text-[9px] text-slate-400 font-normal">음성: "취소"</span>
+            <span className="text-xs font-extrabold">✕ 취소</span>
+            <span className="text-[10px] text-amber-300 font-mono">음성: "취소"</span>
           </button>
 
           {/* Pay button */}
@@ -267,11 +267,11 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
               </span>
             ) : (
               <>
-                <span className="flex items-center gap-1 font-extrabold">
-                  <span>🚀 결제하기</span>
+                <span className="flex items-center gap-1 font-extrabold text-sm">
+                  <span>🚀 결제</span>
                   <span>(₩{totalAmount.toLocaleString()})</span>
                 </span>
-                <span className="text-[9px] text-slate-900 font-semibold">음성: "결제하기" / "구매하기"</span>
+                <span className="text-[10px] text-slate-950 font-bold">음성: "결제"</span>
               </>
             )}
           </button>

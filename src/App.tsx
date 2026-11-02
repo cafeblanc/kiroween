@@ -156,8 +156,9 @@ export const App: React.FC = () => {
   const [latestOrder, setLatestOrder] = useState<ActionOrder | null>(null);
   const [successToast, setSuccessToast] = useState<ActionOrder | null>(null);
   const [lang, setLang] = useState<Language>('en');
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
 
-  // Global listener for voice checkout events across all views
+  // Global listener for voice button commands across all views
   useEffect(() => {
     const handleGlobalCheckout = (e: any) => {
       const prod = e.detail?.product || activeProduct;
@@ -165,12 +166,68 @@ export const App: React.FC = () => {
         setActiveProduct(prod);
       }
       setIsActionOpen(true);
+      setVoiceNotice('🗣️ 음성 버튼 작동: "결제창"');
     };
+
+    const handleSwitchView = (e: any) => {
+      const targetView = e.detail?.view;
+      if (targetView === 'main' || targetView === 'voicelab') {
+        setCurrentView(targetView);
+        setVoiceNotice(`🗣️ 음성 버튼 작동: "${targetView === 'main' ? '방송' : '음성랩'}"`);
+      }
+    };
+
+    const handleOpenAdmin = () => {
+      setIsAdminOpen(true);
+      setVoiceNotice('🗣️ 음성 버튼 작동: "관리자"');
+    };
+
+    const handleSelectProduct = (e: any) => {
+      const pid = e.detail?.productId;
+      const found = products.find(p => p.id === pid);
+      if (found) {
+        setActiveProduct(found);
+        setVoiceNotice(`🗣️ 음성 버튼 작동: "${found.id === 'prod-honey' ? '벌꿀' : '전통차'}"`);
+      }
+    };
+
+    const handleCloseModal = () => {
+      setIsActionOpen(false);
+      setIsAdminOpen(false);
+      setIsReceiptOpen(false);
+    };
+
+    const handleVoiceToast = (e: any) => {
+      const btn = e.detail?.detail?.buttonName || e.detail?.eventName;
+      if (btn) {
+        setVoiceNotice(`🗣️ 음성 버튼 작동: "${btn}"`);
+      }
+    };
+
     window.addEventListener('kiroween:open_checkout', handleGlobalCheckout);
+    window.addEventListener('kiroween:switch_view', handleSwitchView);
+    window.addEventListener('kiroween:open_admin', handleOpenAdmin);
+    window.addEventListener('kiroween:select_product', handleSelectProduct);
+    window.addEventListener('kiroween:close_modal', handleCloseModal);
+    window.addEventListener('kiroween:voice_button_toast', handleVoiceToast);
+
     return () => {
       window.removeEventListener('kiroween:open_checkout', handleGlobalCheckout);
+      window.removeEventListener('kiroween:switch_view', handleSwitchView);
+      window.removeEventListener('kiroween:open_admin', handleOpenAdmin);
+      window.removeEventListener('kiroween:select_product', handleSelectProduct);
+      window.removeEventListener('kiroween:close_modal', handleCloseModal);
+      window.removeEventListener('kiroween:voice_button_toast', handleVoiceToast);
     };
-  }, [activeProduct]);
+  }, [activeProduct, products]);
+
+  // Auto-dismiss voice feedback toast after 2 seconds
+  useEffect(() => {
+    if (voiceNotice) {
+      const timer = setTimeout(() => setVoiceNotice(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [voiceNotice]);
 
   const handleActionSuccess = (order: ActionOrder) => {
     setLatestOrder(order);
@@ -219,26 +276,28 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setCurrentView('main')}
-              className={`px-2.5 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
                 currentView === 'main'
                   ? 'bg-purple-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
+              title='음성으로 "방송"이라고 말해도 전환됩니다'
             >
               <span>📺</span>
-              <span className="hidden sm:inline">Live Stream</span>
+              <span>방송</span>
             </button>
             <button
               type="button"
               onClick={() => setCurrentView('voicelab')}
-              className={`px-2.5 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
                 currentView === 'voicelab'
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
                   : 'text-emerald-400 hover:text-white'
               }`}
+              title='음성으로 "음성랩"이라고 말해도 전환됩니다'
             >
               <span>🎙️</span>
-              <span>Voice Lab (음성 독립 테스트)</span>
+              <span>음성랩</span>
             </button>
           </div>
         </div>
@@ -248,26 +307,31 @@ export const App: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsAdminOpen(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-purple-400 border border-purple-500/40 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1"
+            className="bg-slate-800 hover:bg-slate-700 text-purple-400 border border-purple-500/40 px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1"
+            title='음성으로 "관리자"라고 말해도 열립니다'
           >
             <span>⚙️</span>
-            <span className="hidden sm:inline">Admin Studio</span>
+            <span>관리자</span>
           </button>
 
           <div className="flex bg-slate-950 border border-slate-700 rounded-lg p-0.5">
-            {products.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setActiveProduct(p)}
-                className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 ${
-                  activeProduct?.id === p.id ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <span>{p.icon}</span>
-                <span className="hidden sm:inline">{p.name[lang] || p.name.en}</span>
-              </button>
-            ))}
+            {products.map(p => {
+              const shortName = p.id === 'prod-honey' ? '벌꿀' : '전통차';
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setActiveProduct(p)}
+                  className={`px-2 py-1 rounded text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                    activeProduct?.id === p.id ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={`음성으로 "${shortName}"이라고 말해도 선택됩니다`}
+                >
+                  <span>{p.icon}</span>
+                  <span>{shortName}</span>
+                </button>
+              );
+            })}
           </div>
 
           <select
@@ -343,6 +407,14 @@ export const App: React.FC = () => {
         onClose={() => setIsReceiptOpen(false)}
         lang={lang}
       />
+
+      {/* Voice Button Click Feedback Toast */}
+      {voiceNotice && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 bg-purple-950/95 border border-purple-400 text-purple-200 px-4 py-2 rounded-2xl shadow-2xl z-50 flex items-center gap-2 animate-in slide-in-from-top duration-150 backdrop-blur">
+          <span className="text-base animate-pulse">🎙️</span>
+          <span className="text-xs font-bold text-white">{voiceNotice}</span>
+        </div>
+      )}
 
       {/* Success Toast (Automatically disappears in 2 seconds) */}
       {successToast && (

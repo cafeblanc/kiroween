@@ -8,6 +8,7 @@ import { VoiceStatus, VoiceToolDefinition, GptLiveVoiceWidgetHandle } from './ty
 import { ProductItem, ActionOrder } from '../../types';
 import { ActionExecutionSheet } from '../action/ActionExecutionSheet';
 import { PayPalReceiptModal } from '../action/PayPalReceiptModal';
+import { executeVoiceButtonCommand } from './voiceButtonController';
 
 interface VoiceLabAppProps {
   onBackToMain?: () => void;
@@ -195,6 +196,47 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
+  // Global listener for voice button commands inside Voice Lab
+  useEffect(() => {
+    const handleSelectProduct = (e: any) => {
+      const pid = e.detail?.productId;
+      const found = availableProducts.find(p => p.id === pid);
+      if (found) {
+        setSelectedProduct(found);
+        addLog('info', `📌 현재 결제 대상 상품이 [${found.name.ko || found.name.en}]으로 설정되었습니다.`);
+      }
+    };
+
+    const handleClearLogs = () => {
+      setLogs([]);
+      addLog('info', '🧹 대화 로그가 초기화되었습니다.');
+    };
+
+    const handleTriggerTool = () => {
+      handleToolCall('test_action_trigger', { actionName: 'InstantLabTest', timestamp: Date.now() });
+    };
+
+    const handleDomainPrompt = (e: any) => {
+      const targetDomain = e.detail?.domain;
+      const foundPrompt = DOMAIN_TEST_PROMPTS.find(p => p.domain === targetDomain);
+      if (foundPrompt) {
+        handleQuestionClick(foundPrompt.prompt);
+      }
+    };
+
+    window.addEventListener('kiroween:select_product', handleSelectProduct);
+    window.addEventListener('kiroween:clear_logs', handleClearLogs);
+    window.addEventListener('kiroween:trigger_tool', handleTriggerTool);
+    window.addEventListener('kiroween:select_domain_prompt', handleDomainPrompt);
+
+    return () => {
+      window.removeEventListener('kiroween:select_product', handleSelectProduct);
+      window.removeEventListener('kiroween:clear_logs', handleClearLogs);
+      window.removeEventListener('kiroween:trigger_tool', handleTriggerTool);
+      window.removeEventListener('kiroween:select_domain_prompt', handleDomainPrompt);
+    };
+  }, [availableProducts]);
+
   const addLog = (type: TestLog['type'], content: string) => {
     setLogs(prev => {
       // Deduplication: prevent exact or redundant consecutive duplicate entries
@@ -349,10 +391,11 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
     if (sender === 'user') {
       addLog('user', `나(User): "${text}"`);
 
-      // If checkout sheet is open, check if user said button names ("하나 더", "하나 빼", "결제하기", "취소")
-      if (isCheckoutOpen) {
-        const handled = handleVoiceButtonCommand(text);
-        if (handled) return;
+      // Universal Voice Button Execution: trigger any button click instantly by its short name!
+      const matched = executeVoiceButtonCommand(text);
+      if (matched) {
+        addLog('info', `🎯 음성 버튼 작동: "${matched.buttonName}" 버튼이 클릭되었습니다.`);
+        return;
       }
 
       // Zero-failure fallback: check if user speech explicitly asks for checkout
@@ -428,10 +471,11 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
   };
 
   const handleQuestionClick = (prompt: string) => {
-    // If checkout sheet is open, check button name commands first
-    if (isCheckoutOpen) {
-      const handled = handleVoiceButtonCommand(prompt);
-      if (handled) return;
+    // Check Universal Voice Button command first
+    const matched = executeVoiceButtonCommand(prompt);
+    if (matched && matched.commandType !== 'open_checkout') {
+      addLog('info', `🎯 버튼 작동: "${matched.buttonName}"이(가) 실행되었습니다.`);
+      return;
     }
 
     if (isCheckoutIntent(prompt)) {
@@ -510,28 +554,32 @@ CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
 
         {/* Center: Live Product Switcher & Domain Indicator */}
         <div className="flex items-center gap-2">
-          {/* Active Product Badge / Switcher */}
+          {/* Active Product Badge / Switcher with Short Voice Names */}
           <div className="flex bg-slate-950 border border-purple-500/40 rounded-xl p-1 items-center gap-1 shadow-inner">
-            <span className="text-[10px] text-purple-300 font-bold px-1.5 hidden sm:inline">🛒 판매 상품:</span>
-            {availableProducts.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setSelectedProduct(p);
-                  addLog('info', `📌 현재 결제 대상 상품이 [${p.name.ko || p.name.en}] (${p.price.toLocaleString()}원)으로 설정되었습니다.`);
-                }}
-                className={`px-2 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                  selectedProduct.id === p.id
-                    ? 'bg-purple-600 text-white font-bold shadow-md ring-1 ring-purple-300'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                <span>{p.icon}</span>
-                <span className="truncate max-w-[120px]">{p.name.ko || p.name.en}</span>
-                <span className="text-[10px] opacity-80">({p.price.toLocaleString()}원)</span>
-              </button>
-            ))}
+            <span className="text-[10px] text-purple-300 font-bold px-1.5 hidden sm:inline">🛒 상품:</span>
+            {availableProducts.map(p => {
+              const shortName = p.id === 'prod-honey' ? '벌꿀' : '전통차';
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedProduct(p);
+                    addLog('info', `📌 현재 결제 대상 상품이 [${p.name.ko || p.name.en}] (${p.price.toLocaleString()}원)으로 설정되었습니다.`);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                    selectedProduct.id === p.id
+                      ? 'bg-purple-600 text-white font-bold shadow-md ring-1 ring-purple-300'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                  }`}
+                  title={`음성으로 "${shortName}"이라고 말해도 선택됩니다`}
+                >
+                  <span>{p.icon}</span>
+                  <span>{shortName}</span>
+                  <span className="text-[10px] opacity-80">({p.price.toLocaleString()}원)</span>
+                </button>
+              );
+            })}
           </div>
 
           {activeDomain !== 'general' && DOMAIN_REGISTRY[activeDomain] && (
@@ -549,9 +597,10 @@ CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
               type="button"
               onClick={onBackToMain}
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+              title='음성으로 "방송"이라고 말해도 이동합니다'
             >
               <span>📺</span>
-              <span className="hidden sm:inline">라이브 방송 복귀</span>
+              <span>방송</span>
             </button>
           )}
 
@@ -619,9 +668,10 @@ CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
                 type="button"
                 onClick={() => triggerCheckout(selectedProduct, '결제창 띄우기 버튼 클릭')}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer shadow-lg shrink-0 flex items-center gap-1 active:scale-95"
+                title='음성으로 "결제창"이라고 말해도 열립니다'
               >
                 <span>⚡</span>
-                <span>결제창 띄우기</span>
+                <span>결제창</span>
               </button>
             </div>
 
@@ -664,13 +714,14 @@ CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
 
           {/* Simulated Tool Action Call Card */}
           <div className="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-xs shrink-0">
-            <span className="text-[10px] text-slate-400">도구 호출: "액션 트리거"</span>
+            <span className="text-[10px] text-slate-400">음성 명령: "도구"</span>
             <button
               type="button"
               onClick={() => handleToolCall('test_action_trigger', { actionName: 'InstantLabTest', timestamp: Date.now() })}
               className="bg-indigo-900/60 hover:bg-indigo-800 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition cursor-pointer"
+              title='음성으로 "도구"라고 말해도 실행됩니다'
             >
-              ⚡ 도구 수동 실행
+              ⚡ 도구
             </button>
           </div>
         </section>
@@ -698,9 +749,10 @@ CRITICAL RULES FOR CHECKOUT & PURCHASE (MUST FOLLOW):
               <button
                 type="button"
                 onClick={() => setLogs([])}
-                className="text-[10px] text-slate-500 hover:text-slate-300 transition"
+                className="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700 transition cursor-pointer font-semibold"
+                title='음성으로 "지우기"라고 말해도 삭제됩니다'
               >
-                지우기
+                🗑️ 지우기
               </button>
             </div>
           </div>

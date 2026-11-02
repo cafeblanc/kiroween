@@ -57,6 +57,26 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
     }
   }, []);
 
+  // Listen to Global Voice Commands for Audio & Key Modals
+  useEffect(() => {
+    const handleOpenAudio = () => {
+      refreshDevices();
+      setShowDeviceModal(prev => !prev);
+    };
+
+    const handleOpenKey = () => {
+      setShowKeyModal(prev => !prev);
+    };
+
+    window.addEventListener('kiroween:open_audio_modal', handleOpenAudio);
+    window.addEventListener('kiroween:open_key_modal', handleOpenKey);
+
+    return () => {
+      window.removeEventListener('kiroween:open_audio_modal', handleOpenAudio);
+      window.removeEventListener('kiroween:open_key_modal', handleOpenKey);
+    };
+  }, []);
+
   const {
     status,
     isVoiceActive,
@@ -163,10 +183,10 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
               ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/90'
               : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
           }`}
-          title="보청기 / 블루투스 오디오 장치 설정"
+          title='음성으로 "오디오"라고 말해도 열립니다'
         >
           <span>🦻</span>
-          <span>{detectedHearingAid ? '보청기 연결됨' : '오디오 설정'}</span>
+          <span>{detectedHearingAid ? '보청기' : '오디오'}</span>
         </button>
 
         {/* API Key Modal Button */}
@@ -174,10 +194,10 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
           type="button"
           onClick={() => setShowKeyModal(prev => !prev)}
           className="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1"
-          title="OpenAI API Key 설정"
+          title='음성으로 "키설정"이라고 말해도 열립니다'
         >
           <span>🔑</span>
-          <span>{localKey ? 'Key 등록됨' : 'Key 등록'}</span>
+          <span>키설정</span>
         </button>
 
         {/* Main Single Start / Stop Button */}

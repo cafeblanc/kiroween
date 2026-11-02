@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { VoiceStatus, VoiceToolDefinition, DomainCategory, DomainMeta } from './types';
 import { DomainKnowledgeRouter } from './domainRouter';
+import { executeVoiceButtonCommand } from './voiceButtonController';
 
 export interface UseGptLiveVoiceOptions {
   apiKey?: string;
@@ -431,6 +432,10 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             const userText = (msg.transcript || '').trim();
             if (userText && msg.item_id !== lastUserItemId) {
               lastUserItemId = msg.item_id;
+
+              // Immediately check for voice button command execution
+              executeVoiceButtonCommand(userText);
+
               const detected = DomainKnowledgeRouter.detectDomain(userText);
               setActiveDomain(detected.domain);
               if (detected.domain !== 'general') {
