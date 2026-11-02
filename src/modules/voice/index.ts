@@ -3,5 +3,6 @@
 // import { GptLiveVoiceWidget, useGptLiveVoice } from '@/modules/voice';
 
 export { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
+export { VoiceLabApp } from './VoiceLabApp';
 export { useGptLiveVoice } from './useGptLiveVoice';
 export * from './types';

@@ -4,6 +4,7 @@ import { AgentChat } from './modules/agent/AgentChat';
 import { ActionExecutionSheet } from './modules/action/ActionExecutionSheet';
 import { AdminStudioModal } from './modules/admin/AdminStudioModal';
 import { PayPalReceiptModal } from './modules/action/PayPalReceiptModal';
+import { VoiceLabApp } from './modules/voice';
 import { ProductItem, ActionOrder, Language } from './types';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -146,6 +147,7 @@ const INITIAL_PRODUCTS: ProductItem[] = [
 ];
 
 export const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<'main' | 'voicelab'>('main');
   const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
   const [activeProduct, setActiveProduct] = useState<ProductItem | null>(INITIAL_PRODUCTS[0]);
   const [isActionOpen, setIsActionOpen] = useState(false);
@@ -195,6 +197,34 @@ export const App: React.FC = () => {
             </h1>
             <p className="text-[10px] text-slate-400">Spec-driven Multimodal Execution Architecture</p>
           </div>
+
+          {/* View Switcher: Live Stream vs Dedicated Voice Module Lab */}
+          <div className="ml-2 sm:ml-4 flex bg-slate-950 border border-purple-500/30 rounded-lg p-0.5 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setCurrentView('main')}
+              className={`px-2.5 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'main'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>📺</span>
+              <span className="hidden sm:inline">Live Stream</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentView('voicelab')}
+              className={`px-2.5 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'voicelab'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'text-emerald-400 hover:text-white'
+              }`}
+            >
+              <span>🎙️</span>
+              <span>Voice Lab (음성 독립 테스트)</span>
+            </button>
+          </div>
         </div>
 
         {/* Product Switcher, Admin Button & Language Switcher */}
@@ -239,29 +269,35 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Workspace (Modular Split View) */}
-      <main className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 p-1.5 sm:p-3 overflow-hidden">
-        {/* Left: Stream Player Module (모바일에서 비디오를 최대 크기로 키워 액션 바가 채팅창 바로 위에 밀착 배치: h-[76%]) */}
-        <section className="h-[76%] sm:h-[73%] md:h-full md:col-span-7 flex flex-col min-h-0">
-          <StreamPlayer
-            product={activeProduct}
-            onSelectAction={() => setIsActionOpen(true)}
-            lang={lang}
-          />
-        </section>
+      {/* Main Workspace: Modular Split View vs Standalone Voice Lab */}
+      {currentView === 'voicelab' ? (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <VoiceLabApp onBackToMain={() => setCurrentView('main')} />
+        </div>
+      ) : (
+        <main className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 p-1.5 sm:p-3 overflow-hidden">
+          {/* Left: Stream Player Module (모바일에서 비디오를 최대 크기로 키워 액션 바가 채팅창 바로 위에 밀착 배치: h-[76%]) */}
+          <section className="h-[76%] sm:h-[73%] md:h-full md:col-span-7 flex flex-col min-h-0">
+            <StreamPlayer
+              product={activeProduct}
+              onSelectAction={() => setIsActionOpen(true)}
+              lang={lang}
+            />
+          </section>
 
-        {/* Right: Agentic Chat Module (하단 채팅창) */}
-        <section className="flex-1 min-h-0 md:h-full md:col-span-5 flex flex-col">
-          <AgentChat
-            lang={lang}
-            activeProduct={activeProduct}
-            onTriggerAction={prod => {
-              setActiveProduct(prod);
-              setIsActionOpen(true);
-            }}
-          />
-        </section>
-      </main>
+          {/* Right: Agentic Chat Module (하단 채팅창) */}
+          <section className="flex-1 min-h-0 md:h-full md:col-span-5 flex flex-col">
+            <AgentChat
+              lang={lang}
+              activeProduct={activeProduct}
+              onTriggerAction={prod => {
+                setActiveProduct(prod);
+                setIsActionOpen(true);
+              }}
+            />
+          </section>
+        </main>
+      )}
 
       {/* Action Execution Modal */}
       <ActionExecutionSheet
