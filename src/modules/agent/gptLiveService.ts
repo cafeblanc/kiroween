@@ -141,14 +141,30 @@ export class GptLiveService {
         console.warn('[gpt-live-1 GA] Client secret creation notice, proceeding to direct call:', tokenErr);
       }
 
-      // 7. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      // 7. Send Multipart FormData SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
       const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      const formData = new FormData();
+      formData.append('sdp', new Blob([offer.sdp || ''], { type: 'application/sdp' }));
+      formData.append(
+        'session',
+        new Blob(
+          [
+            JSON.stringify({
+              type: 'realtime',
+              model: 'gpt-4o-realtime-preview',
+              instructions: instructions,
+              voice: 'verse'
+            })
+          ],
+          { type: 'application/json' }
+        )
+      );
+
       const sdpResponse = await fetch(gaCallsUrl, {
         method: 'POST',
-        body: offer.sdp,
+        body: formData,
         headers: {
-          Authorization: `Bearer ${activeBearer}`,
-          'Content-Type': 'application/sdp'
+          Authorization: `Bearer ${activeBearer}`
         }
       });
 

@@ -175,8 +175,12 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       const offer = await pcRef.current.createOffer();
       await pcRef.current.setLocalDescription(offer);
 
-      // 5. Request client secret or GA Calls
+      // 5. Authenticate and build multipart/form-data payload for /v1/realtime/calls
+      // Official GA WebRTC endpoint requires multipart/form-data containing 'sdp' and 'session' (with model parameter)
+      const primaryModel = optionsRef.current.model || 'gpt-4o-realtime-preview';
+      const voice = optionsRef.current.voiceName || 'verse';
       let activeBearer = targetKey;
+
       try {
         const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
           method: 'POST',
@@ -187,8 +191,8 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
           body: JSON.stringify({
             session: {
               type: 'realtime',
-              model: optionsRef.current.model || 'gpt-4o-realtime-preview',
-              voice: optionsRef.current.voiceName || 'verse'
+              model: primaryModel,
+              voice: voice
             }
           })
         });
@@ -198,7 +202,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
           const token = secretData.value || secretData.client_secret?.value;
           if (token) activeBearer = token;
         } else if (secretRes.status === 401) {
-          throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): API 키가 올바른지 확인해주세요.');
+          throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): 입력하신 API 키가 유효하지 않습니다. 올바른 키를 입력해주세요.');
         } else if (secretRes.status === 403) {
           throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 접근 권한이 없거나 제한된 Project 키입니다.');
         } else if (secretRes.status === 429) {
@@ -211,16 +215,51 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         console.warn('[useGptLiveVoice] Proceeding with direct call token:', tokenErr);
       }
 
-      // 6. Send SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      // 6. Send Multipart/form-data SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
+      const createMultipartBody = (targetModel: string) => {
+        const formData = new FormData();
+        formData.append('sdp', new Blob([offer.sdp || ''], { type: 'application/sdp' }));
+        formData.append(
+          'session',
+          new Blob(
+            [
+              JSON.stringify({
+                type: 'realtime',
+                model: targetModel,
+                instructions: optionsRef.current.systemInstruction || 'You are an intelligent voice assistant.',
+                voice: voice
+              })
+            ],
+            { type: 'application/json' }
+          )
+        );
+        return formData;
+      };
+
       const gaCallsUrl = '/api/openai/v1/realtime/calls';
-      const sdpResponse = await fetch(gaCallsUrl, {
+      let sdpResponse = await fetch(gaCallsUrl, {
         method: 'POST',
-        body: offer.sdp,
         headers: {
-          Authorization: `Bearer ${activeBearer}`,
-          'Content-Type': 'application/sdp'
-        }
+          Authorization: `Bearer ${activeBearer}`
+          // Browser will automatically generate Content-Type with multipart boundary
+        },
+        body: createMultipartBody(primaryModel)
       });
+
+      // Model fallback: If gpt-4o-realtime-preview is rejected with 400/404, fallback to gpt-realtime
+      if (!sdpResponse.ok && sdpResponse.status === 400 && primaryModel !== 'gpt-realtime') {
+        console.log('[useGptLiveVoice] Retrying with gpt-realtime model fallback...');
+        const retryRes = await fetch(gaCallsUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeBearer}`
+          },
+          body: createMultipartBody('gpt-realtime')
+        });
+        if (retryRes.ok) {
+          sdpResponse = retryRes;
+        }
+      }
 
       if (!sdpResponse.ok) {
         const errorText = await sdpResponse.text();
