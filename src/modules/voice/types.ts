@@ -30,19 +30,30 @@ export interface VoiceTranscriptItem {
   domain?: DomainCategory;
 }
 
+export interface AudioDeviceOption {
+  deviceId: string;
+  label: string;
+  kind: 'audioinput' | 'audiooutput';
+  isHearingAidOrBluetooth?: boolean;
+}
+
 export interface GptLiveVoiceInProps {
   /** Optional API Key; if omitted, checks localStorage or Vite environment */
   apiKey?: string;
   /** System instructions defining agent persona, role, and context */
   systemInstruction: string;
-  /** Voice model ID (defaults to 'gpt-4o-realtime-preview' for GA WebRTC calls) */
+  /** Voice model ID (defaults to 'gpt-realtime' for GA WebRTC calls) */
   model?: string;
-  /** Preferred voice name (e.g. 'verse', 'alloy', 'shimmer', 'echo') */
+  /** Preferred voice name (e.g. 'alloy', 'verse', 'shimmer', 'echo') */
   voiceName?: string;
   /** List of callable client-side tools */
   tools?: VoiceToolDefinition[];
   /** Enable automatic specialized domain classification & optimized search */
   enableDomainSearch?: boolean;
+  /** Optional audio input device ID (e.g. microphone) */
+  inputDeviceId?: string;
+  /** Optional audio output device ID (e.g. Bluetooth hearing aid, headphones, speaker) */
+  outputDeviceId?: string;
   /** Optional external domain search provider (e.g. custom vector DB or web search) */
   onDomainSearch?: (domain: DomainCategory, query: string) => Promise<string> | string;
   /** Optional custom class name for styling container */

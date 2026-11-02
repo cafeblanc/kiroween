@@ -12,6 +12,8 @@ export interface UseGptLiveVoiceOptions {
   voiceName?: string;
   tools?: VoiceToolDefinition[];
   enableDomainSearch?: boolean;
+  inputDeviceId?: string;
+  outputDeviceId?: string;
   onDomainSearch?: (domain: DomainCategory, query: string) => Promise<string> | string;
   onTranscript?: (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => void;
   onToolCall?: (toolName: string, args: Record<string, any>) => Promise<any> | void;
@@ -131,20 +133,37 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         throw new Error('OpenAI API Key가 설정되지 않았습니다. API 키를 입력해주세요.');
       }
 
-      // 1. Capture microphone
+      // 1. Capture microphone with device selection and echo cancellation
+      const targetInputId = optionsRef.current.inputDeviceId || localStorage.getItem('kiroween_audio_input_device') || '';
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      };
+      if (targetInputId) {
+        audioConstraints.deviceId = { exact: targetInputId };
+      }
+
       try {
         localStreamRef.current = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
+          audio: audioConstraints
         });
       } catch (mediaErr: any) {
-        if (mediaErr?.name === 'NotAllowedError' || mediaErr?.message?.toLowerCase().includes('permission')) {
-          throw new Error('브라우저 마이크 권한이 차단되었습니다 (Permission denied). 크롬 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 [마이크] 권한을 [허용]으로 변경해주세요.');
+        if (targetInputId) {
+          console.warn('[useGptLiveVoice] Exact input device fallback to default mic:', mediaErr);
+          localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+        } else {
+          if (mediaErr?.name === 'NotAllowedError' || mediaErr?.message?.toLowerCase().includes('permission')) {
+            throw new Error('브라우저 마이크 권한이 차단되었습니다 (Permission denied). 크롬 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 [마이크] 권한을 [허용]으로 변경해주세요.');
+          }
+          throw new Error('마이크 장치 접근 실패: ' + (mediaErr?.message || '마이크 장치를 찾을 수 없습니다.'));
         }
-        throw new Error('마이크 장치 접근 실패: ' + (mediaErr?.message || '마이크 장치를 찾을 수 없습니다.'));
       }
 
       setupVisualizer(localStreamRef.current);
@@ -156,6 +175,16 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
 
       remoteAudioRef.current = new Audio();
       remoteAudioRef.current.autoplay = true;
+
+      const targetOutputId = optionsRef.current.outputDeviceId || localStorage.getItem('kiroween_audio_output_device') || '';
+      if (targetOutputId && typeof (remoteAudioRef.current as any).setSinkId === 'function') {
+        try {
+          await (remoteAudioRef.current as any).setSinkId(targetOutputId);
+          console.log('[useGptLiveVoice] Audio routed to hearing aid / output device:', targetOutputId);
+        } catch (sinkErr) {
+          console.warn('[useGptLiveVoice] setSinkId notice (routed via default):', sinkErr);
+        }
+      }
 
       pcRef.current.ontrack = (event) => {
         if (remoteAudioRef.current && event.streams[0]) {
@@ -516,3 +545,65 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
     setError
   };
 }
+
+/**
+ * Enumerate connected audio devices (microphones, speakers, Bluetooth hearing aids)
+ */
+export const enumerateHearingDevices = async (): Promise<{
+  inputs: Array<{ deviceId: string; label: string; kind: 'audioinput'; isHearingAidOrBluetooth: boolean }>;
+  outputs: Array<{ deviceId: string; label: string; kind: 'audiooutput'; isHearingAidOrBluetooth: boolean }>;
+  detectedHearingAid: { deviceId: string; label: string; isHearingAidOrBluetooth: boolean } | null;
+}> => {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+    return { inputs: [], outputs: [], detectedHearingAid: null };
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const isBluetoothOrHearing = (label: string) => {
+      const l = label.toLowerCase();
+      return (
+        l.includes('bluetooth') ||
+        l.includes('hearing') ||
+        l.includes('보청기') ||
+        l.includes('hands-free') ||
+        l.includes('headset') ||
+        l.includes('ear') ||
+        l.includes('buds') ||
+        l.includes('oticon') ||
+        l.includes('phonak') ||
+        l.includes('resound') ||
+        l.includes('starkey') ||
+        l.includes('signia') ||
+        l.includes('widex')
+      );
+    };
+
+    const inputs = devices
+      .filter(d => d.kind === 'audioinput')
+      .map(d => ({
+        deviceId: d.deviceId,
+        label: d.label || `마이크 (${d.deviceId.slice(0, 5)})`,
+        kind: 'audioinput' as const,
+        isHearingAidOrBluetooth: isBluetoothOrHearing(d.label)
+      }));
+
+    const outputs = devices
+      .filter(d => d.kind === 'audiooutput')
+      .map(d => ({
+        deviceId: d.deviceId,
+        label: d.label || `스피커/보청기 (${d.deviceId.slice(0, 5)})`,
+        kind: 'audiooutput' as const,
+        isHearingAidOrBluetooth: isBluetoothOrHearing(d.label)
+      }));
+
+    const detectedHearingAid =
+      outputs.find(o => o.isHearingAidOrBluetooth) ||
+      inputs.find(i => i.isHearingAidOrBluetooth) ||
+      null;
+
+    return { inputs, outputs, detectedHearingAid };
+  } catch (e) {
+    console.warn('[useGptLiveVoice] enumerateDevices notice:', e);
+    return { inputs: [], outputs: [], detectedHearingAid: null };
+  }
+};
