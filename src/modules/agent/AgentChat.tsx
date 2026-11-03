@@ -44,11 +44,20 @@ const VOICE_TOOLS: VoiceToolDefinition[] = [
   }
 ];
 
-const speakLocalized = (text: string, lang: Language) => {
+let cachedVoices: SpeechSynthesisVoice[] = [];
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  cachedVoices = window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    cachedVoices = window.speechSynthesis.getVoices();
+  };
+}
+
+export const speakLocalized = (text: string, lang: Language) => {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   try {
     window.speechSynthesis.cancel();
-    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_]/g, '').trim();
+    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_⚡🤖🛒📦🎉🗣️💡🎙️⚙️]/g, '').trim();
+    if (!clean) return;
     const utter = new SpeechSynthesisUtterance(clean);
     const langMap: Record<Language, string> = {
       ko: 'ko-KR',
@@ -60,9 +69,12 @@ const speakLocalized = (text: string, lang: Language) => {
     };
     utter.lang = langMap[lang] || 'ko-KR';
     utter.rate = 1.05;
-    const voices = window.speechSynthesis.getVoices();
-    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
-    if (matchedVoice) utter.voice = matchedVoice;
+    const voices = cachedVoices.length > 0 ? cachedVoices : window.speechSynthesis.getVoices();
+    const targetPrefix = langMap[lang]?.split('-')[0]?.toLowerCase() || lang.toLowerCase();
+    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
+    if (matchedVoice) {
+      utter.voice = matchedVoice;
+    }
     window.speechSynthesis.speak(utter);
   } catch (e) {
     console.warn('TTS notice:', e);
@@ -230,22 +242,22 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       timestamp: new Date().toLocaleTimeString()
     };
 
-    let replyText = `🤖 AI Agent: "${query}" 질문을 확인했습니다.`;
+    let replyText = `🤖 AI (${lang.toUpperCase()}): "${query}"`;
     let suggested: ProductItem | undefined = undefined;
 
     const q = query.toLowerCase();
-    if (q.includes('buy') || q.includes('결제') || q.includes('checkout') || q.includes('주문') || q.includes('살게') || q.includes('살래')) {
+    if (q.includes('buy') || q.includes('결제') || q.includes('구매') || q.includes('checkout') || q.includes('주문') || q.includes('살게') || q.includes('살래')) {
       if (activeProduct) {
-        replyText = `⚡ ${activeProduct.name[lang] || activeProduct.name.en} PayPal 즉시 결제창을 화면 앞에 열었습니다!`;
+        replyText = `⚡ ${ui.checkoutOpenedMsg} (${activeProduct.name[lang] || activeProduct.name.en})`;
         suggested = activeProduct;
         onTriggerAction(activeProduct);
       }
     } else if (detected.domain !== 'general') {
-      const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, query, activeProduct?.name[lang] || activeProduct?.name.en);
+      const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, query, activeProduct?.name[lang] || activeProduct?.name.en, lang);
       replyText = `🗣️ [${detected.meta.icon} ${detected.meta.nameKo}] ${expertAnswer}`;
       speakLocalized(expertAnswer, lang);
     } else if (activeProduct) {
-      replyText = `🤖 [실시간 방송 컨텍스트] 현재 방송 상품: ${activeProduct.name[lang] || activeProduct.name.en}. ${activeProduct.description[lang] || activeProduct.description.en}`;
+      replyText = `🤖 [${ui.featuredBadge}] ${activeProduct.name[lang] || activeProduct.name.en}. ${activeProduct.description[lang] || activeProduct.description.en}`;
     }
 
     const aiMsg: ChatMessage = {

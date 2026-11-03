@@ -101,8 +101,14 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
   }, [isOpen, loading, totalAmount, quantity, product, lang]);
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] flex items-end sm:items-center justify-center z-50 p-2 sm:p-4 select-none animate-in fade-in duration-150">
-      <div className="bg-slate-900/98 border-2 border-purple-500/80 rounded-2xl w-full max-w-md p-4 sm:p-5 shadow-[0_0_50px_rgba(168,85,247,0.35)] flex flex-col gap-3 max-h-[88vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+    <div
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3 sm:p-4 select-none"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-slate-900 border-2 border-purple-500 rounded-2xl w-full max-w-md p-4 sm:p-5 shadow-2xl flex flex-col gap-3 max-h-[85vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">

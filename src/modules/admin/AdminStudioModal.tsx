@@ -60,8 +60,14 @@ export const AdminStudioModal: React.FC<AdminStudioModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-purple-500/60 rounded-2xl w-full max-w-2xl p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 select-none"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-slate-900 border border-purple-500/60 rounded-2xl w-full max-w-2xl p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">⚙️</span>

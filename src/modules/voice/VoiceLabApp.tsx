@@ -8,8 +8,9 @@ import { VoiceStatus, VoiceToolDefinition, GptLiveVoiceWidgetHandle } from './ty
 import { ProductItem, ActionOrder, Language } from '../../types';
 import { ActionExecutionSheet } from '../action/ActionExecutionSheet';
 import { PayPalReceiptModal } from '../action/PayPalReceiptModal';
-import { executeVoiceButtonCommand } from './voiceButtonController';
+import { executeVoiceButtonCommand, setCheckoutModalState } from './voiceButtonController';
 import { buildVoiceInstructions } from './voicePromptBuilder';
+import { getUIStrings } from '../../i18n/translations';
 
 interface VoiceLabAppProps {
   onBackToMain?: () => void;
@@ -143,17 +144,35 @@ const DOMAIN_TEST_PROMPTS: Array<{ domain: DomainCategory; label: string; prompt
   { domain: 'environment', label: '🌱 환경/생태', prompt: '환경 생태 관점에서 꿀벌 보호와 ESG 탄소 순환 경제의 연관성은?' }
 ];
 
-const speakKorean = (text: string) => {
+let cachedVoicesLab: SpeechSynthesisVoice[] = [];
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  cachedVoicesLab = window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    cachedVoicesLab = window.speechSynthesis.getVoices();
+  };
+}
+
+const speakLocalized = (text: string, lang: Language = 'ko') => {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   try {
     window.speechSynthesis.cancel();
-    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_]/g, '').trim();
+    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_⚡🤖🛒📦🎉🗣️💡🎙️⚙️]/g, '').trim();
+    if (!clean) return;
     const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = 'ko-KR';
+    const langMap: Record<Language, string> = {
+      ko: 'ko-KR',
+      en: 'en-US',
+      ja: 'ja-JP',
+      zh: 'zh-CN',
+      es: 'es-ES',
+      fr: 'fr-FR'
+    };
+    utter.lang = langMap[lang] || 'ko-KR';
     utter.rate = 1.05;
-    const voices = window.speechSynthesis.getVoices();
-    const koVoice = voices.find(v => v.lang.startsWith('ko'));
-    if (koVoice) utter.voice = koVoice;
+    const voices = cachedVoicesLab.length > 0 ? cachedVoicesLab : window.speechSynthesis.getVoices();
+    const targetPrefix = langMap[lang]?.split('-')[0]?.toLowerCase() || lang.toLowerCase();
+    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
+    if (matchedVoice) utter.voice = matchedVoice;
     window.speechSynthesis.speak(utter);
   } catch (e) {
     console.warn('TTS notice:', e);
@@ -184,6 +203,10 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
   const [activeDomain, setActiveDomain] = useState<DomainCategory>('general');
   const [toolAlert, setToolAlert] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCheckoutModalState(isCheckoutOpen);
+  }, [isCheckoutOpen]);
   const [textInput, setTextInput] = useState('');
 
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -466,14 +489,15 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
 
   const handleSimulateQuestion = (prompt: string) => {
     addLog('user', `나(User): "${prompt}"`);
+    const ui = getUIStrings(lang);
 
     // Handle checkout intent in simulated/offline mode as well
     if (isCheckoutIntent(prompt)) {
       triggerCheckout(selectedProduct, prompt);
-      const reply = `네! 현재 판매 중인 ${selectedProduct.name.ko || selectedProduct.name.en} 결제창을 지금 바로 화면에 띄워드렸습니다! 결제를 진행해 주세요.`;
+      const reply = `⚡ ${ui.checkoutOpenedMsg} (${selectedProduct.name[lang] || selectedProduct.name.en})`;
       setTimeout(() => {
-        addLog('agent', `gpt-realtime: [🛍️ 결제창 즉시 호출] ${reply}`);
-        speakKorean(reply);
+        addLog('agent', `gpt-realtime: [🛍️ ${ui.checkoutTitle}] ${reply}`);
+        speakLocalized(reply, lang);
       }, 200);
       return;
     }
@@ -482,10 +506,10 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
     setActiveDomain(detected.domain);
     addLog('domain', `🎯 [파악된 분야]: ${detected.meta.icon} ${detected.meta.nameKo} - 질문 분석 완료`);
 
-    const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, prompt);
+    const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, prompt, selectedProduct.name[lang] || selectedProduct.name.en, lang);
     setTimeout(() => {
-      addLog('agent', `gpt-realtime: [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`);
-      speakKorean(expertAnswer);
+      addLog('agent', `gpt-realtime: [${detected.meta.icon} ${detected.meta.nameKo}] ${expertAnswer}`);
+      speakLocalized(expertAnswer, lang);
     }, 250);
   };
 
@@ -872,6 +896,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
       <ActionExecutionSheet
         product={selectedProduct}
         isOpen={isCheckoutOpen}
+        lang={lang}
         onClose={() => setIsCheckoutOpen(false)}
         onSuccess={handleOrderSuccess}
       />
@@ -881,7 +906,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
         order={latestOrder}
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
-        lang="ko"
+        lang={lang}
       />
 
       {/* Success Toast */}
