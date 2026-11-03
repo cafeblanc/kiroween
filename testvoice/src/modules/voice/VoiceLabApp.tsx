@@ -14,7 +14,6 @@ import { speakLocalizedText } from './ttsSpeaker';
 import { getUIStrings } from '../../i18n/translations';
 
 interface VoiceLabAppProps {
-  onBackToMain?: () => void;
   activeProduct?: ProductItem | null;
   products?: ProductItem[];
   lang?: Language;
@@ -150,11 +149,11 @@ const speakLocalized = (text: string, lang: Language = 'ko') => {
 };
 
 export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
-  onBackToMain,
   activeProduct,
   products,
-  lang = 'ko'
+  lang: initialLang = 'ko'
 }) => {
+  const [lang, setLang] = useState<Language>(initialLang);
   const availableProducts = products && products.length > 0 ? products : DEFAULT_PRODUCTS;
   const [selectedProduct, setSelectedProduct] = useState<ProductItem>(() => activeProduct || availableProducts[0]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -588,19 +587,24 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
           )}
         </div>
 
-        {/* Right: Controls & Back button */}
+        {/* Right: Language Selector & Voice Widget Controls */}
         <div className="flex items-center gap-2">
-          {onBackToMain && (
-            <button
-              type="button"
-              onClick={onBackToMain}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-              title='음성으로 "방송"이라고 말해도 이동합니다'
+          {/* Active UI Language Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-purple-500/30 rounded-xl px-2.5 py-1 shadow-inner">
+            <span className="text-xs text-purple-300">🌐</span>
+            <select
+              value={lang}
+              onChange={e => setLang(e.target.value as Language)}
+              className="bg-transparent text-xs text-purple-200 font-semibold focus:outline-none cursor-pointer"
             >
-              <span>📺</span>
-              <span>방송</span>
-            </button>
-          )}
+              <option value="ko" className="bg-slate-900">한국어 (KO)</option>
+              <option value="en" className="bg-slate-900">English (EN)</option>
+              <option value="ja" className="bg-slate-900">日本語 (JA)</option>
+              <option value="zh" className="bg-slate-900">中文 (ZH)</option>
+              <option value="es" className="bg-slate-900">Español (ES)</option>
+              <option value="fr" className="bg-slate-900">Français (FR)</option>
+            </select>
+          </div>
 
           {/* Standalone Voice Widget Injected */}
           <GptLiveVoiceWidget
