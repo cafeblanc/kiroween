@@ -80,16 +80,18 @@ export const executeVoiceButtonCommand = (spokenText: string): VoiceButtonMatch 
 
     // C. Confirm Payment
     if (
-      // KO
-      t === '결제' || t === '결제하기' || t === '구매' || t === '구매하기' || t.includes('결제하기') || t.includes('구매하기') || t.includes('결제진행') ||
+      // KO (결제, 결제하기, 구매, 구매하라, 구매해, 결제하라, 결제해줘, 살래, 사자 등)
+      t.includes('결제') || t.includes('결재') || t.includes('구매') || t.includes('주문') ||
+      t.includes('살래') || t.includes('살게') || t.includes('사자') || t.includes('산다') ||
+      t.includes('승인') || t.includes('확인') ||
       // EN
-      t === 'pay' || t === 'paynow' || t === 'buy' || t.includes('confirmpay') ||
+      t.includes('pay') || t.includes('buy') || t.includes('confirm') || t.includes('order') ||
       // JA
-      t === '決済' || t === '決済する' || t === '購入' || t === '支払う' || t.includes('決済') ||
+      t.includes('決済') || t.includes('購入') || t.includes('支払') || t.includes('買う') ||
       // ZH
-      t === '付款' || t === '立即付款' || t === '支付' || t.includes('付款') ||
+      t.includes('付款') || t.includes('支付') || t.includes('买单') ||
       // ES / FR
-      t === 'pagar' || t === 'payer'
+      t.includes('pagar') || t.includes('payer')
     ) {
       if (isDebounced('checkout_pay')) return null;
       dispatch('kiroween:checkout_action', { action: 'pay' });
@@ -119,19 +121,16 @@ export const executeVoiceButtonCommand = (spokenText: string): VoiceButtonMatch 
 
   // 2. Open Checkout Sheet (Works when modal is closed, or user explicitly asks for checkout)
   if (
-    // KO
-    t.includes('결제창') || t.includes('구매창') || t.includes('주문창') ||
-    t === '결제' || t === '결제하기' || t === '구매' || t === '구매하기' ||
-    t.includes('결제해') || t.includes('구매해') || t.includes('주문해') ||
+    // KO (결제, 구매, 주문, 살래, 구매하라, 결제해 등 모든 구매 의도)
+    t.includes('결제') || t.includes('결재') || t.includes('구매') || t.includes('주문') ||
     t.includes('살래') || t.includes('살게요') || t.includes('살게') ||
-    t.includes('사고싶') || t.includes('사겠') ||
+    t.includes('사고싶') || t.includes('사겠') || t.includes('사자') || t.includes('산다') ||
     // EN
-    t === 'checkout' || t.includes('checkout') || t === 'buy' || t === 'order' ||
-    t.includes('opencheckout') || t.includes('buythis') || t.includes('buyitem') ||
+    t.includes('checkout') || t.includes('buy') || t.includes('order') || t.includes('pay') ||
     // JA
-    t.includes('決済画面') || t.includes('購入画面') || t.includes('これ買う') || t.includes('買いたい') || t.includes('注文') ||
+    t.includes('決済') || t.includes('購入') || t.includes('買') || t.includes('注文') ||
     // ZH
-    t.includes('结账') || t.includes('结算') || t.includes('我要买') || t.includes('买这个') || t.includes('下单') ||
+    t.includes('结账') || t.includes('结算') || t.includes('买') || t.includes('下单') ||
     // ES
     t.includes('pagar') || t.includes('comprar') || t.includes('abrirpago') ||
     // FR

@@ -24,8 +24,8 @@ export const PayPalReceiptModal: React.FC<PayPalReceiptModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 select-none">
-      <div className="bg-slate-900 border border-emerald-500/50 w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-black/35 backdrop-blur-[2px] z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200 select-none">
+      <div className="bg-slate-900/98 border-2 border-emerald-500/80 w-full max-w-md rounded-2xl shadow-[0_0_50px_rgba(16,185,129,0.35)] flex flex-col overflow-hidden relative max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
         
         {/* Top Header Badge */}
         <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-purple-950 p-4 border-b border-blue-500/30 flex items-center justify-between">
