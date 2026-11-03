@@ -94,6 +94,7 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
     systemInstruction,
     model,
     voiceName,
+    lang,
     tools,
     enableDomainSearch,
     inputDeviceId: selectedInput,

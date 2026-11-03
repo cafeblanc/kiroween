@@ -34,13 +34,11 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
     }
   }, [isOpen, lang]);
 
-  if (!isOpen || !product) return null;
-
-  const totalAmount = product.price * quantity;
+  const totalAmount = (product?.price || 0) * quantity;
   const usdPrice = (totalAmount / 1350).toFixed(2);
 
   const handleExecute = () => {
-    if (loading) return;
+    if (loading || !product) return;
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -99,6 +97,9 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
       window.removeEventListener('kiroween:checkout_action', handleVoiceAction);
     };
   }, [isOpen, loading, totalAmount, quantity, product, lang]);
+
+  // Early return ONLY after all hooks are executed (React Rules of Hooks)
+  if (!isOpen || !product) return null;
 
   return (
     <div

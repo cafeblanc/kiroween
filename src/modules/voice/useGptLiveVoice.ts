@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { VoiceStatus, VoiceToolDefinition, DomainCategory, DomainMeta } from './types';
+import { Language } from '../../types';
 import { DomainKnowledgeRouter } from './domainRouter';
 import { executeVoiceButtonCommand } from './voiceButtonController';
 
@@ -11,6 +12,7 @@ export interface UseGptLiveVoiceOptions {
   systemInstruction: string;
   model?: string;
   voiceName?: string;
+  lang?: Language;
   tools?: VoiceToolDefinition[];
   enableDomainSearch?: boolean;
   inputDeviceId?: string;
@@ -400,10 +402,21 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         });
       }
 
+      const activeLang = currentOpts.lang || 'ko';
+      const langNames: Record<Language, string> = {
+        ko: '한국어 (Korean)',
+        en: 'English',
+        ja: '日本語 (Japanese)',
+        zh: '中文 (Chinese)',
+        es: 'Español (Spanish)',
+        fr: 'Français (French)'
+      };
+
       const domainInstructions = currentOpts.enableDomainSearch
         ? `\n[Specialized Domain Knowledge Optimization]:
-You are equipped with 'domain_optimized_search'. When the user asks domain-specific or expert questions across science, math, astronomy, fortune/divination, philosophy, psychology, nature, medicine/health, physics, literature, history, fashion, or accessories, call 'domain_optimized_search' to retrieve authoritative domain insights before speaking. Tailor your terminology, rigor, and depth according to the domain.`
-        : '';
+You are equipped with 'domain_optimized_search'. When the user asks domain-specific or expert questions across science, math, astronomy, fortune/divination, philosophy, psychology, nature, medicine/health, physics, literature, history, fashion, or accessories, call 'domain_optimized_search' to retrieve authoritative domain insights before speaking.
+★ ABSOLUTE LANGUAGE RULE: You MUST speak and respond 100% EXCLUSIVELY in ${langNames[activeLang]}. Never speak, mumble, or transliterate in any other language under any circumstance.`
+        : `\n★ ABSOLUTE LANGUAGE RULE: You MUST speak and respond 100% EXCLUSIVELY in ${langNames[activeLang]}. Never speak, mumble, or transliterate in any other language under any circumstance.`;
 
       const sessionConfig = {
         type: 'session.update',
@@ -586,7 +599,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
                 if (optionsRef.current.onDomainSearch) {
                   searchResult = await optionsRef.current.onDomainSearch(args.domain, args.query);
                 } else {
-                  searchResult = DomainKnowledgeRouter.resolveDomainKnowledge(args.domain, args.query);
+                  searchResult = DomainKnowledgeRouter.resolveDomainKnowledge(args.domain, args.query, undefined, optionsRef.current.lang || 'ko');
                 }
 
                 dc.send(JSON.stringify({

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProductItem, Language } from '../../types';
+import { speakLocalizedText } from '../voice/ttsSpeaker';
 
 interface GeminiLiveVoiceModalProps {
   isOpen: boolean;
@@ -98,20 +99,7 @@ export const GeminiLiveVoiceModal: React.FC<GeminiLiveVoiceModalProps> = ({
       } catch (_) {}
     }
 
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = lang === 'ko' ? 'ko-KR' : 'en-US';
-    utter.rate = 1.05;
-    utter.pitch = 1.0;
-
-    // Pick best natural voice if available
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      const match = voices.find(v => v.lang.startsWith(lang === 'ko' ? 'ko' : 'en'));
-      if (match) utter.voice = match;
-    }
-
-    utter.onend = () => {
+    speakLocalizedText(text, lang, () => {
       // Buffer delay before unmuting mic to avoid picking up trailing echo
       setTimeout(() => {
         isAgentSpeakingRef.current = false;
@@ -121,15 +109,7 @@ export const GeminiLiveVoiceModal: React.FC<GeminiLiveVoiceModalProps> = ({
           startListening();
         }
       }, 500);
-    };
-
-    utter.onerror = () => {
-      isAgentSpeakingRef.current = false;
-      setStatus('idle');
-      if (onFinished) onFinished();
-    };
-
-    window.speechSynthesis.speak(utter);
+    });
   };
 
   // Initialize Speech Recognition for User Voice

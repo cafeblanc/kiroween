@@ -199,6 +199,11 @@ export const App: React.FC = () => {
       };
 
       recognition.onerror = (e: any) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          isStoppedManually = true;
+          console.log('[NativeSpeechRecognition] Mic permission not granted, stopping loop.');
+          return;
+        }
         if (e.error !== 'no-speech') {
           console.log('[NativeSpeechRecognition] Notice:', e.error);
         }
@@ -212,7 +217,7 @@ export const App: React.FC = () => {
                 recognition.start();
               } catch (_) {}
             }
-          }, 250);
+          }, 1000);
         }
       };
 

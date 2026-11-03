@@ -6,4 +6,5 @@ export { GptLiveVoiceWidget } from './GptLiveVoiceWidget';
 export { VoiceLabApp } from './VoiceLabApp';
 export { useGptLiveVoice } from './useGptLiveVoice';
 export { executeVoiceButtonCommand, setCheckoutModalState } from './voiceButtonController';
+export { speakLocalizedText, findStrictVoice } from './ttsSpeaker';
 export * from './types';

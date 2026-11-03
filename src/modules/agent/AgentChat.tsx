@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, ProductItem, Language } from '../../types';
 import { GptLiveVoiceWidget, VoiceToolDefinition, VoiceStatus, DomainCategory, DOMAIN_REGISTRY, DomainKnowledgeRouter } from '../voice';
 import { buildVoiceInstructions } from '../voice/voicePromptBuilder';
+import { speakLocalizedText } from '../voice/ttsSpeaker';
 import { getUIStrings } from '../../i18n/translations';
 
 interface AgentChatProps {
@@ -44,41 +45,8 @@ const VOICE_TOOLS: VoiceToolDefinition[] = [
   }
 ];
 
-let cachedVoices: SpeechSynthesisVoice[] = [];
-if (typeof window !== 'undefined' && window.speechSynthesis) {
-  cachedVoices = window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => {
-    cachedVoices = window.speechSynthesis.getVoices();
-  };
-}
-
 export const speakLocalized = (text: string, lang: Language) => {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  try {
-    window.speechSynthesis.cancel();
-    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_⚡🤖🛒📦🎉🗣️💡🎙️⚙️]/g, '').trim();
-    if (!clean) return;
-    const utter = new SpeechSynthesisUtterance(clean);
-    const langMap: Record<Language, string> = {
-      ko: 'ko-KR',
-      en: 'en-US',
-      ja: 'ja-JP',
-      zh: 'zh-CN',
-      es: 'es-ES',
-      fr: 'fr-FR'
-    };
-    utter.lang = langMap[lang] || 'ko-KR';
-    utter.rate = 1.05;
-    const voices = cachedVoices.length > 0 ? cachedVoices : window.speechSynthesis.getVoices();
-    const targetPrefix = langMap[lang]?.split('-')[0]?.toLowerCase() || lang.toLowerCase();
-    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
-    if (matchedVoice) {
-      utter.voice = matchedVoice;
-    }
-    window.speechSynthesis.speak(utter);
-  } catch (e) {
-    console.warn('TTS notice:', e);
-  }
+  speakLocalizedText(text, lang);
 };
 
 export const AgentChat: React.FC<AgentChatProps> = ({

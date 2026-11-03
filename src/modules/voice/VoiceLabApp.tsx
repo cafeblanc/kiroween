@@ -10,6 +10,7 @@ import { ActionExecutionSheet } from '../action/ActionExecutionSheet';
 import { PayPalReceiptModal } from '../action/PayPalReceiptModal';
 import { executeVoiceButtonCommand, setCheckoutModalState } from './voiceButtonController';
 import { buildVoiceInstructions } from './voicePromptBuilder';
+import { speakLocalizedText } from './ttsSpeaker';
 import { getUIStrings } from '../../i18n/translations';
 
 interface VoiceLabAppProps {
@@ -144,39 +145,8 @@ const DOMAIN_TEST_PROMPTS: Array<{ domain: DomainCategory; label: string; prompt
   { domain: 'environment', label: '🌱 환경/생태', prompt: '환경 생태 관점에서 꿀벌 보호와 ESG 탄소 순환 경제의 연관성은?' }
 ];
 
-let cachedVoicesLab: SpeechSynthesisVoice[] = [];
-if (typeof window !== 'undefined' && window.speechSynthesis) {
-  cachedVoicesLab = window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => {
-    cachedVoicesLab = window.speechSynthesis.getVoices();
-  };
-}
-
 const speakLocalized = (text: string, lang: Language = 'ko') => {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  try {
-    window.speechSynthesis.cancel();
-    const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_⚡🤖🛒📦🎉🗣️💡🎙️⚙️]/g, '').trim();
-    if (!clean) return;
-    const utter = new SpeechSynthesisUtterance(clean);
-    const langMap: Record<Language, string> = {
-      ko: 'ko-KR',
-      en: 'en-US',
-      ja: 'ja-JP',
-      zh: 'zh-CN',
-      es: 'es-ES',
-      fr: 'fr-FR'
-    };
-    utter.lang = langMap[lang] || 'ko-KR';
-    utter.rate = 1.05;
-    const voices = cachedVoicesLab.length > 0 ? cachedVoicesLab : window.speechSynthesis.getVoices();
-    const targetPrefix = langMap[lang]?.split('-')[0]?.toLowerCase() || lang.toLowerCase();
-    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
-    if (matchedVoice) utter.voice = matchedVoice;
-    window.speechSynthesis.speak(utter);
-  } catch (e) {
-    console.warn('TTS notice:', e);
-  }
+  speakLocalizedText(text, lang);
 };
 
 export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
