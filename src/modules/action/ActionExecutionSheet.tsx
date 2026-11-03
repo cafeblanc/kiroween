@@ -102,22 +102,26 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3 sm:p-4 select-none"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-3 sm:p-4 select-none"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
-        className="relative bg-slate-900 border-2 border-purple-500 rounded-2xl w-full max-w-md p-4 sm:p-5 shadow-2xl flex flex-col gap-3 max-h-[85vh] overflow-y-auto"
+        className="relative bg-slate-900/95 border-2 border-purple-400 rounded-2xl w-full max-w-md p-4 sm:p-5 shadow-[0_0_50px_rgba(168,85,247,0.5)] flex flex-col gap-3 max-h-[85vh] overflow-y-auto ring-1 ring-purple-500/30"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
+        <div className="flex justify-between items-center border-b border-slate-700/80 pb-2.5">
           <div className="flex items-center gap-2">
             <span className="text-xl">⚡</span>
             <div>
               <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
                 {ui.checkoutTitle}
-                <span className="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-purple-600/60 text-purple-200 border border-purple-400/50 px-2 py-0.5 rounded-full font-bold">
                   {ui.checkoutSubtitle}
                 </span>
               </h3>
@@ -127,7 +131,7 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 rounded transition cursor-pointer flex items-center gap-1"
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-600 text-xs font-bold px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 shadow"
           >
             <span>✕ {ui.cancelBtn}</span>
           </button>
@@ -135,15 +139,15 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
 
         {/* Real-time Voice Notice Banner */}
         {voiceNotice && (
-          <div className="bg-purple-950/90 border border-purple-500/50 px-3 py-1.5 rounded-xl text-xs text-purple-200 flex items-center gap-1.5 shadow animate-in fade-in">
+          <div className="bg-purple-900/90 border border-purple-400 px-3 py-1.5 rounded-xl text-xs text-purple-100 flex items-center gap-1.5 shadow">
             <span className="text-sm animate-pulse">🎙️</span>
             <span className="font-semibold text-[11px]">{voiceNotice}</span>
           </div>
         )}
 
         {/* Product Box */}
-        <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center gap-3">
-          <span className="text-3xl p-1 bg-purple-900/30 rounded-lg border border-purple-500/30 shrink-0">
+        <div className="bg-slate-800/80 border border-purple-500/30 p-3 rounded-xl flex items-center gap-3 shadow-md">
+          <span className="text-3xl p-1 bg-purple-900/40 rounded-lg border border-purple-500/40 shrink-0">
             {product.icon}
           </span>
           <div className="flex-1 min-w-0">
@@ -151,29 +155,29 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
               <p className="text-xs font-bold text-white truncate">
                 {product.name[lang] || product.name.ko || product.name.en}
               </p>
-              <span className="text-[10px] text-emerald-400 font-semibold shrink-0">
+              <span className="text-[10px] text-emerald-300 font-bold shrink-0">
                 {ui.inStock}: {product.stock}{ui.unitCount}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-amber-400 font-extrabold">
+              <span className="text-xs text-amber-300 font-extrabold">
                 {ui.unitPrice}: {product.currency} {product.price.toLocaleString()}
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">(${((product.price) / 1350).toFixed(2)} USD)</span>
+              <span className="text-[10px] text-slate-300 font-mono">(${((product.price) / 1350).toFixed(2)} USD)</span>
             </div>
           </div>
         </div>
 
         {/* Quantity Stepper with Voice Commands */}
-        <div className="bg-slate-950/80 border border-purple-500/30 p-3 rounded-xl flex flex-col gap-2">
+        <div className="bg-slate-800/80 border border-purple-500/30 p-3 rounded-xl flex flex-col gap-2 shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-purple-200 flex items-center gap-1">
               <span>📦 {ui.quantitySelect}</span>
-              <span className="text-[9px] bg-purple-900/50 text-purple-300 px-1.5 py-0.2 rounded border border-purple-500/30">
+              <span className="text-[9px] bg-purple-900/50 text-purple-200 px-1.5 py-0.2 rounded border border-purple-500/40 font-bold">
                 {ui.voiceControllable}
               </span>
             </span>
-            <span className="text-xs font-bold text-white font-mono">{quantity}{ui.unitCount}</span>
+            <span className="text-xs font-bold text-amber-300 font-mono">{quantity}{ui.unitCount}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -182,23 +186,23 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
               type="button"
               onClick={() => setQuantity(q => Math.max(1, q - 1))}
               disabled={quantity <= 1}
-              className="flex-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-700 text-slate-200 py-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95"
+              className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 border border-slate-600 text-white py-2 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95 shadow"
             >
               <span className="text-sm font-extrabold">➖ {ui.decreaseBtn}</span>
               <span className="text-[10px] text-amber-300 font-mono">"{ui.decreaseBtn}"</span>
             </button>
 
             {/* Display quantity */}
-            <div className="px-4 py-2 bg-slate-900 border border-purple-500/40 rounded-xl text-center shrink-0 min-w-[70px]">
+            <div className="px-4 py-1.5 bg-slate-900 border-2 border-purple-400 rounded-xl text-center shrink-0 min-w-[70px] shadow-inner">
               <span className="text-base font-extrabold text-amber-400 font-mono">{quantity}</span>
-              <span className="text-[10px] text-slate-400 block">{ui.unitCount}</span>
+              <span className="text-[10px] text-slate-300 block">{ui.unitCount}</span>
             </div>
 
             {/* Increase button */}
             <button
               type="button"
               onClick={() => setQuantity(q => q + 1)}
-              className="flex-1 bg-purple-900/40 hover:bg-purple-900/60 border border-purple-500/50 text-purple-200 py-2.5 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95"
+              className="flex-1 bg-purple-700/80 hover:bg-purple-600 border border-purple-400 text-white py-2 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center cursor-pointer active:scale-95 shadow"
             >
               <span className="text-sm font-extrabold">➕ {ui.increaseBtn}</span>
               <span className="text-[10px] text-amber-300 font-mono">"{ui.increaseBtn}"</span>
@@ -208,20 +212,20 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
 
         {/* Payment Method Selector */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] text-slate-400 font-bold">{ui.paymentMethodTitle}:</label>
+          <label className="text-[11px] text-slate-300 font-bold">{ui.paymentMethodTitle}:</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setPaymentMethod('paypal_wallet')}
-              className={`p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer ${
+              className={`p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer shadow-sm ${
                 paymentMethod === 'paypal_wallet'
-                  ? 'bg-blue-950/80 border-blue-400 text-white shadow-md'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-blue-900/60 border-2 border-blue-400 text-white shadow-md'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white'
               }`}
             >
               <span className="text-lg">🅿️</span>
               <div>
-                <p className="text-xs font-bold text-blue-400">{ui.paypalWallet}</p>
+                <p className="text-xs font-bold text-blue-300">{ui.paypalWallet}</p>
                 <p className="text-[9px] text-slate-400">One-click Instant</p>
               </div>
             </button>
@@ -229,10 +233,10 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
             <button
               type="button"
               onClick={() => setPaymentMethod('paypal_card')}
-              className={`p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer ${
+              className={`p-2 rounded-xl border text-left flex items-center gap-2 transition cursor-pointer shadow-sm ${
                 paymentMethod === 'paypal_card'
-                  ? 'bg-blue-950/80 border-blue-400 text-white shadow-md'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-blue-900/60 border-2 border-blue-400 text-white shadow-md'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white'
               }`}
             >
               <span className="text-lg">💳</span>
@@ -245,15 +249,15 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
         </div>
 
         {/* Total Price Summary */}
-        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-          <span className="text-xs text-slate-300 font-bold">
+        <div className="bg-slate-800/90 p-2.5 rounded-xl border border-purple-500/30 flex items-center justify-between shadow-md">
+          <span className="text-xs text-slate-200 font-bold">
             {ui.totalAmount} ({quantity}{ui.unitCount}):
           </span>
           <div className="text-right">
             <span className="text-sm font-extrabold text-amber-400 font-mono">
               {product.currency} {totalAmount.toLocaleString()}
             </span>
-            <span className="text-[10px] text-slate-400 font-mono ml-1.5">
+            <span className="text-[10px] text-slate-300 font-mono ml-1.5">
               (${usdPrice} USD)
             </span>
           </div>
@@ -266,7 +270,7 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="col-span-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold py-3 rounded-xl text-xs border border-slate-700 transition flex flex-col items-center justify-center cursor-pointer shadow"
+            className="col-span-4 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-bold py-3 rounded-xl text-xs border border-slate-600 transition flex flex-col items-center justify-center cursor-pointer shadow"
           >
             <span className="text-xs font-extrabold">✕ {ui.cancelBtn}</span>
             <span className="text-[10px] text-amber-300 font-mono">"{ui.cancelBtn}"</span>
@@ -277,7 +281,7 @@ export const ActionExecutionSheet: React.FC<ActionExecutionSheetProps> = ({
             type="button"
             disabled={loading}
             onClick={handleExecute}
-            className="col-span-8 bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 active:scale-95 disabled:opacity-50 text-slate-950 font-extrabold py-3 rounded-xl text-xs sm:text-sm shadow-xl transition flex flex-col items-center justify-center cursor-pointer"
+            className="col-span-8 bg-gradient-to-r from-amber-400 via-amber-300 to-emerald-400 hover:from-amber-300 hover:to-emerald-300 active:scale-95 disabled:opacity-50 text-slate-950 font-extrabold py-3 rounded-xl text-xs sm:text-sm shadow-xl transition flex flex-col items-center justify-center cursor-pointer"
           >
             {loading ? (
               <span className="text-slate-950 font-bold flex items-center gap-1.5">

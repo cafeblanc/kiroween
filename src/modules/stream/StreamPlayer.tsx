@@ -129,7 +129,10 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
             </div>
             <button
               type="button"
-              onClick={onSelectAction}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectAction();
+              }}
               title={ui.checkoutBtnTip}
               className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-lg transition cursor-pointer shrink-0 flex items-center gap-1.5 border border-purple-400/40"
             >

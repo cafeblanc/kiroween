@@ -695,7 +695,10 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => triggerCheckout(selectedProduct, '결제창 띄우기 버튼 클릭')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerCheckout(selectedProduct, '결제창 띄우기 버튼 클릭');
+                }}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer shadow-lg shrink-0 flex items-center gap-1 active:scale-95"
                 title='음성으로 "결제창"이라고 말해도 열립니다'
               >
