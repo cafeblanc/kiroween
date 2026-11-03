@@ -24,6 +24,7 @@ export interface ChatMessage {
   text: Record<Language, string> | string;
   suggestedProduct?: ProductItem;
   timestamp: string;
+  isStreaming?: boolean;
 }
 
 export interface ActionOrder {

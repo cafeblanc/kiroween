@@ -49,6 +49,51 @@ export const speakLocalized = (text: string, lang: Language) => {
   speakLocalizedText(text, lang);
 };
 
+const QUICK_QUESTIONS: Record<Language, Array<{ label: string; query: string }>> = {
+  ko: [
+    { label: '🩺 의학적 효능', query: '의학적으로 아카시아 꿀의 효능과 혈당 영향은?' },
+    { label: '🔮 운세/재물운', query: '오늘 내 일진과 황금빛 기운의 재물운을 점쳐줘' },
+    { label: '🔬 과학적 효소', query: '과학적으로 효소의 기질 특이성과 분해 메커니즘을 설명해줘' },
+    { label: '⚖️ 품질·원산지', query: '법률적으로 전자상거래 원산지 표시 규정과 품질 보증은?' },
+    { label: '⚡ 바로 결제하기', query: '결제창 띄워줘! 지금 바로 구매할래' }
+  ],
+  en: [
+    { label: '🩺 Health Benefits', query: 'What are the medical health benefits of acacia honey?' },
+    { label: '🔮 Daily Fortune', query: 'Tell me my daily fortune and golden wealth energy today' },
+    { label: '🔬 Enzyme Science', query: 'Explain enzyme substrate specificity in honey scientifically' },
+    { label: '⚖️ Origin Certified', query: 'What are the origin certification standards for this product?' },
+    { label: '⚡ Instant Buy', query: 'Open checkout! I want to buy this right now' }
+  ],
+  ja: [
+    { label: '🩺 蜂蜜の健康効能', query: 'アカシア蜂蜜の医学的な効能と血糖値への影響を教えて' },
+    { label: '🔮 今日の金運', query: '今日の運勢と黄金の財運エネルギーを占って' },
+    { label: '🔬 酵素の科学', query: 'ミツバチ酵素の基質特異性と分解メカニズムを科学的に解説して' },
+    { label: '⚖️ 原産地品質認証', query: 'この商品の産地直送品質認証基準について教えて' },
+    { label: '⚡ すぐ購入する', query: '決済画面を開いて！今すぐ購入したい' }
+  ],
+  zh: [
+    { label: '🩺 养生功效', query: '从医学角度看洋槐蜂蜜的营养价值与健康功效是什么？' },
+    { label: '🔮 今日财运', query: '请为我测算今日生肖运势与财富金运' },
+    { label: '🔬 活性酶科学', query: '请科学解释蜂蜜转化酶的基质特异性机制' },
+    { label: '⚖️ 权威质检', query: '本产品的原产地认证与特级质检标准是什么？' },
+    { label: '⚡ 即刻结账', query: '打开结算页面！我现在要下单购买' }
+  ],
+  es: [
+    { label: '🩺 Beneficios', query: '¿Cuáles son los beneficios para la salud de la miel de acacia?' },
+    { label: '🔮 Fortuna Hoy', query: 'Dime mi fortuna de hoy y energía de abundancia' },
+    { label: '🔬 Enzimas Puras', query: 'Explica científicamente la actividad enzimática de la miel' },
+    { label: '⚖️ Certificación', query: '¿Cuáles son los estándares de origen y calidad certificados?' },
+    { label: '⚡ Comprar Ya', query: '¡Abre la pantalla de pago! Quiero comprar esto ahora' }
+  ],
+  fr: [
+    { label: '🩺 Bienfaits', query: 'Quels sont les bienfaits pour la santé du miel d acacia ?' },
+    { label: '🔮 Fortune du Jour', query: 'Parlez-moi de ma chance et de ma prospérité aujourd hui' },
+    { label: '🔬 Science Enzymes', query: 'Expliquez scientifiquement l activité enzymatique du miel' },
+    { label: '⚖️ Origine Pure', query: 'Quelles sont les normes d origine et certifications ?' },
+    { label: '⚡ Payer Immédiat', query: 'Ouvrez la page de paiement ! Je veux acheter maintenant' }
+  ]
+};
+
 export const AgentChat: React.FC<AgentChatProps> = ({
   lang,
   onTriggerAction,
@@ -110,6 +155,41 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     );
   };
 
+  // Handle streaming delta from gpt-realtime WebRTC for live typing animation
+  const handleTranscriptStream = (_sender: 'agent', _delta: string, fullText: string, domain?: DomainCategory) => {
+    if (!fullText) return;
+    let displayPrefix = '';
+    if (domain && domain !== 'general' && DOMAIN_REGISTRY[domain]) {
+      const meta = DOMAIN_REGISTRY[domain];
+      displayPrefix = `[${meta.icon} ${meta.nameKo} 최적화] `;
+    }
+    const formatted = `🗣️ ${displayPrefix}${fullText}`;
+
+    setMessages(prev => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].sender === 'ai' && copy[i].isStreaming) {
+          copy[i] = {
+            ...copy[i],
+            text: formatted,
+            isStreaming: true
+          };
+          return copy;
+        }
+      }
+      return [
+        ...prev,
+        {
+          id: 'stream-' + Date.now(),
+          sender: 'ai',
+          text: formatted,
+          timestamp: new Date().toLocaleTimeString(),
+          isStreaming: true
+        }
+      ];
+    });
+  };
+
   // Handle incoming transcripts from the independent Voice Module with strict deduplication
   const handleVoiceTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
     if (!text || !text.trim()) return;
@@ -150,12 +230,25 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     }
 
     setMessages(prev => {
+      // If there was an active streaming message, settle it
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].sender === 'ai' && copy[i].isStreaming) {
+          copy[i] = {
+            ...copy[i],
+            text: formattedText,
+            isStreaming: false
+          };
+          return copy;
+        }
+      }
+
       // Prevent duplicate messages from OpenAI audio/text multiple event fires
-      if (prev.length > 0) {
-        const last = prev[prev.length - 1];
+      if (copy.length > 0) {
+        const last = copy[copy.length - 1];
         const lastText = typeof last.text === 'string' ? last.text : '';
         if (last.sender === (sender === 'user' ? 'user' : 'ai') && (lastText === formattedText || lastText.includes(trimmed))) {
-          return prev;
+          return copy;
         }
       }
 
@@ -163,9 +256,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({
         id: Date.now() + '-' + sender,
         sender: sender === 'user' ? 'user' : 'ai',
         text: formattedText,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: new Date().toLocaleTimeString(),
+        isStreaming: false
       };
-      return [...prev, msg];
+      return [...copy, msg];
     });
   };
 
@@ -279,6 +373,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           lang={lang}
           onStatusChange={setVoiceStatus}
           onTranscript={handleVoiceTranscript}
+          onTranscriptStream={handleTranscriptStream}
           onToolCall={handleVoiceToolCall}
           onDomainDetected={handleDomainDetected}
         />
@@ -314,6 +409,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({
                 <span>· {m.timestamp}</span>
               </div>
               {typeof m.text === 'string' ? m.text : (m.text[lang] || m.text.en)}
+              {m.isStreaming && (
+                <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 animate-pulse align-middle" />
+              )}
             </div>
 
             {/* In-Stream Suggested Action Card */}
@@ -341,51 +439,23 @@ export const AgentChat: React.FC<AgentChatProps> = ({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Quick Domain One-Click Question & Test Chips */}
+      {/* Quick Domain One-Click Question & Test Chips (Fully Localized) */}
       <div className="px-2 py-1.5 bg-slate-950/70 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto text-[10px] shrink-0">
-        <span className="text-purple-400 font-bold shrink-0">원클릭 테스트:</span>
-        <button
-          type="button"
-          onClick={() => sendQuery('의학적으로 아카시아 꿀의 효능과 혈당 영향은?')}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
-        >
-          🩺 의학적 효능
-        </button>
-        <button
-          type="button"
-          onClick={() => sendQuery('오늘 내 일진과 황금빛 기운의 재물운을 점쳐줘')}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
-        >
-          🔮 운세/재물운
-        </button>
-        <button
-          type="button"
-          onClick={() => sendQuery('과학적으로 효소의 기질 특이성과 분해 메커니즘을 설명해줘')}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
-        >
-          🔬 과학적 효소
-        </button>
-        <button
-          type="button"
-          onClick={() => sendQuery('법률적으로 전자상거래 원산지 표시 규정과 품질 보증은?')}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
-        >
-          ⚖️ 법률/품질보증
-        </button>
-        <button
-          type="button"
-          onClick={() => sendQuery('요리 미식 관점에서 마이야르 반응과 꿀의 고메 페어링 비법은?')}
-          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer"
-        >
-          🍳 요리/미식
-        </button>
-        <button
-          type="button"
-          onClick={() => sendQuery('이 꿀 바로 주문해줘')}
-          className="bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/40 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer font-bold"
-        >
-          ⚡ 꿀 바로 주문
-        </button>
+        <span className="text-purple-400 font-bold shrink-0">{lang === 'ko' ? '원클릭 질문:' : 'Quick Prompt:'}</span>
+        {(QUICK_QUESTIONS[lang] || QUICK_QUESTIONS.ko).map((chip, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => sendQuery(chip.query)}
+            className={`px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer font-semibold ${
+              idx === 4
+                ? 'bg-purple-900/70 hover:bg-purple-800 text-purple-200 border border-purple-500/50 font-bold'
+                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'
+            }`}
+          >
+            {chip.label}
+          </button>
+        ))}
       </div>
 
       {/* Input Form */}
