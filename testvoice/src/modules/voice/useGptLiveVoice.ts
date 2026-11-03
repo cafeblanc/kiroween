@@ -360,7 +360,10 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       return true;
     } catch (err: any) {
       console.error('[useGptLiveVoice] Connection error:', err);
-      const msg = err?.message || '실시간 음성 연결에 실패했습니다.';
+      let msg = err?.message || '실시간 음성 연결에 실패했습니다.';
+      if (msg.includes('Failed to fetch')) {
+        msg = 'OpenAI 통신 실패 (Failed to fetch): 5180 로컬 서버 프록시 또는 네트워크 상태, 유효한 OpenAI API 키 여부를 확인해주세요.';
+      }
       reportError(msg);
       stopVoice();
       return false;
