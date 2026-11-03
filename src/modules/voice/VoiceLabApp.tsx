@@ -598,6 +598,7 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
             systemInstruction={systemInstruction}
             tools={TEST_TOOLS}
             enableDomainSearch={true}
+            lang={lang}
             onStatusChange={status => {
               setVoiceStatus(status);
               if (status === 'connected') {

@@ -6,6 +6,7 @@ import { AdminStudioModal } from './modules/admin/AdminStudioModal';
 import { PayPalReceiptModal } from './modules/action/PayPalReceiptModal';
 import { VoiceLabApp, executeVoiceButtonCommand, setCheckoutModalState } from './modules/voice';
 import { ProductItem, ActionOrder, Language } from './types';
+import { getUIStrings } from './i18n/translations';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
   {
@@ -231,20 +232,20 @@ export const App: React.FC = () => {
         setActiveProduct(prod);
       }
       setIsActionOpen(true);
-      setVoiceNotice('🗣️ 음성 버튼 작동: "결제창"');
+      setVoiceNotice(`${ui.voiceToastPrefix}"${ui.checkoutBtn}"`);
     };
 
     const handleSwitchView = (e: any) => {
       const targetView = e.detail?.view;
       if (targetView === 'main' || targetView === 'voicelab') {
         setCurrentView(targetView);
-        setVoiceNotice(`🗣️ 음성 버튼 작동: "${targetView === 'main' ? '방송' : '음성랩'}"`);
+        setVoiceNotice(`${ui.voiceToastPrefix}"${targetView === 'main' ? ui.liveTab : ui.voiceLabTab}"`);
       }
     };
 
     const handleOpenAdmin = () => {
       setIsAdminOpen(true);
-      setVoiceNotice('🗣️ 음성 버튼 작동: "관리자"');
+      setVoiceNotice(`${ui.voiceToastPrefix}"${ui.adminBtn}"`);
     };
 
     const handleSelectProduct = (e: any) => {
@@ -252,7 +253,7 @@ export const App: React.FC = () => {
       const found = products.find(p => p.id === pid);
       if (found) {
         setActiveProduct(found);
-        setVoiceNotice(`🗣️ 음성 버튼 작동: "${found.id === 'prod-honey' ? '벌꿀' : '전통차'}"`);
+        setVoiceNotice(`${ui.voiceToastPrefix}"${found.id === 'prod-honey' ? ui.honeyShort : ui.teaShort}"`);
       }
     };
 
@@ -265,7 +266,7 @@ export const App: React.FC = () => {
     const handleVoiceToast = (e: any) => {
       const btn = e.detail?.detail?.buttonName || e.detail?.eventName;
       if (btn) {
-        setVoiceNotice(`🗣️ 음성 버튼 작동: "${btn}"`);
+        setVoiceNotice(`${ui.voiceToastPrefix}"${btn}"`);
       }
     };
 
@@ -284,7 +285,7 @@ export const App: React.FC = () => {
       window.removeEventListener('kiroween:close_modal', handleCloseModal);
       window.removeEventListener('kiroween:voice_button_toast', handleVoiceToast);
     };
-  }, [activeProduct, products]);
+  }, [activeProduct, products, lang]);
 
   // Auto-dismiss voice feedback toast after 2 seconds
   useEffect(() => {
@@ -323,6 +324,8 @@ export const App: React.FC = () => {
     }
   };
 
+  const ui = getUIStrings(lang);
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-white overflow-hidden font-sans">
       {/* Top Header */}
@@ -331,9 +334,9 @@ export const App: React.FC = () => {
           <span className="text-xl">🎃</span>
           <div>
             <h1 className="text-xs sm:text-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-              Kiroween Agentic Video Stream
+              {ui.appTitle}
             </h1>
-            <p className="text-[10px] text-slate-400">Spec-driven Multimodal Execution Architecture</p>
+            <p className="text-[10px] text-slate-400">{ui.appSubtitle}</p>
           </div>
 
           {/* View Switcher: Live Stream vs Dedicated Voice Module Lab */}
@@ -346,10 +349,10 @@ export const App: React.FC = () => {
                   ? 'bg-purple-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
-              title='음성으로 "방송"이라고 말해도 전환됩니다'
+              title={ui.liveTabTip}
             >
               <span>📺</span>
-              <span>방송</span>
+              <span>{ui.liveTab}</span>
             </button>
             <button
               type="button"
@@ -359,10 +362,10 @@ export const App: React.FC = () => {
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
                   : 'text-emerald-400 hover:text-white'
               }`}
-              title='음성으로 "음성랩"이라고 말해도 전환됩니다'
+              title={ui.voiceLabTabTip}
             >
               <span>🎙️</span>
-              <span>음성랩</span>
+              <span>{ui.voiceLabTab}</span>
             </button>
           </div>
         </div>
@@ -373,15 +376,16 @@ export const App: React.FC = () => {
             type="button"
             onClick={() => setIsAdminOpen(true)}
             className="bg-slate-800 hover:bg-slate-700 text-purple-400 border border-purple-500/40 px-2 py-1 rounded-lg text-xs font-semibold cursor-pointer transition flex items-center gap-1"
-            title='음성으로 "관리자"라고 말해도 열립니다'
+            title={ui.adminBtnTip}
           >
             <span>⚙️</span>
-            <span>관리자</span>
+            <span>{ui.adminBtn}</span>
           </button>
 
           <div className="flex bg-slate-950 border border-slate-700 rounded-lg p-0.5">
             {products.map(p => {
-              const shortName = p.id === 'prod-honey' ? '벌꿀' : '전통차';
+              const shortName = p.id === 'prod-honey' ? ui.honeyShort : ui.teaShort;
+              const tip = p.id === 'prod-honey' ? ui.honeyTip : ui.teaTip;
               return (
                 <button
                   key={p.id}
@@ -390,7 +394,7 @@ export const App: React.FC = () => {
                   className={`px-2 py-1 rounded text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
                     activeProduct?.id === p.id ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'
                   }`}
-                  title={`음성으로 "${shortName}"이라고 말해도 선택됩니다`}
+                  title={tip}
                 >
                   <span>{p.icon}</span>
                   <span>{shortName}</span>

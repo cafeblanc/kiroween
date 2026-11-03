@@ -2,6 +2,7 @@
 // Completely decoupled from application business logic for universal portability.
 
 import { DomainCategory, DomainMeta } from './domainRouter';
+import { Language } from '../../types';
 export * from './domainRouter';
 
 export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error';
@@ -58,6 +59,8 @@ export interface GptLiveVoiceInProps {
   onDomainSearch?: (domain: DomainCategory, query: string) => Promise<string> | string;
   /** Optional custom class name for styling container */
   className?: string;
+  /** Active UI language for button and status localization */
+  lang?: Language;
 }
 
 export interface GptLiveVoiceOutCallbacks {

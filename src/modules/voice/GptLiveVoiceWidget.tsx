@@ -4,6 +4,7 @@
 import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { GptLiveVoiceWidgetProps, GptLiveVoiceWidgetHandle, DOMAIN_REGISTRY, AudioDeviceOption } from './types';
 import { useGptLiveVoice, enumerateHearingDevices } from './useGptLiveVoice';
+import { getUIStrings } from '../../i18n/translations';
 
 export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVoiceWidgetProps>(({
   apiKey,
@@ -13,6 +14,7 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
   tools,
   enableDomainSearch = true,
   className = '',
+  lang = 'ko',
   onDomainSearch,
   onTranscript,
   onTranscriptStream,
@@ -22,6 +24,7 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
   onError,
   onAudioLevel
 }, ref) => {
+  const ui = getUIStrings(lang);
   const [localKey, setLocalKey] = useState(() => apiKey || localStorage.getItem('kiroween_openai_api_key') || '');
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [showDeviceModal, setShowDeviceModal] = useState(false);
@@ -183,10 +186,10 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
               ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/90'
               : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
           }`}
-          title='음성으로 "오디오"라고 말해도 열립니다'
+          title={ui.audioSettingsBtn}
         >
           <span>🦻</span>
-          <span>{detectedHearingAid ? '보청기' : '오디오'}</span>
+          <span>{detectedHearingAid ? '🦻' : ui.audioSettingsBtn}</span>
         </button>
 
         {/* API Key Modal Button */}
@@ -194,10 +197,10 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
           type="button"
           onClick={() => setShowKeyModal(prev => !prev)}
           className="text-[11px] bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1"
-          title='음성으로 "키설정"이라고 말해도 열립니다'
+          title={ui.apiKeyBtn}
         >
           <span>🔑</span>
-          <span>키설정</span>
+          <span>{ui.apiKeyBtn}</span>
         </button>
 
         {/* Main Single Start / Stop Button */}
@@ -221,12 +224,12 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
           </span>
           <span>
             {status === 'speaking'
-              ? '발화 중 (끼어들기 가능)'
+              ? ui.agentStatusSpeaking
               : status === 'listening'
-              ? '질문 듣는 중...'
+              ? ui.agentStatusListening
               : isVoiceActive
-              ? '통화 종료 (Stop)'
-              : '음성 대화 시작 (Start Voice)'}
+              ? ui.stopVoiceBtn
+              : ui.startVoiceBtn}
           </span>
         </button>
       </div>

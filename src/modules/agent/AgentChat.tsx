@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, ProductItem, Language } from '../../types';
 import { GptLiveVoiceWidget, VoiceToolDefinition, VoiceStatus, DomainCategory, DOMAIN_REGISTRY, DomainKnowledgeRouter } from '../voice';
 import { buildVoiceInstructions } from '../voice/voicePromptBuilder';
+import { getUIStrings } from '../../i18n/translations';
 
 interface AgentChatProps {
   lang: Language;
@@ -43,17 +44,25 @@ const VOICE_TOOLS: VoiceToolDefinition[] = [
   }
 ];
 
-const speakKorean = (text: string) => {
+const speakLocalized = (text: string, lang: Language) => {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   try {
     window.speechSynthesis.cancel();
     const clean = text.replace(/\[.*?\]/g, '').replace(/[#\*\_]/g, '').trim();
     const utter = new SpeechSynthesisUtterance(clean);
-    utter.lang = 'ko-KR';
+    const langMap: Record<Language, string> = {
+      ko: 'ko-KR',
+      en: 'en-US',
+      ja: 'ja-JP',
+      zh: 'zh-CN',
+      es: 'es-ES',
+      fr: 'fr-FR'
+    };
+    utter.lang = langMap[lang] || 'ko-KR';
     utter.rate = 1.05;
     const voices = window.speechSynthesis.getVoices();
-    const koVoice = voices.find(v => v.lang.startsWith('ko'));
-    if (koVoice) utter.voice = koVoice;
+    const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+    if (matchedVoice) utter.voice = matchedVoice;
     window.speechSynthesis.speak(utter);
   } catch (e) {
     console.warn('TTS notice:', e);
@@ -65,17 +74,18 @@ export const AgentChat: React.FC<AgentChatProps> = ({
   onTriggerAction,
   activeProduct
 }) => {
+  const ui = getUIStrings(lang);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'init-1',
       sender: 'ai',
       text: {
-        en: '🤖 Welcome to Kiroween Multimodal Agent! Ask anything via text or voice. Specialized domain queries (Science, Medicine, History, Fortune, Physics, Fashion, etc.) are automatically optimized.',
-        ko: '🤖 Kiroween 멀티모달 에이전트에 오신 것을 환영합니다! 텍스트 또는 음성으로 질문해 보세요. 과학·의학·역사·운세·물리·패션 등 전문 질문은 핵심어를 자동 감지하여 최적화된 전문 답변을 제공합니다.',
-        ja: '🤖 Kiroweenマルチモーダルエージェントへようこそ！科学、医学、歴史などの専門的な質問にも最適化された回答を提供します。',
-        zh: '🤖 欢迎来到 Kiroween 多模态智能代理！科学、医学、历史、物理等专业提问均支持核心词自动识别与深度优化检索。',
-        es: '🤖 ¡Bienvenido al Agente Multimodal de Kiroween! Respuestas optimizadas para ciencia, medicina, historia y más.',
-        fr: '🤖 Bienvenue sur l’Agent Multimodal Kiroween ! Réponses expertes optimisées par domaine.'
+        en: '🤖 Welcome to Kiroween Live Commerce! I am your AI co-host. You can speak commands like "Checkout", "Add", "Minus", "Pay", or "Cancel" anytime.',
+        ko: '🤖 Kiroween 라이브 커머스에 오신 것을 환영합니다! 실시간 AI 공동 쇼호스트입니다. "결제창", "더하기", "빼기", "결제", "취소"를 음성으로 언제든 말씀해 보세요!',
+        ja: '🤖 Kiroweenライブコマースへようこそ！AI共同MCです。「決済画面」「増やす」「減らす」「決済」「キャンセル」と声に出してみてください！',
+        zh: '🤖 欢迎来到 Kiroween 直播电商！我是您的AI助播。您可以随时语音说出“结账”、“增加”、“减少”、“付款”或“取消”！',
+        es: '🤖 ¡Bienvenido al Live Shopping de Kiroween! Di "Pagar", "Añadir", "Quitar" o "Cancelar" en cualquier momento.',
+        fr: '🤖 Bienvenue sur Kiroween Live Shopping ! Dites "Paiement", "Ajouter", "Moins", "Payer" ou "Annuler" à tout moment.'
       },
       timestamp: 'Ready'
     }
@@ -185,7 +195,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       const actionMsg: ChatMessage = {
         id: Date.now() + '-action',
         sender: 'ai',
-        text: `⚡ [gpt-realtime] 현재 방송 중인 ${activeProduct.name[lang] || activeProduct.name.en} 결제창을 화면 앞에 열었습니다!`,
+        text: `⚡ [gpt-realtime] ${ui.checkoutOpenedMsg} (${activeProduct.name[lang] || activeProduct.name.en})`,
         suggestedProduct: activeProduct,
         timestamp: new Date().toLocaleTimeString()
       };
@@ -232,8 +242,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       }
     } else if (detected.domain !== 'general') {
       const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, query, activeProduct?.name[lang] || activeProduct?.name.en);
-      replyText = `🗣️ [${detected.meta.icon} ${detected.meta.nameKo} 최적화 답변] ${expertAnswer}`;
-      speakKorean(expertAnswer);
+      replyText = `🗣️ [${detected.meta.icon} ${detected.meta.nameKo}] ${expertAnswer}`;
+      speakLocalized(expertAnswer, lang);
     } else if (activeProduct) {
       replyText = `🤖 [실시간 방송 컨텍스트] 현재 방송 상품: ${activeProduct.name[lang] || activeProduct.name.en}. ${activeProduct.description[lang] || activeProduct.description.en}`;
     }
@@ -264,19 +274,19 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           <span className="text-lg">🤖</span>
           <div>
             <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-              Kiroween Contextual Agent
+              {ui.agentTitle}
               {(voiceStatus === 'connected' || voiceStatus === 'speaking' || voiceStatus === 'listening') && (
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span>
               )}
             </h3>
             <span className="text-[10px] text-emerald-400 font-medium">
               {voiceStatus === 'speaking'
-                ? '🗣️ gpt-live-1 발화 중 (끼어들기 가능)'
+                ? ui.agentStatusSpeaking
                 : voiceStatus === 'listening'
-                ? '👂 실시간 음성 경청 중 (말씀하세요)'
+                ? ui.agentStatusListening
                 : voiceStatus === 'connected'
-                ? '🟢 실시간 음성 통화 대기 중'
-                : '● 전문 13개 도메인 최적화 엔진 탑재'}
+                ? ui.agentStatusConnected
+                : ui.agentStatusIdle}
             </span>
           </div>
         </div>
@@ -286,6 +296,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           systemInstruction={voiceInstructions}
           tools={VOICE_TOOLS}
           enableDomainSearch={false}
+          lang={lang}
           onStatusChange={setVoiceStatus}
           onTranscript={handleVoiceTranscript}
           onToolCall={handleVoiceToolCall}
@@ -403,14 +414,14 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="말씀하시거나 질문 입력 (예: '의학적으로는?', '역사적 유래는?')..."
+          placeholder={ui.chatPlaceholder}
           className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
         />
         <button
           type="submit"
           className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition cursor-pointer shrink-0"
         >
-          Send
+          {ui.sendBtn}
         </button>
       </form>
     </div>

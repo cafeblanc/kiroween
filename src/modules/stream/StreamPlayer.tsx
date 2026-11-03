@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ProductItem, Language } from '../../types';
 import { LiveViewerOverlay } from './LiveViewerOverlay';
+import { getUIStrings } from '../../i18n/translations';
 
 interface StreamPlayerProps {
   product: ProductItem | null;
@@ -106,35 +107,38 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
       </div>
 
       {/* 2. Dedicated Bottom Action Bar (동영상 화면 바로 밑에 등록된 상품 및 결제창 버튼 표시) */}
-      {product && (
-        <div className="w-full bg-slate-900/95 border border-slate-800 px-3.5 py-2.5 rounded-xl flex items-center justify-between shadow-xl shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="text-xl sm:text-2xl">{product.icon}</span>
-            <div className="truncate">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  등록 상품
-                </span>
-                <p className="text-xs font-bold text-white truncate">
-                  {product.name[lang] || product.name.ko || product.name.en}
+      {product && (() => {
+        const ui = getUIStrings(lang);
+        return (
+          <div className="w-full bg-slate-900/95 border border-slate-800 px-3.5 py-2.5 rounded-xl flex items-center justify-between shadow-xl shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-xl sm:text-2xl">{product.icon}</span>
+              <div className="truncate">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    {ui.featuredBadge}
+                  </span>
+                  <p className="text-xs font-bold text-white truncate">
+                    {product.name[lang] || product.name.ko || product.name.en}
+                  </p>
+                </div>
+                <p className="text-xs text-amber-400 font-extrabold mt-0.5">
+                  {product.currency} {product.price.toLocaleString()}
                 </p>
               </div>
-              <p className="text-xs text-amber-400 font-extrabold mt-0.5">
-                {product.currency} {product.price.toLocaleString()}원
-              </p>
             </div>
+            <button
+              type="button"
+              onClick={onSelectAction}
+              title={ui.checkoutBtnTip}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-lg transition cursor-pointer shrink-0 flex items-center gap-1.5 border border-purple-400/40"
+            >
+              <span>⚡</span>
+              <span>{ui.checkoutBtn}</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onSelectAction}
-            title='음성으로 "결제창"이라고 말해도 바로 열립니다'
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-lg transition cursor-pointer shrink-0 flex items-center gap-1.5 border border-purple-400/40"
-          >
-            <span>⚡</span>
-            <span>결제창</span>
-          </button>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
