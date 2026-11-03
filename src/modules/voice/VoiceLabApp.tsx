@@ -227,16 +227,32 @@ export const VoiceLabApp: React.FC<VoiceLabAppProps> = ({
       }
     };
 
+    const handleOpenCheckoutEvent = (e: any) => {
+      const prod = e.detail?.product || selectedProduct;
+      if (prod) setSelectedProduct(prod);
+      setIsCheckoutOpen(true);
+      addLog('tool', `⚡ 결제창이 음성 명령으로 즉시 열렸습니다: ${prod.name[lang] || prod.name.ko || prod.name.en}`);
+    };
+
+    const handleCloseModalEvent = () => {
+      setIsCheckoutOpen(false);
+      setIsReceiptOpen(false);
+    };
+
     window.addEventListener('kiroween:select_product', handleSelectProduct);
     window.addEventListener('kiroween:clear_logs', handleClearLogs);
     window.addEventListener('kiroween:trigger_tool', handleTriggerTool);
     window.addEventListener('kiroween:select_domain_prompt', handleDomainPrompt);
+    window.addEventListener('kiroween:open_checkout', handleOpenCheckoutEvent);
+    window.addEventListener('kiroween:close_modal', handleCloseModalEvent);
 
     return () => {
       window.removeEventListener('kiroween:select_product', handleSelectProduct);
       window.removeEventListener('kiroween:clear_logs', handleClearLogs);
       window.removeEventListener('kiroween:trigger_tool', handleTriggerTool);
       window.removeEventListener('kiroween:select_domain_prompt', handleDomainPrompt);
+      window.removeEventListener('kiroween:open_checkout', handleOpenCheckoutEvent);
+      window.removeEventListener('kiroween:close_modal', handleCloseModalEvent);
     };
   }, [availableProducts]);
 

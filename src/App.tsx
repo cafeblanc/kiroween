@@ -175,7 +175,7 @@ export const App: React.FC = () => {
     try {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       const langMap: Record<Language, string> = {
         ko: 'ko-KR',
         en: 'en-US',
@@ -187,11 +187,14 @@ export const App: React.FC = () => {
       recognition.lang = langMap[lang] || 'ko-KR';
 
       recognition.onresult = (event: any) => {
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult && lastResult[0]) {
-          const transcript = (lastResult[0].transcript || '').trim();
-          console.log('[NativeSpeechRecognition] Heard voice command:', transcript);
-          executeVoiceButtonCommand(transcript);
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res && res[0]) {
+            const transcript = (res[0].transcript || '').trim();
+            if (transcript) {
+              executeVoiceButtonCommand(transcript);
+            }
+          }
         }
       };
 
@@ -203,9 +206,13 @@ export const App: React.FC = () => {
 
       recognition.onend = () => {
         if (!isStoppedManually) {
-          try {
-            recognition.start();
-          } catch (_) {}
+          setTimeout(() => {
+            if (!isStoppedManually) {
+              try {
+                recognition.start();
+              } catch (_) {}
+            }
+          }, 250);
         }
       };
 
@@ -453,14 +460,16 @@ export const App: React.FC = () => {
         </main>
       )}
 
-      {/* Action Execution Modal */}
-      <ActionExecutionSheet
-        product={activeProduct}
-        isOpen={isActionOpen}
-        lang={lang}
-        onClose={() => setIsActionOpen(false)}
-        onSuccess={handleActionSuccess}
-      />
+      {/* Action Execution Modal (Main Live View) */}
+      {currentView === 'main' && (
+        <ActionExecutionSheet
+          product={activeProduct}
+          isOpen={isActionOpen}
+          lang={lang}
+          onClose={() => setIsActionOpen(false)}
+          onSuccess={handleActionSuccess}
+        />
+      )}
 
       {/* Admin Studio Modal */}
       <AdminStudioModal
