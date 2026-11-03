@@ -15,6 +15,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
+  const ui = getUIStrings(lang);
   const activeMarker = product?.timelineMarkers?.slice().reverse().find(m => currentTime >= m.timeSeconds) || product?.timelineMarkers?.[0];
 
   useEffect(() => {
@@ -65,9 +66,21 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
         {/* Floating Top Controls */}
         <div className="absolute top-3 left-3 right-3 flex flex-col gap-2 z-20 pointer-events-none">
           <div className="flex justify-between items-center w-full">
-            <div className="bg-red-600/90 backdrop-blur px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1.5 shadow">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-              LIVE STREAM
+            <div className="flex items-center gap-2">
+              <div className="bg-red-600/90 backdrop-blur px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1.5 shadow">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                LIVE STREAM
+              </div>
+              {product && (
+                <div className={`backdrop-blur border px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 shadow transition-all ${
+                  product.stock <= 5
+                    ? 'bg-red-950/90 text-red-300 border-red-500/60 animate-pulse'
+                    : 'bg-slate-950/80 text-emerald-300 border-emerald-500/40'
+                }`}>
+                  <span>📦</span>
+                  <span>{ui.inStock} {product.stock}{ui.unitCount}</span>
+                </div>
+              )}
             </div>
 
             <button
@@ -122,9 +135,19 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ product, onSelectAct
                     {product.name[lang] || product.name.ko || product.name.en}
                   </p>
                 </div>
-                <p className="text-xs text-amber-400 font-extrabold mt-0.5">
-                  {product.currency} {product.price.toLocaleString()}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-xs text-amber-400 font-extrabold font-mono">
+                    {product.currency} {product.price.toLocaleString()}
+                  </p>
+                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-all flex items-center gap-1 ${
+                    product.stock <= 5
+                      ? 'bg-red-500/20 text-red-300 border-red-500/50 animate-pulse'
+                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  }`}>
+                    <span>📦</span>
+                    <span>{ui.inStock}: <strong>{product.stock}</strong>{ui.unitCount} {product.stock === 0 ? '(품절)' : ''}</span>
+                  </span>
+                </div>
               </div>
             </div>
             <button
