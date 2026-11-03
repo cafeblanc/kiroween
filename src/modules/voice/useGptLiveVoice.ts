@@ -214,7 +214,33 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         }
       };
 
+      // Resilient WebRTC state & network disconnect monitoring
+      pcRef.current.onconnectionstatechange = () => {
+        const state = pcRef.current?.connectionState;
+        console.log('[useGptLiveVoice] WebRTC connectionState changed:', state);
+        if (state === 'failed') {
+          reportError('WebRTC 실시간 음성 연결이 불안정하여 끊어졌습니다. 네트워크 상태를 확인하시거나 마이크를 다시 켜주세요.');
+          stopVoice();
+        } else if (state === 'closed') {
+          updateStatus('idle');
+        }
+      };
+
+      pcRef.current.oniceconnectionstatechange = () => {
+        const iceState = pcRef.current?.iceConnectionState;
+        console.log('[useGptLiveVoice] WebRTC iceConnectionState changed:', iceState);
+        if (iceState === 'failed') {
+          reportError('WebRTC ICE 네트워크 터널링에 실패했습니다. 방화벽 환경 또는 네트워크 연결을 점검해주세요.');
+          stopVoice();
+        }
+      };
+
       for (const track of localStreamRef.current.getAudioTracks()) {
+        track.onended = () => {
+          console.warn('[useGptLiveVoice] Microphone track ended unexpectedly (device unplugged/disconnected)');
+          reportError('마이크 장치가 분리되었거나 사용할 수 없게 되었습니다. 마이크 연결을 확인해주세요.');
+          stopVoice();
+        };
         pcRef.current.addTrack(track, localStreamRef.current);
       }
 

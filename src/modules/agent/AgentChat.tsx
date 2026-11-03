@@ -287,6 +287,18 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     }
   };
 
+  // Handle voice module error notice gracefully without crashing
+  const handleVoiceError = (errorMessage: string) => {
+    console.warn('[AgentChat] Voice module error notice:', errorMessage);
+    const errorMsg: ChatMessage = {
+      id: Date.now() + '-voice-error',
+      sender: 'ai',
+      text: `⚠️ [음성 쇼호스트 안내] ${errorMessage}`,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setMessages(prev => [...prev, errorMsg]);
+  };
+
   // Unified Query execution (for text submission and quick chips)
   const sendQuery = (queryText: string) => {
     const query = queryText.trim();
@@ -376,6 +388,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           onTranscriptStream={handleTranscriptStream}
           onToolCall={handleVoiceToolCall}
           onDomainDetected={handleDomainDetected}
+          onError={handleVoiceError}
         />
       </div>
 

@@ -7,6 +7,7 @@ import { PayPalReceiptModal } from './modules/action/PayPalReceiptModal';
 import { VoiceLabApp, executeVoiceButtonCommand, setCheckoutModalState } from './modules/voice';
 import { ProductItem, ActionOrder, Language } from './types';
 import { getUIStrings } from './i18n/translations';
+import { ErrorBoundary } from './ErrorBoundary';
 
 const INITIAL_PRODUCTS: ProductItem[] = [
   {
@@ -442,34 +443,40 @@ export const App: React.FC = () => {
       {/* Main Workspace: Modular Split View vs Standalone Voice Lab */}
       {currentView === 'voicelab' ? (
         <div className="flex-1 min-h-0 overflow-hidden">
-          <VoiceLabApp
-            onBackToMain={() => setCurrentView('main')}
-            activeProduct={activeProduct}
-            products={products}
-            lang={lang}
-          />
+          <ErrorBoundary compact fallbackTitle="음성 대화 랩 모듈 오류">
+            <VoiceLabApp
+              onBackToMain={() => setCurrentView('main')}
+              activeProduct={activeProduct}
+              products={products}
+              lang={lang}
+            />
+          </ErrorBoundary>
         </div>
       ) : (
         <main className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-3 p-1.5 sm:p-3 overflow-hidden">
           {/* Left: Stream Player Module (모바일에서 비디오를 최대 크기로 키워 액션 바가 채팅창 바로 위에 밀착 배치: h-[76%]) */}
           <section className="h-[76%] sm:h-[73%] md:h-full md:col-span-7 flex flex-col min-h-0">
-            <StreamPlayer
-              product={activeProduct}
-              onSelectAction={() => setIsActionOpen(true)}
-              lang={lang}
-            />
+            <ErrorBoundary compact fallbackTitle="비디오 플레이어 모듈 오류">
+              <StreamPlayer
+                product={activeProduct}
+                onSelectAction={() => setIsActionOpen(true)}
+                lang={lang}
+              />
+            </ErrorBoundary>
           </section>
 
           {/* Right: Agentic Chat Module (하단 채팅창) */}
           <section className="flex-1 min-h-0 md:h-full md:col-span-5 flex flex-col">
-            <AgentChat
-              lang={lang}
-              activeProduct={activeProduct}
-              onTriggerAction={prod => {
-                setActiveProduct(prod);
-                setIsActionOpen(true);
-              }}
-            />
+            <ErrorBoundary compact fallbackTitle="AI 쇼호스트 채팅 모듈 오류">
+              <AgentChat
+                lang={lang}
+                activeProduct={activeProduct}
+                onTriggerAction={prod => {
+                  setActiveProduct(prod);
+                  setIsActionOpen(true);
+                }}
+              />
+            </ErrorBoundary>
           </section>
         </main>
       )}
