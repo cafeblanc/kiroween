@@ -318,8 +318,10 @@ export const App: React.FC = () => {
     setIsReceiptOpen(true);
     if (activeProduct) {
       const deductQty = order.quantity || 1;
+      const updatedStock = Math.max(0, activeProduct.stock - deductQty);
+      setActiveProduct(prev => (prev ? { ...prev, stock: updatedStock } : null));
       setProducts(prev =>
-        prev.map(p => (p.id === activeProduct.id ? { ...p, stock: Math.max(0, p.stock - deductQty) } : p))
+        prev.map(p => (p.id === activeProduct.id ? { ...p, stock: updatedStock } : p))
       );
     }
   };
@@ -327,6 +329,13 @@ export const App: React.FC = () => {
   const handleAddProduct = (newProd: ProductItem) => {
     setProducts(prev => [newProd, ...prev]);
     setActiveProduct(newProd);
+  };
+
+  const handleUpdateProduct = (updatedProd: ProductItem) => {
+    setProducts(prev => prev.map(p => (p.id === updatedProd.id ? updatedProd : p)));
+    if (activeProduct?.id === updatedProd.id) {
+      setActiveProduct(updatedProd);
+    }
   };
 
   const handleDeleteProduct = (id: string) => {
@@ -482,7 +491,9 @@ export const App: React.FC = () => {
         onClose={() => setIsAdminOpen(false)}
         products={products}
         onAddProduct={handleAddProduct}
+        onUpdateProduct={handleUpdateProduct}
         onDeleteProduct={handleDeleteProduct}
+        lang={lang}
       />
 
       {/* Official PayPal Order Receipt & Logistics Tracking Modal */}
