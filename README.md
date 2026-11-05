@@ -23,6 +23,16 @@ Traditional live commerce forces users to leave the video stream to tap small ch
 
 ---
 
+## 🎥 Live Demo & Video Showcase
+
+- **🌐 Live Web Application**: [https://kiroween.vercel.app](https://kiroween.vercel.app) *(Deploy your fork with 1-click on Vercel)*
+- **🎬 2-Minute Demo Video Walkthrough**: [Watch on YouTube / Loom](https://youtu.be/your_demo_video_link) *(See [docs/DEMO_VIDEO_GUIDE.md](docs/DEMO_VIDEO_GUIDE.md) for full script)*
+- **🎙️ Standalone Voice Lab**: Integrated Voice Testing Sandbox for low-latency testing
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcafeblanc%2Fkiroween)
+
+---
+
 ## ⚡ Key Highlights & Architecture
 
 ### 1. Dual-Engine Real-Time Voice Checkout (Dual-Engine Pipeline)
