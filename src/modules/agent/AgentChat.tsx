@@ -1,0 +1,493 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { ChatMessage, ProductItem, Language } from '../../types';
+import { GptLiveVoiceWidget, VoiceToolDefinition, VoiceStatus, DomainCategory, DOMAIN_REGISTRY, DomainKnowledgeRouter } from '../voice';
+import { buildVoiceInstructions } from '../voice/voicePromptBuilder';
+import { speakLocalizedText } from '../voice/ttsSpeaker';
+import { getUIStrings } from '../../i18n/translations';
+
+interface AgentChatProps {
+  lang: Language;
+  onTriggerAction: (product: ProductItem) => void;
+  activeProduct: ProductItem | null;
+}
+
+const VOICE_TOOLS: VoiceToolDefinition[] = [
+  {
+    name: 'open_checkout',
+    description: 'Trigger and immediately open the in-stream checkout payment sheet modal for the featured product currently being advertised in the live video stream when the user says "결제창 띄워", "결제창 띄워줘", "결제창 열어줘", "결제해줘", "구매창 띄워", "이거 살래", "구매할래", "주문할래", "checkout", "buy this", "order this".',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'Product ID currently advertised in video'
+        },
+        reason: {
+          type: 'string',
+          description: 'User intent phrase'
+        }
+      }
+    }
+  },
+  {
+    name: 'execute_instant_action',
+    description: 'Trigger instant in-stream checkout action sheet when the user expresses desire to buy, order, or purchase the current live stream item.',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'Product ID to purchase'
+        }
+      },
+      required: ['productId']
+    }
+  }
+];
+
+export const speakLocalized = (text: string, lang: Language) => {
+  speakLocalizedText(text, lang);
+};
+
+const QUICK_QUESTIONS: Record<Language, Array<{ label: string; query: string }>> = {
+  ko: [
+    { label: '🩺 의학적 효능', query: '의학적으로 아카시아 꿀의 효능과 혈당 영향은?' },
+    { label: '🔮 운세/재물운', query: '오늘 내 일진과 황금빛 기운의 재물운을 점쳐줘' },
+    { label: '🔬 과학적 효소', query: '과학적으로 효소의 기질 특이성과 분해 메커니즘을 설명해줘' },
+    { label: '⚖️ 품질·원산지', query: '법률적으로 전자상거래 원산지 표시 규정과 품질 보증은?' },
+    { label: '⚡ 바로 결제하기', query: '결제창 띄워줘! 지금 바로 구매할래' }
+  ],
+  en: [
+    { label: '🩺 Health Benefits', query: 'What are the medical health benefits of acacia honey?' },
+    { label: '🔮 Daily Fortune', query: 'Tell me my daily fortune and golden wealth energy today' },
+    { label: '🔬 Enzyme Science', query: 'Explain enzyme substrate specificity in honey scientifically' },
+    { label: '⚖️ Origin Certified', query: 'What are the origin certification standards for this product?' },
+    { label: '⚡ Instant Buy', query: 'Open checkout! I want to buy this right now' }
+  ],
+  ja: [
+    { label: '🩺 蜂蜜の健康効能', query: 'アカシア蜂蜜の医学的な効能と血糖値への影響を教えて' },
+    { label: '🔮 今日の金運', query: '今日の運勢と黄金の財運エネルギーを占って' },
+    { label: '🔬 酵素の科学', query: 'ミツバチ酵素の基質特異性と分解メカニズムを科学的に解説して' },
+    { label: '⚖️ 原産地品質認証', query: 'この商品の産地直送品質認証基準について教えて' },
+    { label: '⚡ すぐ購入する', query: '決済画面を開いて！今すぐ購入したい' }
+  ],
+  zh: [
+    { label: '🩺 养生功效', query: '从医学角度看洋槐蜂蜜的营养价值与健康功效是什么？' },
+    { label: '🔮 今日财运', query: '请为我测算今日生肖运势与财富金运' },
+    { label: '🔬 活性酶科学', query: '请科学解释蜂蜜转化酶的基质特异性机制' },
+    { label: '⚖️ 权威质检', query: '本产品的原产地认证与特级质检标准是什么？' },
+    { label: '⚡ 即刻结账', query: '打开结算页面！我现在要下单购买' }
+  ],
+  es: [
+    { label: '🩺 Beneficios', query: '¿Cuáles son los beneficios para la salud de la miel de acacia?' },
+    { label: '🔮 Fortuna Hoy', query: 'Dime mi fortuna de hoy y energía de abundancia' },
+    { label: '🔬 Enzimas Puras', query: 'Explica científicamente la actividad enzimática de la miel' },
+    { label: '⚖️ Certificación', query: '¿Cuáles son los estándares de origen y calidad certificados?' },
+    { label: '⚡ Comprar Ya', query: '¡Abre la pantalla de pago! Quiero comprar esto ahora' }
+  ],
+  fr: [
+    { label: '🩺 Bienfaits', query: 'Quels sont les bienfaits pour la santé du miel d acacia ?' },
+    { label: '🔮 Fortune du Jour', query: 'Parlez-moi de ma chance et de ma prospérité aujourd hui' },
+    { label: '🔬 Science Enzymes', query: 'Expliquez scientifiquement l activité enzymatique du miel' },
+    { label: '⚖️ Origine Pure', query: 'Quelles sont les normes d origine et certifications ?' },
+    { label: '⚡ Payer Immédiat', query: 'Ouvrez la page de paiement ! Je veux acheter maintenant' }
+  ]
+};
+
+export const AgentChat: React.FC<AgentChatProps> = ({
+  lang,
+  onTriggerAction,
+  activeProduct
+}) => {
+  const ui = getUIStrings(lang);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'init-1',
+      sender: 'ai',
+      text: {
+        en: '🤖 Welcome to Kiroween Live Commerce! I am your AI co-host. You can speak commands like "Checkout", "Add", "Minus", "Pay", or "Cancel" anytime.',
+        ko: '🤖 Kiroween 라이브 커머스에 오신 것을 환영합니다! 실시간 AI 공동 쇼호스트입니다. "결제창", "더하기", "빼기", "결제", "취소"를 음성으로 언제든 말씀해 보세요!',
+        ja: '🤖 Kiroweenライブコマースへようこそ！AI共同MCです。「決済画面」「増やす」「減らす」「決済」「キャンセル」と声に出してみてください！',
+        zh: '🤖 欢迎来到 Kiroween 直播电商！我是您的AI助播。您可以随时语音说出“结账”、“增加”、“减少”、“付款”或“取消”！',
+        es: '🤖 ¡Bienvenido al Live Shopping de Kiroween! Di "Pagar", "Añadir", "Quitar" o "Cancelar" en cualquier momento.',
+        fr: '🤖 Bienvenue sur Kiroween Live Shopping ! Dites "Paiement", "Ajouter", "Moins", "Payer" ou "Annuler" à tout moment.'
+      },
+      timestamp: 'Ready'
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [activeDomainNotice, setActiveDomainNotice] = useState<string | null>(null);
+
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll so newest messages always appear at bottom and previous messages push up
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Dynamic localized system instructions: Strictly bound to UI language and registered stream product (NO VIDEO SEARCHING)
+  const voiceInstructions = buildVoiceInstructions(lang, activeProduct);
+
+  // Helper: check if speech has checkout/purchase intent (covers variations & typos)
+  const isCheckoutSpeech = (str: string) => {
+    const s = str.replace(/\s+/g, '').toLowerCase();
+    return (
+      s.includes('결제') ||
+      s.includes('결재') ||
+      s.includes('구매') ||
+      s.includes('주문') ||
+      s.includes('살래') ||
+      s.includes('살게') ||
+      s.includes('살까') ||
+      s.includes('살게요') ||
+      s.includes('사겠') ||
+      s.includes('사고싶') ||
+      s.includes('계산') ||
+      s.includes('checkout') ||
+      s.includes('buy') ||
+      s.includes('order') ||
+      s.includes('pay')
+    );
+  };
+
+  // Handle streaming delta from gpt-realtime WebRTC for live typing animation
+  const handleTranscriptStream = (_sender: 'agent', _delta: string, fullText: string, domain?: DomainCategory) => {
+    if (!fullText) return;
+    let displayPrefix = '';
+    if (domain && domain !== 'general' && DOMAIN_REGISTRY[domain]) {
+      const meta = DOMAIN_REGISTRY[domain];
+      displayPrefix = `[${meta.icon} ${meta.nameKo} 최적화] `;
+    }
+    const formatted = `🗣️ ${displayPrefix}${fullText}`;
+
+    setMessages(prev => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].sender === 'ai' && copy[i].isStreaming) {
+          copy[i] = {
+            ...copy[i],
+            text: formatted,
+            isStreaming: true
+          };
+          return copy;
+        }
+      }
+      return [
+        ...prev,
+        {
+          id: 'stream-' + Date.now(),
+          sender: 'ai',
+          text: formatted,
+          timestamp: new Date().toLocaleTimeString(),
+          isStreaming: true
+        }
+      ];
+    });
+  };
+
+  // Handle incoming transcripts from the independent Voice Module with strict deduplication
+  const handleVoiceTranscript = (sender: 'user' | 'agent', text: string, domain?: DomainCategory) => {
+    if (!text || !text.trim()) return;
+
+    let displayPrefix = '';
+    if (domain && domain !== 'general' && DOMAIN_REGISTRY[domain]) {
+      const meta = DOMAIN_REGISTRY[domain];
+      displayPrefix = `[${meta.icon} ${meta.nameKo} 최적화] `;
+    }
+
+    const trimmed = text.trim();
+    const formattedText = sender === 'user' ? `🎙️ ${displayPrefix}"${trimmed}"` : `🗣️ ${displayPrefix}${trimmed}`;
+
+    // Handle In-Modal Button Voice Commands ("하나 더", "하나 빼", "결제하기", "취소")
+    const t = trimmed.replace(/\s+/g, '').toLowerCase();
+    if (t.includes('취소') || t.includes('닫기') || t.includes('안살래') || t.includes('그만')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'cancel' } }));
+      }
+    } else if (t.includes('결제하기') || t.includes('구매하기') || t.includes('결제진행') || t.includes('구매완료')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'pay' } }));
+      }
+    } else if (t.includes('하나더') || t.includes('더하기') || t.includes('플러스') || t.includes('수량추가') || t.includes('올려')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'increase' } }));
+      }
+    } else if (t.includes('하나빼') || t.includes('빼기') || t.includes('마이너스') || t.includes('수량빼') || t.includes('줄여')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kiroween:checkout_action', { detail: { action: 'decrease' } }));
+      }
+    }
+
+    // Zero-failure fallback: If user speech OR AI voice mentions checkout, open checkout sheet immediately!
+    if (activeProduct && isCheckoutSpeech(trimmed)) {
+      console.log('[AgentChat] Voice checkout trigger fired:', sender, trimmed);
+      onTriggerAction(activeProduct);
+    }
+
+    setMessages(prev => {
+      // If there was an active streaming message, settle it
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].sender === 'ai' && copy[i].isStreaming) {
+          copy[i] = {
+            ...copy[i],
+            text: formattedText,
+            isStreaming: false
+          };
+          return copy;
+        }
+      }
+
+      // Prevent duplicate messages from OpenAI audio/text multiple event fires
+      if (copy.length > 0) {
+        const last = copy[copy.length - 1];
+        const lastText = typeof last.text === 'string' ? last.text : '';
+        if (last.sender === (sender === 'user' ? 'user' : 'ai') && (lastText === formattedText || lastText.includes(trimmed))) {
+          return copy;
+        }
+      }
+
+      const msg: ChatMessage = {
+        id: Date.now() + '-' + sender,
+        sender: sender === 'user' ? 'user' : 'ai',
+        text: formattedText,
+        timestamp: new Date().toLocaleTimeString(),
+        isStreaming: false
+      };
+      return [...copy, msg];
+    });
+  };
+
+  // Handle tool execution triggered by the independent Voice Module
+  const handleVoiceToolCall = (toolName: string) => {
+    if ((toolName === 'execute_instant_action' || toolName === 'open_checkout') && activeProduct) {
+      const actionMsg: ChatMessage = {
+        id: Date.now() + '-action',
+        sender: 'ai',
+        text: `⚡ [gpt-realtime] ${ui.checkoutOpenedMsg} (${activeProduct.name[lang] || activeProduct.name.en})`,
+        suggestedProduct: activeProduct,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setMessages(prev => [...prev, actionMsg]);
+      onTriggerAction(activeProduct);
+    }
+  };
+
+  // Handle domain detection notification
+  const handleDomainDetected = (domain: DomainCategory) => {
+    const meta = DOMAIN_REGISTRY[domain];
+    if (meta && domain !== 'general') {
+      setActiveDomainNotice(`${meta.icon} 파악된 분야: [${meta.nameKo}] - 질문 분석 및 최적화 답변 준비 중...`);
+      setTimeout(() => setActiveDomainNotice(null), 4000);
+    }
+  };
+
+  // Handle voice module error notice gracefully without crashing
+  const handleVoiceError = (errorMessage: string) => {
+    console.warn('[AgentChat] Voice module error notice:', errorMessage);
+    const errorMsg: ChatMessage = {
+      id: Date.now() + '-voice-error',
+      sender: 'ai',
+      text: `⚠️ [음성 쇼호스트 안내] ${errorMessage}`,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setMessages(prev => [...prev, errorMsg]);
+  };
+
+  // Unified Query execution (for text submission and quick chips)
+  const sendQuery = (queryText: string) => {
+    const query = queryText.trim();
+    if (!query) return;
+
+    const detected = DomainKnowledgeRouter.detectDomain(query);
+    if (detected.domain !== 'general') {
+      handleDomainDetected(detected.domain);
+    }
+
+    const userMsg: ChatMessage = {
+      id: Date.now() + '-user',
+      sender: 'user',
+      text: detected.domain !== 'general' ? `[${detected.meta.icon} ${detected.meta.nameKo}] "${query}"` : `"${query}"`,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    let replyText = `🤖 AI (${lang.toUpperCase()}): "${query}"`;
+    let suggested: ProductItem | undefined = undefined;
+
+    const q = query.toLowerCase();
+    if (q.includes('buy') || q.includes('결제') || q.includes('구매') || q.includes('checkout') || q.includes('주문') || q.includes('살게') || q.includes('살래')) {
+      if (activeProduct) {
+        replyText = `⚡ ${ui.checkoutOpenedMsg} (${activeProduct.name[lang] || activeProduct.name.en})`;
+        suggested = activeProduct;
+        onTriggerAction(activeProduct);
+      }
+    } else if (detected.domain !== 'general') {
+      const expertAnswer = DomainKnowledgeRouter.resolveDomainKnowledge(detected.domain, query, activeProduct?.name[lang] || activeProduct?.name.en, lang);
+      replyText = `🗣️ [${detected.meta.icon} ${detected.meta.nameKo}] ${expertAnswer}`;
+      speakLocalized(expertAnswer, lang);
+    } else if (activeProduct) {
+      replyText = `🤖 [${ui.featuredBadge}] ${activeProduct.name[lang] || activeProduct.name.en}. ${activeProduct.description[lang] || activeProduct.description.en}`;
+    }
+
+    const aiMsg: ChatMessage = {
+      id: Date.now() + '-ai',
+      sender: 'ai',
+      text: replyText,
+      suggestedProduct: suggested,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    setMessages(prev => [...prev, userMsg, aiMsg]);
+    setInput('');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendQuery(input);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative">
+      
+      {/* Header with Unified Start/Stop Voice Button & Domain Optimization */}
+      <div className="px-3.5 py-2.5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🤖</span>
+          <div>
+            <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+              {ui.agentTitle}
+              {(voiceStatus === 'connected' || voiceStatus === 'speaking' || voiceStatus === 'listening') && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span>
+              )}
+            </h3>
+            <span className="text-[10px] text-emerald-400 font-medium">
+              {voiceStatus === 'speaking'
+                ? ui.agentStatusSpeaking
+                : voiceStatus === 'listening'
+                ? ui.agentStatusListening
+                : voiceStatus === 'connected'
+                ? ui.agentStatusConnected
+                : ui.agentStatusIdle}
+            </span>
+          </div>
+        </div>
+
+        {/* Completely Standalone Autonomous Voice Module Instance */}
+        <GptLiveVoiceWidget
+          systemInstruction={voiceInstructions}
+          tools={VOICE_TOOLS}
+          enableDomainSearch={false}
+          lang={lang}
+          onStatusChange={setVoiceStatus}
+          onTranscript={handleVoiceTranscript}
+          onTranscriptStream={handleTranscriptStream}
+          onToolCall={handleVoiceToolCall}
+          onDomainDetected={handleDomainDetected}
+          onError={handleVoiceError}
+        />
+      </div>
+
+      {/* Floating Domain Detection Banner */}
+      {activeDomainNotice && (
+        <div className="bg-indigo-950/95 border-b border-indigo-500/50 px-3 py-1.5 text-xs text-indigo-200 flex items-center justify-between animate-in slide-in-from-top duration-200 shrink-0">
+          <span className="font-bold flex items-center gap-1.5">
+            <span className="animate-spin text-sm">⚙️</span>
+            <span>{activeDomainNotice}</span>
+          </span>
+          <span className="text-[10px] text-indigo-400">자동 분리 최적화</span>
+        </div>
+      )}
+
+      {/* Unified Messages Feed */}
+      <div
+        ref={chatContainerRef}
+        className="flex-1 p-3 overflow-y-auto flex flex-col gap-2.5 scroll-smooth min-h-0"
+      >
+        {messages.map(m => (
+          <div key={m.id} className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}>
+            <div
+              className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed shadow-md ${
+                m.sender === 'user'
+                  ? 'bg-purple-600 text-white font-medium rounded-br-none'
+                  : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-0.5 opacity-70 text-[9px]">
+                <span>{m.sender === 'user' ? '👤 나 (User)' : '🤖 Kiroween Agent'}</span>
+                <span>· {m.timestamp}</span>
+              </div>
+              {typeof m.text === 'string' ? m.text : (m.text[lang] || m.text.en)}
+              {m.isStreaming && (
+                <span className="inline-block w-1.5 h-3.5 ml-1 bg-purple-400 animate-pulse align-middle" />
+              )}
+            </div>
+
+            {/* In-Stream Suggested Action Card */}
+            {m.suggestedProduct && (
+              <div className="mt-2 bg-slate-950 border border-purple-500/60 p-2.5 rounded-xl flex items-center justify-between gap-3 w-full max-w-[85%] shadow-xl animate-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xl">{m.suggestedProduct.icon}</span>
+                  <div className="truncate">
+                    <p className="text-[11px] font-bold text-white truncate">{m.suggestedProduct.name[lang] || m.suggestedProduct.name.en}</p>
+                    <p className="text-[11px] text-amber-400 font-extrabold">{m.suggestedProduct.currency} {m.suggestedProduct.price.toLocaleString()}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onTriggerAction(m.suggestedProduct!)}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition cursor-pointer shrink-0 shadow-md flex items-center gap-1"
+                >
+                  <span>🅿️</span>
+                  <span>PayPal 결제</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* Quick Domain One-Click Question & Test Chips (Fully Localized) */}
+      <div className="px-2 py-1.5 bg-slate-950/70 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto text-[10px] shrink-0">
+        <span className="text-purple-400 font-bold shrink-0">{lang === 'ko' ? '원클릭 질문:' : 'Quick Prompt:'}</span>
+        {(QUICK_QUESTIONS[lang] || QUICK_QUESTIONS.ko).map((chip, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => sendQuery(chip.query)}
+            className={`px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer font-semibold ${
+              idx === 4
+                ? 'bg-purple-900/70 hover:bg-purple-800 text-purple-200 border border-purple-500/50 font-bold'
+                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'
+            }`}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className="p-2 border-t border-slate-800 bg-slate-950/90 flex gap-2 shrink-0">
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder={ui.chatPlaceholder}
+          className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+        />
+        <button
+          type="submit"
+          className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition cursor-pointer shrink-0"
+        >
+          {ui.sendBtn}
+        </button>
+      </form>
+    </div>
+  );
+};
+export default AgentChat;

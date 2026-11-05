@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "name": "onProductContextSwitch",
+      "trigger": "stream:product_changed",
+      "action": "agent:update_context_memory",
+      "description": "Automatically updates AI agent's active memory when video stream switches items"
+    },
+    {
+      "name": "onInstantActionTriggered",
+      "trigger": "chat:intent_buy",
+      "action": "action:open_execution_modal",
+      "description": "Launches in-stream transaction modal without video pause or route navigation"
+    },
+    {
+      "name": "onOrderSettled",
+      "trigger": "action:settlement_success",
+      "action": "stream:deduct_stock_and_notify",
+      "description": "Deducts live inventory in real time and broadcasts notification to viewers"
+    }
+  ]
+}
