@@ -1,0 +1,13 @@
+{
+  "name": "PubMed & iPSC Experiment Integrity Verifier",
+  "version": "1.0.0",
+  "description": "Automatically verifies that every bio-experiment entry in src/data/bioExperiments.ts includes a valid PubMed PMID/DOI, Yamanaka stem-cell factor specification, and fallback microscopy media whenever experiment data is modified.",
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "src/data/bioExperiments.ts"
+  },
+  "action": {
+    "type": "agentPrompt",
+    "prompt": "Inspect src/data/bioExperiments.ts against .kiro/specs/stem-cell-bio-stitcher/requirements.md. Verify that each experiment has: (1) a verified peer-reviewed journal citation and PMID/DOI, (2) explicit iPSC stem-cell differentiation lineage, and (3) both videoUrl and high-res microscopy imageUrl."
+  }
+}
