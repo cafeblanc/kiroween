@@ -65,7 +65,8 @@ export const BioStitchLabView: React.FC = () => {
 
   // High-Impact Ear-Stimulating Cardiac Thump Engine & Real Specimen Assets
   const [isHeartbeatAudioOn, setIsHeartbeatAudioOn] = useState<boolean>(true);
-  const lastCardiacBeatRef = useRef<number>(0);
+  const chimeraCardiacIntervalRef = useRef<number | null>(null);
+  const morphIntervalRef = useRef<number | null>(null);
   const masterImgRef = useRef<HTMLImageElement | null>(null);
   const roarImgRef = useRef<HTMLImageElement | null>(null);
   const quadImgRef = useRef<HTMLImageElement | null>(null);
@@ -296,18 +297,8 @@ export const BioStitchLabView: React.FC = () => {
       // =========================================================
       // 5. PROGRESSIVE CHIMERA ENTITY MORPHOGENESIS & RENDERING
       // =========================================================
-      let entityAlpha = 0.88;
-      if (morphStage === "injecting") {
-        entityAlpha = 0.2 + Math.abs(Math.sin(frame * 0.12)) * 0.28;
-      } else if (morphStage === "morphing") {
-        entityAlpha = 0.35 + (morphPercent / 100) * 0.55;
-      } else if (morphStage === "draining" || morphStage === "awakened") {
-        entityAlpha = 1.0;
-      }
-
       // Floating Buoyancy Wave in fluid
       const floatY = fluidLevel > 0.4 ? Math.sin(frame * 0.038) * 8 : 10;
-      const wobble = Math.sin(frame * 0.028) * 0.03;
 
       // 6-Organ Cycling Flash & Fade (번쩍번쩍 나타났다 스르르 사라지는 효과)
       // 0: Horns & Teeth (대소하는 큰 입과 이빨, 뿔)
@@ -325,7 +316,6 @@ export const BioStitchLabView: React.FC = () => {
       const isHeartFlashing = organCycle === 2;
       const isTorsoFlashing = organCycle === 3;
       const isLimbsFlashing = organCycle === 4;
-      const isVeinsFlashing = organCycle === 5;
 
       // REAL-TIME HEARTBEAT SIMULATION SYNCED TO creatureBpm
       const beatSpeed = (creatureBpm / 60) * 0.13;
@@ -333,16 +323,6 @@ export const BioStitchLabView: React.FC = () => {
       const rawPulse = Math.sin(beatPhase);
       const isBeatSystole = rawPulse > 0.35;
       const heartPumpScale = 1 + (isBeatSystole ? Math.pow(rawPulse, 5) * 0.52 : -Math.pow(Math.abs(rawPulse), 3) * 0.08);
-
-      // WebAudio Loud Ear-Stimulating Cardiac Thump on Systole
-      if (isBeatSystole && isHeartbeatAudioOn) {
-        const nowMs = performance.now();
-        const minGap = (60 / creatureBpm) * 850;
-        if (nowMs - lastCardiacBeatRef.current > minGap) {
-          lastCardiacBeatRef.current = nowMs;
-          playCardiacThump(creatureBpm);
-        }
-      }
 
       // =========================================================
       // 5-A. REAL LABORATORY PHOTOGRAPHIC COMPOSITE & MORPHOGENESIS
@@ -368,20 +348,121 @@ export const BioStitchLabView: React.FC = () => {
         const photoX = cx - targetW / 2;
         const photoY = cy - targetH / 2 + floatY;
 
-        ctx.globalAlpha = entityAlpha;
+        if (morphStage === "idle") {
+          // 0. Dormant state: faint latent silhouette shimmering in murky fluid
+          ctx.save();
+          ctx.filter = "blur(5px) brightness(0.65) contrast(130%)";
+          ctx.globalAlpha = 0.55 + Math.sin(frame * 0.035) * 0.15;
+          ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
+          ctx.restore();
+        } else if (morphStage === "injecting") {
+          // 1. Step 1: AI Diffusion Latent Noise Phase (희미한 안개 속 원시 형태: 32px -> 14px 블러 점진 해제)
+          const blurPx = Math.max(12, Math.round(32 - (Math.min(100, morphPercent) / 35) * 18));
+          ctx.save();
+          ctx.filter = `blur(${blurPx}px) contrast(${1.4 + (morphPercent / 35) * 0.4}) brightness(${0.55 + (morphPercent / 35) * 0.35})`;
+          ctx.globalAlpha = 0.35 + (morphPercent / 35) * 0.45;
+          ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
+          ctx.restore();
 
-        // Progressive AI Diffusion Morphogenesis Filter
-        if (morphStage === "injecting") {
-          const blurPx = Math.max(1, Math.round(12 - (morphPercent / 100) * 10));
-          ctx.filter = `blur(${blurPx}px) contrast(${1 + (morphPercent / 100) * 0.4})`;
-        } else if (morphStage === "morphing" && morphPercent < 50) {
-          const blurPx = Math.max(0.5, Math.round(3 - (morphPercent / 50) * 2.5));
-          ctx.filter = `blur(${blurPx}px)`;
+          // Swirling Stem-Cell Latent Noise Scanlines
+          ctx.strokeStyle = "rgba(52, 211, 153, 0.4)";
+          ctx.lineWidth = 1;
+          for (let nl = 0; nl < 6; nl++) {
+            const ny = vatY + ((frame * 3 + nl * 60) % vatH);
+            ctx.beginPath();
+            ctx.moveTo(vatX, ny);
+            ctx.lineTo(vatX + vatW, ny);
+            ctx.stroke();
+          }
+        } else if (morphStage === "morphing") {
+          // 2. Step 2: Denoising & Fine Biological Feature Solidification (점점 윤곽이 뚜렷해짐: 14px -> 0px)
+          const morphProgress = Math.max(0, Math.min(1.0, (morphPercent - 35) / 37));
+          const blurPx = Math.max(0, Math.round((1 - morphProgress) * 14));
+          ctx.save();
+          if (blurPx > 0) {
+            ctx.filter = `blur(${blurPx}px) contrast(${1.15 + morphProgress * 0.35})`;
+          }
+          ctx.globalAlpha = 0.8 + morphProgress * 0.2;
+          ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
+          ctx.restore();
+
+          // High-frequency synaptic electricity arcs sparking across solidifying organs
+          const sparkCount = Math.floor(morphPercent / 14);
+          for (let sp = 0; sp < sparkCount; sp++) {
+            const sx = cx + (Math.sin(frame * 0.25 + sp * 2) * targetW * 0.35);
+            const sy = cy + floatY + (Math.cos(frame * 0.18 + sp * 3) * targetH * 0.35);
+            ctx.strokeStyle = sp % 2 === 0 ? "#67e8f9" : "#fde047";
+            ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + (Math.random() - 0.5) * 22, sy + (Math.random() - 0.5) * 22);
+            ctx.lineTo(sx + (Math.random() - 0.5) * 35, sy + (Math.random() - 0.5) * 35);
+            ctx.stroke();
+          }
+        } else if (morphStage === "draining") {
+          // 3. Step 3: Amniotic Fluid Rapid Drainage & Water Condensation
+          ctx.save();
+          ctx.globalAlpha = 1.0;
+          ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
+          ctx.restore();
+
+          // Vertical water condensation streaks running down the glass
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+          ctx.lineWidth = 1.5;
+          for (let d = 0; d < 8; d++) {
+            const dx = vatX + 25 + d * ((vatW - 50) / 7);
+            const dy = vatY + ((frame * 6 + d * 45) % (vatH - 20));
+            ctx.beginPath();
+            ctx.moveTo(dx, dy);
+            ctx.lineTo(dx + Math.sin(frame * 0.1 + d) * 2, dy + 25);
+            ctx.stroke();
+          }
+        } else if (morphStage === "awakened") {
+          // 4. Step 4: 짠! 하고 완전 각성 (High-Definition Crystal Clarity Beast in Drained Bioreactor)
+          ctx.save();
+          ctx.globalAlpha = 1.0;
+          ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
+          ctx.restore();
+
+          // Awakened Brilliant Bio-Flash (짠! 효과) on initial awakening
+          if (frame % 120 < 15) {
+            const flashA = (15 - (frame % 120)) / 15 * 0.45;
+            ctx.fillStyle = `rgba(255, 255, 255, ${flashA})`;
+            ctx.fillRect(vatX, vatY, vatW, vatH);
+          }
+
+          // Rising steam vents from bottom metal flange
+          for (let st = 0; st < 6; st++) {
+            const stX = vatX + 35 + st * ((vatW - 70) / 5);
+            const stY = vatY + vatH - 12 - ((frame * 2 + st * 25) % 95);
+            const stR = 8 + ((frame * 2 + st * 25) % 95) * 0.25;
+            ctx.fillStyle = `rgba(226, 232, 240, ${Math.max(0, 0.35 - (stR / 50))})`;
+            ctx.beginPath();
+            ctx.arc(stX, stY, stR, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
 
-        ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
-        ctx.filter = "none";
-        ctx.restore();
+        // Real-Time Contracting Heart Shockwave Radiation Rings (Centered on Creature's Chest)
+        const chestX = cx;
+        const chestY = cy + floatY - 8;
+        if (isBeatSystole) {
+          ctx.save();
+          ctx.strokeStyle = `rgba(244, 63, 94, ${0.85 * (creatureBpm / 140)})`;
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.arc(chestX, chestY, 36 * heartPumpScale, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.strokeStyle = "rgba(34, 211, 238, 0.7)";
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.arc(chestX, chestY, 52 * heartPumpScale, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.restore(); // Clip restore
       }
 
       // 5-B. 4 FLOATING REAL LABORATORY MICROSCOPY LENSES (점진적 융합 변형)
@@ -444,386 +525,7 @@ export const BioStitchLabView: React.FC = () => {
         });
       }
 
-      ctx.save();
-      ctx.translate(cx, cy + floatY);
-      ctx.rotate(wobble);
-      ctx.globalAlpha = entityAlpha;
 
-      // --- A. LIMBS & APPENDAGES LAYER (날개 / 6개 촉수 / 섬모) ---
-      ctx.save();
-      const limbsGlow = isLimbsFlashing ? 1.0 : 0.4;
-      ctx.strokeStyle = selectedLimbs.traitTag === "gamer" ? "#06b6d4" : selectedLimbs.traitTag === "disco" ? "#a855f7" : "#f59e0b";
-
-      if (selectedLimbs.id === "limbs-wings") {
-        // Grand regenerating dragon/axolotl wings
-        const wingFlap = Math.sin(frame * 0.05) * 16;
-        [-1, 1].forEach((dir) => {
-          ctx.beginPath();
-          ctx.moveTo(dir * 22, -15);
-          ctx.bezierCurveTo(dir * 85, -55 + wingFlap, dir * 155, -35 - wingFlap, dir * 185, 25);
-          ctx.bezierCurveTo(dir * 135, 75, dir * 75, 65, dir * 25, 35);
-          ctx.fillStyle = `rgba(245, 158, 11, ${0.22 * limbsGlow})`;
-          ctx.fill();
-          ctx.lineWidth = isLimbsFlashing ? 3.5 : 2;
-          ctx.stroke();
-
-          // Feathered wing bone spars
-          for (let r = 0; r < 4; r++) {
-            ctx.beginPath();
-            ctx.moveTo(dir * 30, -5);
-            ctx.lineTo(dir * (90 + r * 22), -15 + r * 15 + wingFlap * 0.4);
-            ctx.strokeStyle = `rgba(251, 191, 36, ${0.55 * limbsGlow})`;
-            ctx.stroke();
-          }
-        });
-      } else if (selectedLimbs.id === "limbs-octo") {
-        // 6 Multi-dexterous Gamer Tentacles
-        for (let i = 0; i < 6; i++) {
-          const dir = i < 3 ? -1 : 1;
-          const order = i % 3;
-          const wave = Math.sin(frame * 0.08 + order * 1.3) * 20;
-          ctx.beginPath();
-          ctx.moveTo(dir * 24, 15 + order * 18);
-          ctx.bezierCurveTo(
-            dir * (55 + order * 25), 30 + wave,
-            dir * (105 + order * 25), 75 - wave,
-            dir * (150 + order * 15), 115 + wave
-          );
-          ctx.strokeStyle = isLimbsFlashing ? "#67e8f9" : `rgba(6, 182, 212, ${0.55 + 0.45 * limbsGlow})`;
-          ctx.lineWidth = isLimbsFlashing ? 4.5 : 3;
-          ctx.stroke();
-
-          // Glowing suction nodes
-          for (let s = 1; s <= 4; s++) {
-            const sx = dir * (35 + s * 26);
-            const sy = 30 + s * 20 + wave * (s / 4);
-            ctx.fillStyle = isLimbsFlashing ? "#ffffff" : "#22d3ee";
-            ctx.beginPath();
-            ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-      } else {
-        // Anthrobot dense cilia array (Ciliated moonwalk legs)
-        ctx.strokeStyle = `rgba(168, 85, 247, ${0.65 + 0.35 * limbsGlow})`;
-        ctx.lineWidth = isLimbsFlashing ? 3 : 1.8;
-        for (let c = -55; c <= 55; c += 4) {
-          const wave = Math.sin(frame * 0.16 + c * 0.2) * 14;
-          ctx.beginPath();
-          ctx.moveTo(c, 85);
-          ctx.lineTo(c + wave * 0.9, 135 + Math.abs(wave));
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-
-      // --- B. MUSCULAR TORSO, RIBCAGE & SPINE (근육질 흉곽 & 복근 & 척추) ---
-      ctx.save();
-      const torsoGlow = isTorsoFlashing ? 1.0 : 0.45;
-      const torsoColor = selectedTorso.traitTag === "gamer" ? "#ec4899" : selectedTorso.traitTag === "disco" ? "#10b981" : "#f59e0b";
-
-      // Muscular Chest Armor (대흉근 Pectorals)
-      ctx.fillStyle = `rgba(30, 41, 59, ${0.65 * entityAlpha})`;
-      [-1, 1].forEach((dir) => {
-        ctx.beginPath();
-        ctx.ellipse(dir * 22, -8, 20, 15, dir * 0.25, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = isTorsoFlashing ? "#fef08a" : torsoColor;
-        ctx.lineWidth = isTorsoFlashing ? 2.8 : 1.6;
-        ctx.stroke();
-      });
-
-      // Chiseled 6-Pack Abs (근육질 복근)
-      for (let ab = 0; ab < 3; ab++) {
-        const aby = 18 + ab * 14;
-        [-1, 1].forEach((dir) => {
-          ctx.beginPath();
-          ctx.ellipse(dir * 13, aby, 11, 6, 0, 0, Math.PI * 2);
-          ctx.strokeStyle = isTorsoFlashing ? "#fde047" : `rgba(255, 255, 255, ${0.28 + 0.45 * torsoGlow})`;
-          ctx.lineWidth = 1.4;
-          ctx.stroke();
-        });
-      }
-
-      // Organic Curving Spine (6 Vertebrae)
-      for (let v = 0; v < 6; v++) {
-        const vy = -36 + v * 19;
-        const vx = Math.sin(frame * 0.05 + v * 0.6) * 4;
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.35 + 0.45 * torsoGlow})`;
-        ctx.beginPath();
-        ctx.ellipse(vx, vy, 12, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // 5 Pairs of Translucent Ribs
-        if (v < 5) {
-          const ribW = 36 - v * 3.5;
-          [-1, 1].forEach((dir) => {
-            ctx.beginPath();
-            ctx.moveTo(vx + dir * 7, vy);
-            ctx.bezierCurveTo(vx + dir * ribW * 0.8, vy + 4, vx + dir * ribW, vy + 16, vx + dir * (ribW * 0.5), vy + 22);
-            ctx.strokeStyle = isTorsoFlashing ? "#fef08a" : `rgba(255, 255, 255, ${0.28 + 0.45 * torsoGlow})`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          });
-        }
-      }
-      ctx.restore();
-
-      // --- C. BIOLUMINESCENT VEIN NETWORK (전신 생체 발광 형광 혈관망) ---
-      ctx.save();
-      const veinGlow = isVeinsFlashing ? 1.0 : 0.35;
-      ctx.strokeStyle = isVeinsFlashing ? "#67e8f9" : `rgba(56, 189, 248, ${0.4 * veinGlow})`;
-      ctx.lineWidth = isVeinsFlashing ? 2.4 : 1.2;
-      for (let vn = 0; vn < 8; vn++) {
-        const vDir = vn % 2 === 0 ? -1 : 1;
-        const vOffset = Math.floor(vn / 2) * 22;
-        ctx.beginPath();
-        ctx.moveTo(0, 5);
-        ctx.bezierCurveTo(vDir * 18, -15 + vOffset, vDir * 35, 10 + vOffset, vDir * 55, 45 + vOffset);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // --- D. HEART LAYER (박동하는 유기적 심장 & 대동맥) ---
-      ctx.save();
-      const heartX = 0;
-      const heartY = 4;
-      const heartGlow = isHeartFlashing ? 1.0 : 0.55;
-
-      // Heartbeat Shockwave Radiation Ring (when heart pumps)
-      if (isBeatSystole) {
-        ctx.strokeStyle = `rgba(244, 63, 94, ${0.8 * heartGlow})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(heartX, heartY, 36 * heartPumpScale, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.translate(heartX, heartY);
-      ctx.scale(heartPumpScale, heartPumpScale);
-
-      // Anatomical Heart Ventricles & Aorta Arch
-      ctx.beginPath();
-      ctx.moveTo(0, 18);
-      ctx.bezierCurveTo(-26, -5, -24, -28, 0, -15);
-      ctx.bezierCurveTo(24, -28, 26, -5, 0, 18);
-      const heartGrad = ctx.createRadialGradient(0, 0, 3, 0, 0, 28);
-      if (selectedHeart.id === "heart-ghost") {
-        heartGrad.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-        heartGrad.addColorStop(0.5, `rgba(16, 185, 129, ${0.85 * heartGlow})`);
-        heartGrad.addColorStop(1, "rgba(5, 150, 105, 0.2)");
-      } else if (selectedHeart.id === "heart-overclock") {
-        heartGrad.addColorStop(0, "rgba(254, 240, 138, 0.95)");
-        heartGrad.addColorStop(0.5, `rgba(245, 158, 11, ${0.85 * heartGlow})`);
-        heartGrad.addColorStop(1, "rgba(239, 68, 68, 0.3)");
-      } else {
-        heartGrad.addColorStop(0, "rgba(244, 114, 182, 0.95)");
-        heartGrad.addColorStop(0.5, `rgba(168, 85, 247, ${0.85 * heartGlow})`);
-        heartGrad.addColorStop(1, "rgba(109, 40, 217, 0.3)");
-      }
-      ctx.fillStyle = heartGrad;
-      ctx.fill();
-      ctx.strokeStyle = isHeartFlashing ? "#ffffff" : "#f43f5e";
-      ctx.lineWidth = isHeartFlashing ? 3.5 : 2;
-      ctx.stroke();
-
-      // Aorta & Pulmonary Vena Cava Pipes exiting top of heart
-      ctx.strokeStyle = "rgba(244, 63, 94, 0.85)";
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-6, -20);
-      ctx.bezierCurveTo(-15, -40, 12, -45, 16, -30);
-      ctx.stroke();
-      ctx.restore();
-
-      // --- E. HEAD LAYER: 뿔, 귀, 이마 주름, 뇌 오가노이드, 안구 (Head / Horns / Ears / Brain / Eyes) ---
-      ctx.save();
-      const headX = 0;
-      const headY = -82;
-      const brainGlow = isBrainFlashing ? 1.0 : 0.5;
-
-      // 1. Demonic / Bio-Chimera Horns (나선형 악마의 뿔 2개)
-      [-1, 1].forEach((dir) => {
-        ctx.beginPath();
-        ctx.moveTo(headX + dir * 18, headY - 18);
-        ctx.bezierCurveTo(dir * 45, headY - 45, dir * 55, headY - 75, dir * 32, headY - 95);
-        ctx.bezierCurveTo(dir * 20, headY - 75, dir * 25, headY - 45, headX + dir * 10, headY - 24);
-        ctx.fillStyle = isJawsFlashing ? "#fde047" : `rgba(245, 158, 11, ${0.75 * entityAlpha})`;
-        ctx.fill();
-        ctx.strokeStyle = isJawsFlashing ? "#ffffff" : "#b45309";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Horn ridges (뿔의 골격 마디 주름)
-        for (let hr = 1; hr <= 3; hr++) {
-          ctx.beginPath();
-          ctx.moveTo(dir * (22 + hr * 8), headY - 28 - hr * 16);
-          ctx.lineTo(dir * (14 + hr * 6), headY - 24 - hr * 16);
-          ctx.strokeStyle = "#fef08a";
-          ctx.stroke();
-        }
-      });
-
-      // 2. Pointed Bio-Ears (쫑긋한 생체 귀)
-      [-1, 1].forEach((dir) => {
-        ctx.beginPath();
-        ctx.moveTo(headX + dir * 28, headY - 5);
-        ctx.lineTo(headX + dir * 52, headY - 22);
-        ctx.lineTo(headX + dir * 29, headY + 12);
-        ctx.fillStyle = "rgba(30, 41, 59, 0.85)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.7)";
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
-      });
-
-      // 3. Cranial Outer Shell & Forehead Wrinkles (두개골 & 이마 주름)
-      ctx.beginPath();
-      ctx.ellipse(headX, headY, 32, 38, 0, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(15, 23, 42, ${0.85 * entityAlpha})`;
-      ctx.fill();
-      ctx.strokeStyle = isBrainFlashing ? "#67e8f9" : "rgba(148, 163, 184, 0.65)";
-      ctx.lineWidth = isBrainFlashing ? 3 : 1.8;
-      ctx.stroke();
-
-      // Forehead Grotesque Wrinkles (이마 주름 3선)
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.5)";
-      ctx.lineWidth = 1.2;
-      for (let wLine = 0; wLine < 3; wLine++) {
-        ctx.beginPath();
-        ctx.moveTo(headX - 16, headY - 22 + wLine * 5);
-        ctx.bezierCurveTo(headX - 8, headY - 24 + wLine * 5, headX + 8, headY - 20 + wLine * 5, headX + 16, headY - 22 + wLine * 5);
-        ctx.stroke();
-      }
-
-      // 4. Intricate Brain Organoid Sulci & Gyri (대뇌 피질 주름)
-      ctx.strokeStyle = isBrainFlashing
-        ? "#67e8f9"
-        : selectedHead.id === "head-dishbrain"
-        ? `rgba(34, 211, 238, ${0.7 * brainGlow})`
-        : selectedHead.id === "head-brainex"
-        ? `rgba(168, 85, 247, ${0.7 * brainGlow})`
-        : `rgba(56, 189, 248, ${0.7 * brainGlow})`;
-      ctx.lineWidth = 1.6;
-      for (let f = 0; f < 5; f++) {
-        ctx.beginPath();
-        const fy = headY - 18 + f * 6;
-        ctx.moveTo(headX - 18, fy);
-        ctx.bezierCurveTo(headX - 9, fy - 5, headX + 9, fy + 5, headX + 18, fy);
-        ctx.stroke();
-      }
-
-      // DishBrain Silicon Grid Chip Overlay
-      if (selectedHead.id === "head-dishbrain") {
-        ctx.strokeStyle = "#fde047";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(headX - 11, headY - 12, 22, 22);
-        for (let p = -8; p <= 8; p += 4) {
-          ctx.beginPath();
-          ctx.moveTo(headX + p, headY - 16);
-          ctx.lineTo(headX + p, headY + 16);
-          ctx.stroke();
-        }
-      }
-
-      // 5. Nostrils (야성적인 콧구멍 슬릿)
-      ctx.fillStyle = "#0f172a";
-      [-4, 4].forEach((nx) => {
-        ctx.beginPath();
-        ctx.ellipse(headX + nx, headY + 8, 2.5, 3.5, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // 6. BIZARRE AWAKENED CHIMERA EYES (양쪽 눈 + 이마 제3의 눈)
-      const eyeOpenAmount = eyesOpen; // 0 (closed) -> 1 (wide glowing eyes)
-      [-12, 12].forEach((ex) => {
-        const ey = headY - 2;
-        ctx.fillStyle = "#000000";
-        ctx.beginPath();
-        ctx.ellipse(ex, ey, 7, 2 + eyeOpenAmount * 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (eyeOpenAmount > 0.15) {
-          ctx.fillStyle = selectedHead.traitTag === "gamer" ? "#22d3ee" : selectedHead.traitTag === "disco" ? "#f43f5e" : "#fbbf24";
-          ctx.beginPath();
-          ctx.arc(ex, ey, 3 * eyeOpenAmount, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Laser/Bioluminescent Eye Beam Ray
-          ctx.strokeStyle = `rgba(254, 240, 138, ${0.75 * eyeOpenAmount})`;
-          ctx.lineWidth = 1.8;
-          ctx.beginPath();
-          ctx.moveTo(ex, ey);
-          ctx.lineTo(ex * 3.2, ey + 32);
-          ctx.stroke();
-        }
-      });
-
-      // Third Eye on Forehead
-      if (eyeOpenAmount > 0.25) {
-        ctx.fillStyle = "#000000";
-        ctx.beginPath();
-        ctx.ellipse(headX, headY - 15, 5, 2 + eyeOpenAmount * 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#ec4899";
-        ctx.beginPath();
-        ctx.arc(headX, headY - 15, 2.5 * eyeOpenAmount, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // --- F. GRAND GRINNING BIO-TEETH & LAUGHING JAWS (대소하는 큰 입과 이빨) ---
-      // 귀밑까지 쩍 벌어진 호탕한 대소(大笑) 미소!
-      const mouthY = headY + 22;
-      const jawDrop = eyeOpenAmount > 0.5 ? 8 : Math.sin(frame * 0.08) * 3; // 입이 더 쩍 벌어짐
-
-      // Wide grinning mouth cavity
-      ctx.beginPath();
-      ctx.moveTo(headX - 22, mouthY - 4);
-      ctx.bezierCurveTo(headX - 12, mouthY + 12 + jawDrop, headX + 12, mouthY + 12 + jawDrop, headX + 22, mouthY - 4);
-      ctx.bezierCurveTo(headX + 12, mouthY + 4, headX - 12, mouthY + 4, headX - 22, mouthY - 4);
-      ctx.fillStyle = "#020617";
-      ctx.fill();
-      ctx.strokeStyle = isJawsFlashing ? "#fde047" : "rgba(244, 63, 94, 0.85)";
-      ctx.lineWidth = isJawsFlashing ? 2.8 : 1.8;
-      ctx.stroke();
-
-      // Sharp Bio-Fangs & Grinning Teeth (위아래 뾰족한 이빨들)
-      const teethColor = isJawsFlashing ? "#ffffff" : "#fef08a";
-      ctx.fillStyle = teethColor;
-
-      // Upper Teeth (5 Fangs)
-      for (let ut = -2; ut <= 2; ut++) {
-        const tx = headX + ut * 8;
-        const ty = mouthY - 1;
-        ctx.beginPath();
-        ctx.moveTo(tx - 3, ty);
-        ctx.lineTo(tx, ty + 6 + (Math.abs(ut) === 1 ? 3 : 0)); // 송곳니 더 김
-        ctx.lineTo(tx + 3, ty);
-        ctx.fill();
-      }
-
-      // Lower Teeth (4 Fangs)
-      for (let lt = -1.5; lt <= 1.5; lt += 1) {
-        const tx = headX + lt * 8;
-        const ty = mouthY + 8 + jawDrop;
-        ctx.beginPath();
-        ctx.moveTo(tx - 3, ty);
-        ctx.lineTo(tx, ty - 6);
-        ctx.lineTo(tx + 3, ty);
-        ctx.fill();
-      }
-
-      // Laughing Tongue inside
-      ctx.fillStyle = "rgba(225, 29, 72, 0.75)";
-      ctx.beginPath();
-      ctx.ellipse(headX, mouthY + 4 + jawDrop * 0.5, 9, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore(); // Head restore
-
-      ctx.restore(); // restore translated entity
 
       // =========================================================
       // 6. REAL-TIME ECG MONITOR OSCILLOSCOPE (튜브 바닥 심전도)
@@ -958,6 +660,11 @@ export const BioStitchLabView: React.FC = () => {
 
   // WebAudio Sound Effects
   const triggerBioBeep = (freqStart = 520, freqEnd = 180, duration = 0.15) => {
+    // If it's the 520Hz hospital beep default call, route directly to visceral cardiac thump!
+    if (freqStart === 520) {
+      playCardiacThump(activeExp.pulseBpm);
+      return;
+    }
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
@@ -995,55 +702,69 @@ export const BioStitchLabView: React.FC = () => {
       if (ctx.state === "suspended") ctx.resume();
 
       const now = ctx.currentTime;
-      // 1. High-Impact Low-End Lub: 65 Hz -> 26 Hz, high Q filter, 1.25 gain
+      // 1. High-Impact Deep Sub-Bass Lub (쿵!): 80 Hz -> 22 Hz, 1.6 gain
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       const filter1 = ctx.createBiquadFilter();
 
       filter1.type = "lowpass";
-      filter1.frequency.setValueAtTime(220, now);
-      filter1.Q.setValueAtTime(4.2, now);
+      filter1.frequency.setValueAtTime(240, now);
+      filter1.Q.setValueAtTime(4.5, now);
 
       osc1.type = "sine";
-      const baseFreq = Math.min(100, 52 + (bpm / 200) * 44);
+      const baseFreq = Math.min(105, 58 + (bpm / 200) * 45);
       osc1.frequency.setValueAtTime(baseFreq, now);
-      osc1.frequency.exponentialRampToValueAtTime(25, now + 0.15);
+      osc1.frequency.exponentialRampToValueAtTime(22, now + 0.16);
 
       gain1.gain.setValueAtTime(0.001, now);
-      gain1.gain.linearRampToValueAtTime(1.25, now + 0.015);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      gain1.gain.linearRampToValueAtTime(1.6, now + 0.015);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
       osc1.connect(filter1);
       filter1.connect(gain1);
       gain1.connect(ctx.destination);
 
       osc1.start(now);
-      osc1.stop(now + 0.18);
+      osc1.stop(now + 0.19);
 
-      // 2. Snappy Mitral Valve Dub (쾅!): 160 Hz -> 35 Hz, bandpass resonance
-      const dubTime = now + 0.11;
+      // 2. Visceral Mitral Valve Dub (쾅!): sharp bandpass resonance
+      const dubTime = now + 0.095;
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       const filter2 = ctx.createBiquadFilter();
 
       filter2.type = "bandpass";
-      filter2.frequency.setValueAtTime(320, dubTime);
-      filter2.Q.setValueAtTime(3.0, dubTime);
+      filter2.frequency.setValueAtTime(340, dubTime);
+      filter2.Q.setValueAtTime(3.5, dubTime);
 
       osc2.type = "triangle";
-      osc2.frequency.setValueAtTime(baseFreq * 1.35, dubTime);
-      osc2.frequency.exponentialRampToValueAtTime(30, dubTime + 0.13);
+      osc2.frequency.setValueAtTime(baseFreq * 1.45, dubTime);
+      osc2.frequency.exponentialRampToValueAtTime(26, dubTime + 0.14);
 
       gain2.gain.setValueAtTime(0.001, dubTime);
-      gain2.gain.linearRampToValueAtTime(1.05, dubTime + 0.012);
-      gain2.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.15);
+      gain2.gain.linearRampToValueAtTime(1.35, dubTime + 0.012);
+      gain2.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.16);
 
       osc2.connect(filter2);
       filter2.connect(gain2);
       gain2.connect(ctx.destination);
 
       osc2.start(dubTime);
-      osc2.stop(dubTime + 0.16);
+      osc2.stop(dubTime + 0.17);
+
+      // 3. Ultra-Low Sub-harmonic Rumble (가슴을 울리는 진동)
+      const osc3 = ctx.createOscillator();
+      const gain3 = ctx.createGain();
+      osc3.type = "sine";
+      osc3.frequency.setValueAtTime(38, now);
+      osc3.frequency.exponentialRampToValueAtTime(18, now + 0.22);
+      gain3.gain.setValueAtTime(0.001, now);
+      gain3.gain.linearRampToValueAtTime(0.85, now + 0.02);
+      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+      osc3.connect(gain3);
+      gain3.connect(ctx.destination);
+      osc3.start(now);
+      osc3.stop(now + 0.24);
     } catch {}
   };
 
@@ -1194,6 +915,32 @@ export const BioStitchLabView: React.FC = () => {
     };
   }, [isSoundOn, activeExp.id, langMode]);
 
+  // Active WebAudio Cardiac Loop for Chimera Assembler (Strictly dynamic to creatureBpm)
+  useEffect(() => {
+    if (!isStitchModalOpen || activeModalTab !== "chimera_assembler" || !isHeartbeatAudioOn) {
+      if (chimeraCardiacIntervalRef.current) {
+        window.clearInterval(chimeraCardiacIntervalRef.current);
+        chimeraCardiacIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Immediate beat on mount or BPM change
+    playCardiacThump(creatureBpm);
+
+    const intervalMs = Math.max(260, Math.round((60 / creatureBpm) * 1000));
+    chimeraCardiacIntervalRef.current = window.setInterval(() => {
+      playCardiacThump(creatureBpm);
+    }, intervalMs);
+
+    return () => {
+      if (chimeraCardiacIntervalRef.current) {
+        window.clearInterval(chimeraCardiacIntervalRef.current);
+        chimeraCardiacIntervalRef.current = null;
+      }
+    };
+  }, [isStitchModalOpen, activeModalTab, isHeartbeatAudioOn, creatureBpm]);
+
   // Desktop chat scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1260,129 +1007,140 @@ export const BioStitchLabView: React.FC = () => {
 
   // Assemble & Resurrect Custom Mythic/Grotesque/Disco Chimera!
   const handleAssembleChimera = () => {
+    if (morphIntervalRef.current) {
+      window.clearInterval(morphIntervalRef.current);
+    }
+
     // 1. Step 1: AI Diffusion Faint Stem-Cell Mist Injection
     setMorphStage("injecting");
-    setMorphPercent(18);
+    setMorphPercent(0);
     setFluidLevel(1.0);
     setEyesOpen(0.0);
     setChimeraResult(null);
-    triggerBioBeep(320, 640, 0.25);
 
-    // 2. Step 2: Progressive Morphogenesis (Bones, Organs, and Muscles coagulating)
-    setTimeout(() => {
-      setMorphStage("morphing");
-      setMorphPercent(68);
-      triggerBioBeep(680, 920, 0.3);
-    }, 900);
+    // Initial cardiac thump
+    playCardiacThump(creatureBpm);
 
-    // 3. Step 3: Bioreactor Fluid Draining (배양액이 천천히 빠짐)
-    setTimeout(() => {
-      setMorphStage("draining");
-      setMorphPercent(92);
-      triggerBioBeep(420, 260, 0.4);
+    const startTime = Date.now();
+    const duration = 4600; // 4.6 seconds of progressive AI diffusion synthesis
 
-      // Smooth fluid draining animation (1.0 -> 0.15)
-      let currentFluid = 1.0;
-      const drainInterval = setInterval(() => {
-        currentFluid -= 0.055;
-        if (currentFluid <= 0.15) {
-          currentFluid = 0.15;
-          clearInterval(drainInterval);
-        }
-        setFluidLevel(currentFluid);
-      }, 70);
-    }, 2000);
+    morphIntervalRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(1.0, elapsed / duration);
+      const percent = Math.round(progress * 100);
+      setMorphPercent(percent);
 
-    // 4. Step 4: Fluid fully drained -> Eyes Open & Monstrous Laughter / Roar Awakens!
-    setTimeout(() => {
-      const traits = [
-        selectedHead.traitTag,
-        selectedHeart.traitTag,
-        selectedTorso.traitTag,
-        selectedLimbs.traitTag
-      ];
-      const gamerCount = traits.filter((t) => t === "gamer").length;
-      const discoCount = traits.filter((t) => t === "disco").length;
-
-      let res: ChimeraCreationResult;
-
-      if (gamerCount >= 2) {
-        res = {
-          archetype: "gamer",
-          badge: "🕹️🐙⚡",
-          titleKo: "기괴한 변이 탄생: 6팔 달린 불사의 아케이드 게이머 키메라!",
-          titleEn: "Bizarre Awakening: The 6-Armed Immortal Arcade Gamer Chimera!",
-          subtitleKo: `${selectedHead.nameKo} + ${selectedLimbs.nameKo} 과융합 변이`,
-          subtitleEn: `${selectedHead.nameEn} + ${selectedLimbs.nameEn} Hyper-Fusion`,
-          storyKo:
-            "만능줄기세포(iPSC)에 퐁(Pong) 게임 뇌세포(DishBrain)의 도파민 신호가 과다 증폭되었습니다! 배양액이 빠지자마자 6개의 초정밀 재생 팔다리가 솟아나더니, 크게 껄껄 웃으며 실험실 모니터를 장악해 초당 120타의 속도로 게임 대결을 신청합니다!",
-          storyEn:
-            "DishBrain gaming dopamine overloaded the stem-cell matrix! The fluid drained, six limbs flexed, and with a booming laugh, the chimera hijacked the lab mainframe for a high-score Pong match!",
-          firstWordsKo: "크하하하하! 으하하! 인간 박사님, 동전 넣으세요! 저랑 퐁 한 판 안 뜨면 실험실 문 안 열어줍니다!",
-          firstWordsEn: "MWAHAHAHA! HAHAHA! INSERT COIN, DOCTOR! Nobody leaves this lab until you beat my high score!",
-          speechKo:
-            "경고! 디시브레인 게이머 유전자가 과다 발현되었습니다. 크게 웃는 여섯 개의 재생 팔다리를 가진 키메라가 깨어나 게임 대결을 요구하고 있습니다.",
-          speechEn:
-            "Alert! DishBrain gaming neurons have taken over the matrix! A laughing six-armed chimera has awakened and challenges you to Pong!",
-          bpm: 145,
-          colorHex: "#06b6d4"
-        };
-      } else if (discoCount >= 2) {
-        res = {
-          archetype: "disco",
-          badge: "🎃🪩🕺",
-          titleKo: "할로윈 폭주 탄생: 자정의 문워크 디스코 프랑켄슈타인!",
-          titleEn: "Midnight Outbreak: The Moonwalking Disco Frankenstein!",
-          subtitleKo: `${selectedHeart.nameKo} + ${selectedLimbs.nameKo} 리듬 공명`,
-          subtitleEn: `${selectedHeart.nameEn} + ${selectedLimbs.nameEn} Rhythm Resonance`,
-          storyKo:
-            "예일대 BrainEx 관류 펌프의 맥박이 128 BPM 할로윈 신스웨이브 주파수와 공명했습니다! 배양액이 빠지며 눈을 번쩍 뜬 생명체가 큰 입으로 호탕하게 웃으며 배양기 유리를 박차고 나와 무중력 문워크 군무를 춥니다!",
-          storyEn:
-            "The BrainEx pump locked onto a 128-BPM Halloween rhythm! Fluid drained, eyes flashed open, and with a roaring chuckle, the creature broke into a zero-gravity moonwalk across the ceiling!",
-          firstWordsKo: "와하하하하! 심장이 백이십팔 비트로 뛰는데 어떻게 가만히 있나요? 조명 끄고 네온 불빛 켜세요, 파티 시작입니다!",
-          firstWordsEn: "WAHAHAHA! With a 128-BPM stem-cell heart, staying still is impossible! Turn on the blacklights, it's Kiroween party time!",
-          speechKo:
-            "놀라운 현상입니다! 줄기세포 배양액이 배출되자, 자정의 문워크 디스코 키메라가 크게 웃으며 실험실 전체를 축제의 장으로 바꾸고 있습니다.",
-          speechEn:
-            "Incredible! As the bioreactor fluid drained, the Midnight Disco Chimera awakened with laughter, transforming the lab into a dance floor!",
-          bpm: 128,
-          colorHex: "#a855f7"
-        };
+      if (progress < 0.35) {
+        // Step 1: Latent Noise Phase (0% -> 35%)
+        setMorphStage("injecting");
+        setFluidLevel(1.0);
+      } else if (progress < 0.72) {
+        // Step 2: Progressive Denoising & Fine Biological Feature Solidification (35% -> 72%)
+        setMorphStage("morphing");
+        setFluidLevel(1.0);
+      } else if (progress < 0.96) {
+        // Step 3: Amniotic Fluid Rapid Drainage (72% -> 96%)
+        setMorphStage("draining");
+        const drainProg = (progress - 0.72) / 0.24;
+        setFluidLevel(Math.max(0.15, 1.0 - drainProg * 0.85));
       } else {
-        res = {
-          archetype: "mythic",
-          badge: "🏛️🦁🦅",
-          titleKo: "신화적 초월체 부활: 프로메테우스 네온 스핑크스(Neon Sphinx)!",
-          titleEn: "Mythic Resurrection: The Prometheus Neon Sphinx!",
-          subtitleKo: `${selectedHead.nameKo} + ${selectedTorso.nameKo} 완벽 융합`,
-          subtitleEn: `${selectedHead.nameEn} + ${selectedTorso.nameEn} Perfect Synthesis`,
-          storyKo:
-            "스탠퍼드 92% 인간 대뇌 오가노이드의 고차원 자아와 반투명 유령 심장, 황금 사자 동체, 그리고 아홀로틀의 재생 날개가 완벽히 융합되었습니다! 배양액이 빠져나가자 황금빛 눈을 번쩍 뜨고 깊은 웃음을 터뜨리며 당신을 바라봅니다.",
-          storyEn:
-            "The 92% human cortical organoid, Ghost Heart, and regenerating wings fused seamlessly! The fluid drained, golden eyes opened wide with a deep divine laugh, gazing directly at its creator.",
-          firstWordsKo: "하하하하... 인간의 뇌와 불멸의 육체를 이어 붙인 창조주여, 나의 첫 번째 수수께끼에 답할 준비가 되었는가?",
-          firstWordsEn: "HAHAHAHA... O Creator who stitched human mind to immortal flesh... are you ready to answer my first riddle?",
-          speechKo:
-            "생체 접합 대성공! 배양액이 완전히 배출되자, 고대 신화 속의 초월 생명체 네온 스핑크스가 황금빛 눈을 뜨고 지성의 미소를 짓고 있습니다.",
-          speechEn:
-            "Bio-stitching complete! As the fluid drained, the mythical Neon Sphinx opened its golden eyes with an all-knowing smile.",
-          bpm: 84,
-          colorHex: "#10b981"
-        };
+        // Step 4: 짠! 하고 완전 각성 (Brilliant bio-flash & Roar)
+        if (morphIntervalRef.current) {
+          window.clearInterval(morphIntervalRef.current);
+          morphIntervalRef.current = null;
+        }
+
+        const traits = [
+          selectedHead.traitTag,
+          selectedHeart.traitTag,
+          selectedTorso.traitTag,
+          selectedLimbs.traitTag
+        ];
+        const gamerCount = traits.filter((t) => t === "gamer").length;
+        const discoCount = traits.filter((t) => t === "disco").length;
+
+        let res: ChimeraCreationResult;
+
+        if (gamerCount >= 2) {
+          res = {
+            archetype: "gamer",
+            badge: "🕹️🐙⚡",
+            titleKo: "기괴한 변이 탄생: 6팔 달린 불사의 아케이드 게이머 키메라!",
+            titleEn: "Bizarre Awakening: The 6-Armed Immortal Arcade Gamer Chimera!",
+            subtitleKo: `${selectedHead.nameKo} + ${selectedLimbs.nameKo} 과융합 변이`,
+            subtitleEn: `${selectedHead.nameEn} + ${selectedLimbs.nameEn} Hyper-Fusion`,
+            storyKo:
+              "만능줄기세포(iPSC)에 퐁(Pong) 게임 뇌세포(DishBrain)의 도파민 신호가 과다 증폭되었습니다! 배양액이 빠지자마자 6개의 초정밀 재생 팔다리가 솟아나더니, 크게 껄껄 웃으며 실험실 모니터를 장악해 초당 120타의 속도로 게임 대결을 신청합니다!",
+            storyEn:
+              "DishBrain gaming dopamine overloaded the stem-cell matrix! The fluid drained, six limbs flexed, and with a booming laugh, the chimera hijacked the lab mainframe for a high-score Pong match!",
+            firstWordsKo: "크하하하하! 으하하! 인간 박사님, 동전 넣으세요! 저랑 퐁 한 판 안 뜨면 실험실 문 안 열어줍니다!",
+            firstWordsEn: "MWAHAHAHA! HAHAHA! INSERT COIN, DOCTOR! Nobody leaves this lab until you beat my high score!",
+            speechKo:
+              "경고! 디시브레인 게이머 유전자가 과다 발현되었습니다. 크게 웃는 여섯 개의 재생 팔다리를 가진 키메라가 깨어나 게임 대결을 요구하고 있습니다.",
+            speechEn:
+              "Alert! DishBrain gaming neurons have taken over the matrix! A laughing six-armed chimera has awakened and challenges you to Pong!",
+            bpm: 145,
+            colorHex: "#06b6d4"
+          };
+        } else if (discoCount >= 2) {
+          res = {
+            archetype: "disco",
+            badge: "🎃🪩🕺",
+            titleKo: "할로윈 폭주 탄생: 자정의 문워크 디스코 프랑켄슈타인!",
+            titleEn: "Midnight Outbreak: The Moonwalking Disco Frankenstein!",
+            subtitleKo: `${selectedHeart.nameKo} + ${selectedLimbs.nameKo} 리듬 공명`,
+            subtitleEn: `${selectedHeart.nameEn} + ${selectedLimbs.nameEn} Rhythm Resonance`,
+            storyKo:
+              "예일대 BrainEx 관류 펌프의 맥박이 128 BPM 할로윈 신스웨이브 주파수와 공명했습니다! 배양액이 빠지며 눈을 번쩍 뜬 생명체가 큰 입으로 호탕하게 웃으며 배양기 유리를 박차고 나와 무중력 문워크 군무를 춥니다!",
+            storyEn:
+              "The BrainEx pump locked onto a 128-BPM Halloween rhythm! Fluid drained, eyes flashed open, and with a roaring chuckle, the creature broke into a zero-gravity moonwalk across the ceiling!",
+            firstWordsKo: "와하하하하! 심장이 백이십팔 비트로 뛰는데 어떻게 가만히 있나요? 조명 끄고 네온 불빛 켜세요, 파티 시작입니다!",
+            firstWordsEn: "WAHAHAHA! With a 128-BPM stem-cell heart, staying still is impossible! Turn on the blacklights, it's Kiroween party time!",
+            speechKo:
+              "놀라운 현상입니다! 줄기세포 배양액이 배출되자, 자정의 문워크 디스코 키메라가 크게 웃으며 실험실 전체를 축제의 장으로 바꾸고 있습니다.",
+            speechEn:
+              "Incredible! As the bioreactor fluid drained, the Midnight Disco Chimera awakened with laughter, transforming the lab into a dance floor!",
+            bpm: 128,
+            colorHex: "#a855f7"
+          };
+        } else {
+          res = {
+            archetype: "mythic",
+            badge: "🏛️🦁🦅",
+            titleKo: "신화적 초월체 부활: 프로메테우스 네온 스핑크스(Neon Sphinx)!",
+            titleEn: "Mythic Resurrection: The Prometheus Neon Sphinx!",
+            subtitleKo: `${selectedHead.nameKo} + ${selectedTorso.nameKo} 완벽 융합`,
+            subtitleEn: `${selectedHead.nameEn} + ${selectedTorso.nameEn} Perfect Synthesis`,
+            storyKo:
+              "스탠퍼드 92% 인간 대뇌 오가노이드의 고차원 자아와 반투명 유령 심장, 황금 사자 동체, 그리고 아홀로틀의 재생 날개가 완벽히 융합되었습니다! 배양액이 빠져나가자 황금빛 눈을 번쩍 뜨고 깊은 웃음을 터뜨리며 당신을 바라봅니다.",
+            storyEn:
+              "The 92% human cortical organoid, Ghost Heart, and regenerating wings fused seamlessly! The fluid drained, golden eyes opened wide with a deep divine laugh, gazing directly at its creator.",
+            firstWordsKo: "하하하하... 인간의 뇌와 불멸의 육체를 이어 붙인 창조주여, 나의 첫 번째 수수께끼에 답할 준비가 되었는가?",
+            firstWordsEn: "HAHAHAHA... O Creator who stitched human mind to immortal flesh... are you ready to answer my first riddle?",
+            speechKo:
+              "생체 접합 대성공! 배양액이 완전히 배출되자, 고대 신화 속의 초월 생명체 네온 스핑크스가 황금빛 눈을 뜨고 지성의 미소를 짓고 있습니다.",
+            speechEn:
+              "Bio-stitching complete! As the fluid drained, the mythical Neon Sphinx opened its golden eyes with an all-knowing smile.",
+            bpm: 84,
+            colorHex: "#10b981"
+          };
+        }
+
+        setMorphPercent(100);
+        setMorphStage("awakened");
+        setFluidLevel(0.15);
+        setEyesOpen(1.0);
+        setCreatureBpm(res.bpm);
+        setChimeraResult(res);
+
+        // Immediate visceral cardiac thump & monstrous roar
+        playCardiacThump(res.bpm);
+        playChimeraRoar(res.firstWordsKo, res.firstWordsEn);
+
+        // Warm & Flexible Neural Narrator Voice
+        speakText(res.speechKo, res.speechEn);
       }
-
-      setMorphPercent(100);
-      setMorphStage("awakened");
-      setEyesOpen(1.0);
-      setCreatureBpm(res.bpm);
-      setChimeraResult(res);
-
-      // Play Guttural Monstrous Laughter & Roar Audio
-      playChimeraRoar(res.firstWordsKo, res.firstWordsEn);
-
-      // Warm & Flexible Neural Narrator Voice
-      speakText(res.speechKo, res.speechEn);
-    }, 3400);
+    }, 35);
   };
 
   const handleCustomLiveSearch = async (e: React.FormEvent) => {
@@ -2020,7 +1778,11 @@ export const BioStitchLabView: React.FC = () => {
                             min="38"
                             max="210"
                             value={creatureBpm}
-                            onChange={(e) => setCreatureBpm(Number(e.target.value))}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setCreatureBpm(val);
+                              if (isHeartbeatAudioOn) playCardiacThump(val);
+                            }}
                             className="w-28 sm:w-44 accent-rose-500 cursor-pointer"
                           />
                         </div>
@@ -2029,8 +1791,9 @@ export const BioStitchLabView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              setIsHeartbeatAudioOn(!isHeartbeatAudioOn);
-                              if (!isHeartbeatAudioOn) playCardiacThump(creatureBpm);
+                              const nextState = !isHeartbeatAudioOn;
+                              setIsHeartbeatAudioOn(nextState);
+                              if (nextState) playCardiacThump(creatureBpm);
                             }}
                             className={`text-[10px] font-black px-2.5 py-1 rounded transition border flex items-center gap-1 cursor-pointer ${
                               isHeartbeatAudioOn
@@ -2043,28 +1806,40 @@ export const BioStitchLabView: React.FC = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setCreatureBpm(42)}
+                            onClick={() => {
+                              setCreatureBpm(42);
+                              if (isHeartbeatAudioOn) playCardiacThump(42);
+                            }}
                             className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 42 ? "bg-sky-600 border-sky-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-sky-300 border-slate-700"}`}
                           >
                             ❄️ 42 {isKo ? "(동면·서맥)" : "(Bradycardia)"}
                           </button>
                           <button
                             type="button"
-                            onClick={() => setCreatureBpm(76)}
+                            onClick={() => {
+                              setCreatureBpm(76);
+                              if (isHeartbeatAudioOn) playCardiacThump(76);
+                            }}
                             className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 76 ? "bg-emerald-600 border-emerald-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-emerald-300 border-slate-700"}`}
                           >
                             🌿 76 {isKo ? "(정상)" : "(Normal)"}
                           </button>
                           <button
                             type="button"
-                            onClick={() => setCreatureBpm(130)}
+                            onClick={() => {
+                              setCreatureBpm(130);
+                              if (isHeartbeatAudioOn) playCardiacThump(130);
+                            }}
                             className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 130 ? "bg-amber-600 border-amber-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700"}`}
                           >
                             🔥 130 {isKo ? "(흥분)" : "(Elevated)"}
                           </button>
                           <button
                             type="button"
-                            onClick={() => setCreatureBpm(185)}
+                            onClick={() => {
+                              setCreatureBpm(185);
+                              if (isHeartbeatAudioOn) playCardiacThump(185);
+                            }}
                             className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 185 ? "bg-rose-600 border-rose-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-rose-400 border-slate-700"}`}
                           >
                             ⚡ 185 {isKo ? "(벼락 과부하)" : "(Tachycardia)"}
