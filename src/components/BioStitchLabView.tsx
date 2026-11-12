@@ -38,6 +38,69 @@ interface ChimeraCreationResult {
   colorHex: string;
 }
 
+// Generate organic biological cardiac acoustic buffer ("쿵... 쾅!", Lub-Dub)
+function createOrganicHeartbeatBuffer(ctx: AudioContext): AudioBuffer {
+  const sampleRate = ctx.sampleRate || 44100;
+  const duration = 0.55;
+  const totalSamples = Math.floor(sampleRate * duration);
+  const audioBuf = ctx.createBuffer(1, totalSamples, sampleRate);
+  const data = audioBuf.getChannelData(0);
+
+  // Brown noise for biological fluid turbulence
+  let lastNoise = 0;
+  let fVal = 0;
+  const alpha = (2 * Math.PI * 65) / sampleRate;
+
+  for (let i = 0; i < totalSamples; i++) {
+    const white = Math.random() * 2 - 1;
+    lastNoise = (lastNoise + 0.04 * white) / 1.04;
+    fVal += alpha * (lastNoise - fVal);
+    const filteredNoise = fVal;
+    const t = i / sampleRate;
+    let sample = 0;
+
+    // S1 (쿵! Lub): 0.02s to 0.22s
+    const t1 = t - 0.02;
+    if (t1 >= 0 && t1 < 0.20) {
+      const attack = Math.min(1.0, t1 / 0.006);
+      const decay = Math.exp(-t1 * 15);
+      const env = attack * decay;
+
+      const freq1 = 54 * Math.exp(-t1 * 10) + 24;
+      const w1 = Math.sin(2 * Math.PI * freq1 * t1);
+
+      const freqSub = 28 * Math.exp(-t1 * 8) + 14;
+      const wSub = Math.sin(2 * Math.PI * freqSub * t1);
+
+      const turb = filteredNoise * 2.4;
+      const raw = (w1 * 1.5 + wSub * 1.25 + turb * 0.55) * env;
+      sample += Math.tanh(raw * 2.5) * 0.98;
+    }
+
+    // S2 (쾅! Dub): 0.165s to 0.35s
+    const t2 = t - 0.165;
+    if (t2 >= 0 && t2 < 0.18) {
+      const attack2 = Math.min(1.0, t2 / 0.005);
+      const decay2 = Math.exp(-t2 * 19);
+      const env2 = attack2 * decay2;
+
+      const freq2 = 68 * Math.exp(-t2 * 12) + 32;
+      const w2 = Math.sin(2 * Math.PI * freq2 * t2);
+
+      const freqSub2 = 38 * Math.exp(-t2 * 9) + 20;
+      const wSub2 = Math.sin(2 * Math.PI * freqSub2 * t2);
+
+      const turb2 = filteredNoise * 2.0;
+      const raw2 = (w2 * 1.35 + wSub2 * 1.0 + turb2 * 0.45) * env2;
+      sample += Math.tanh(raw2 * 2.3) * 0.94;
+    }
+
+    data[i] = Math.max(-0.99, Math.min(0.99, sample));
+  }
+
+  return audioBuf;
+}
+
 export const BioStitchLabView: React.FC = () => {
   const [experiments] = useState<BioExperimentCase[]>(VERIFIED_BIO_EXPERIMENTS);
   const [activeExp, setActiveExp] = useState<BioExperimentCase>(VERIFIED_BIO_EXPERIMENTS[0]);
@@ -65,6 +128,7 @@ export const BioStitchLabView: React.FC = () => {
 
   // High-Impact Ear-Stimulating Cardiac Thump Engine & Real Specimen Assets
   const [isHeartbeatAudioOn, setIsHeartbeatAudioOn] = useState<boolean>(true);
+  const cardiacBufferRef = useRef<AudioBuffer | null>(null);
   const chimeraCardiacIntervalRef = useRef<number | null>(null);
   const morphIntervalRef = useRef<number | null>(null);
   const masterImgRef = useRef<HTMLImageElement | null>(null);
@@ -83,6 +147,27 @@ export const BioStitchLabView: React.FC = () => {
     const qImg = new Image();
     qImg.src = "/images/chimera_microscopy_quad.jpg";
     quadImgRef.current = qImg;
+
+    // Preload organic biological heartbeat WAV or synthesize in-memory buffer
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        if (!audioCtxRef.current) audioCtxRef.current = new AudioCtx();
+        if (audioCtxRef.current && !cardiacBufferRef.current) {
+          cardiacBufferRef.current = createOrganicHeartbeatBuffer(audioCtxRef.current);
+        }
+      }
+      fetch("/sounds/cardiac_thump_organic.wav")
+        .then((res) => res.arrayBuffer())
+        .then((buf) => {
+          if (audioCtxRef.current) {
+            audioCtxRef.current.decodeAudioData(buf, (decoded) => {
+              cardiacBufferRef.current = decoded;
+            });
+          }
+        })
+        .catch(() => {});
+    } catch {}
   }, []);
 
   // Block 3: 3-Second Auto-Absorbing Synapse Chat (with dismissed cursor fix)
@@ -690,7 +775,7 @@ export const BioStitchLabView: React.FC = () => {
     } catch {}
   };
 
-  // WebAudio High-Impact Ear-Stimulating Cardiac Thump Engine (쿵... 쾅!)
+  // WebAudio High-Impact Organic Biological Cardiac Thump Engine ("쿵쾅! 쿵쾅!")
   const playCardiacThump = (bpm: number) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -701,70 +786,40 @@ export const BioStitchLabView: React.FC = () => {
       const ctx = audioCtxRef.current;
       if (ctx.state === "suspended") ctx.resume();
 
-      const now = ctx.currentTime;
-      // 1. High-Impact Deep Sub-Bass Lub (쿵!): 80 Hz -> 22 Hz, 1.6 gain
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      const filter1 = ctx.createBiquadFilter();
+      if (!cardiacBufferRef.current) {
+        cardiacBufferRef.current = createOrganicHeartbeatBuffer(ctx);
+      }
 
-      filter1.type = "lowpass";
-      filter1.frequency.setValueAtTime(240, now);
-      filter1.Q.setValueAtTime(4.5, now);
+      const src = ctx.createBufferSource();
+      src.buffer = cardiacBufferRef.current;
 
-      osc1.type = "sine";
-      const baseFreq = Math.min(105, 58 + (bpm / 200) * 45);
-      osc1.frequency.setValueAtTime(baseFreq, now);
-      osc1.frequency.exponentialRampToValueAtTime(22, now + 0.16);
+      // Realistic speed scaling with BPM (faster BPM = tighter, snappier thuds)
+      const speedRate = Math.max(0.85, Math.min(1.5, 0.92 + (bpm / 200) * 0.35));
+      src.playbackRate.setValueAtTime(speedRate, ctx.currentTime);
 
-      gain1.gain.setValueAtTime(0.001, now);
-      gain1.gain.linearRampToValueAtTime(1.6, now + 0.015);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      // Deep analog chest wall absorption filter: 180Hz cutoff (filters out all high-pitch machine tones!)
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.setValueAtTime(180, ctx.currentTime);
+      lowpass.Q.setValueAtTime(1.2, ctx.currentTime);
 
-      osc1.connect(filter1);
-      filter1.connect(gain1);
-      gain1.connect(ctx.destination);
+      // Sub-bass peaking boost filter: 46Hz (+8.5dB massive chest thud boost!)
+      const bassBoost = ctx.createBiquadFilter();
+      bassBoost.type = "peaking";
+      bassBoost.frequency.setValueAtTime(46, ctx.currentTime);
+      bassBoost.Q.setValueAtTime(1.6, ctx.currentTime);
+      bassBoost.gain.setValueAtTime(8.5, ctx.currentTime);
 
-      osc1.start(now);
-      osc1.stop(now + 0.19);
+      const gainNode = ctx.createGain();
+      // Massive punchy output volume (일부러 더 쿵쾅쿵쾅하게!)
+      gainNode.gain.setValueAtTime(3.2, ctx.currentTime);
 
-      // 2. Visceral Mitral Valve Dub (쾅!): sharp bandpass resonance
-      const dubTime = now + 0.095;
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      const filter2 = ctx.createBiquadFilter();
+      src.connect(bassBoost);
+      bassBoost.connect(lowpass);
+      lowpass.connect(gainNode);
+      gainNode.connect(ctx.destination);
 
-      filter2.type = "bandpass";
-      filter2.frequency.setValueAtTime(340, dubTime);
-      filter2.Q.setValueAtTime(3.5, dubTime);
-
-      osc2.type = "triangle";
-      osc2.frequency.setValueAtTime(baseFreq * 1.45, dubTime);
-      osc2.frequency.exponentialRampToValueAtTime(26, dubTime + 0.14);
-
-      gain2.gain.setValueAtTime(0.001, dubTime);
-      gain2.gain.linearRampToValueAtTime(1.35, dubTime + 0.012);
-      gain2.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.16);
-
-      osc2.connect(filter2);
-      filter2.connect(gain2);
-      gain2.connect(ctx.destination);
-
-      osc2.start(dubTime);
-      osc2.stop(dubTime + 0.17);
-
-      // 3. Ultra-Low Sub-harmonic Rumble (가슴을 울리는 진동)
-      const osc3 = ctx.createOscillator();
-      const gain3 = ctx.createGain();
-      osc3.type = "sine";
-      osc3.frequency.setValueAtTime(38, now);
-      osc3.frequency.exponentialRampToValueAtTime(18, now + 0.22);
-      gain3.gain.setValueAtTime(0.001, now);
-      gain3.gain.linearRampToValueAtTime(0.85, now + 0.02);
-      gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
-      osc3.connect(gain3);
-      gain3.connect(ctx.destination);
-      osc3.start(now);
-      osc3.stop(now + 0.24);
+      src.start(ctx.currentTime);
     } catch {}
   };
 
@@ -1802,7 +1857,7 @@ export const BioStitchLabView: React.FC = () => {
                             }`}
                           >
                             <span>🫀</span>
-                            <span>{isHeartbeatAudioOn ? (isKo ? "맥박 소리 (쿵쾅!) ON" : "Pulse Sound ON") : (isKo ? "맥박 소리 OFF" : "Pulse Sound OFF")}</span>
+                            <span>{isHeartbeatAudioOn ? (isKo ? "생체 심장박동 (쿵쾅!) ON" : "Biological Heartbeat ON") : (isKo ? "맥박 소리 OFF" : "Pulse Sound OFF")}</span>
                           </button>
                           <button
                             type="button"
