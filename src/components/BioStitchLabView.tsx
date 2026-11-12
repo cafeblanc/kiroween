@@ -1117,15 +1117,15 @@ export const BioStitchLabView: React.FC = () => {
                                 : "Bioreactor Standby"
                               : morphStage === "injecting"
                               ? isKo
-                                ? "🧬 야마나카 줄기세포 주입 중... (18%)"
-                                : "🧬 Injecting Yamanaka iPSCs... (18%)"
+                                ? `🧬 야마나카 줄기세포 주입 중... (${morphPercent}%)`
+                                : `🧬 Injecting Yamanaka iPSCs... (${morphPercent}%)`
                               : morphStage === "morphing"
                               ? isKo
-                                ? "⚡ 신경·혈관 급속 변이 및 융합 중... (68%)"
-                                : "⚡ Rapid Morphogenesis & Lightning... (68%)"
+                                ? `⚡ 신경·혈관 급속 변이 및 융합 중... (${morphPercent}%)`
+                                : `⚡ Rapid Morphogenesis & Lightning... (${morphPercent}%)`
                               : isKo
-                              ? "✨ 신규 키메라 생명체 부활 완료! (100%)"
-                              : "✨ Chimera Awakened! (100%)"}
+                              ? `✨ 신규 키메라 생명체 부활 완료! (${morphPercent}%)`
+                              : `✨ Chimera Awakened! (${morphPercent}%)`}
                           </span>
                         </div>
                       </div>
