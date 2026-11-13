@@ -20,3 +20,76 @@
 .animate-pulse-glow {
   animation: pulseGlow 2.8s infinite ease-in-out;
 }
+
+@keyframes monsterLunge {
+  0% {
+    transform: scale(0.65) translate(0, 20px);
+    filter: blur(6px) brightness(0.6);
+  }
+  30% {
+    transform: scale(1.15) translate(4px, -8px);
+    filter: blur(2px) brightness(1.2);
+  }
+  65% {
+    transform: scale(1.65) translate(-8px, 6px);
+    filter: blur(0px) brightness(1.4);
+  }
+  85% {
+    transform: scale(2.05) translate(3px, -4px);
+  }
+  100% {
+    transform: scale(1.75) translate(0, 0);
+  }
+}
+
+.animate-monsterLunge {
+  animation: monsterLunge 2.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes screenJolt {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(-10px, 8px) rotate(-2deg); }
+  30% { transform: translate(12px, -8px) rotate(2deg); }
+  45% { transform: translate(-8px, -6px) rotate(-1.5deg); }
+  60% { transform: translate(8px, 6px) rotate(1.5deg); }
+  75% { transform: translate(-4px, 2px) rotate(-0.5deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+.animate-screenJolt {
+  animation: screenJolt 0.45s infinite ease-in-out;
+}
+
+@keyframes emergencyStrobe {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.75; }
+}
+
+.animate-emergencyStrobe {
+  animation: emergencyStrobe 0.2s infinite ease-in-out;
+}
+
+@keyframes monsterTwitch {
+  0% { transform: scale(1.6) translate(0, 0) rotate(0deg); }
+  20% { transform: scale(1.65) translate(-4px, 3px) rotate(-1deg); }
+  40% { transform: scale(1.58) translate(5px, -2px) rotate(1.2deg); }
+  60% { transform: scale(1.68) translate(-3px, -4px) rotate(-0.8deg); }
+  80% { transform: scale(1.62) translate(4px, 2px) rotate(0.6deg); }
+  100% { transform: scale(1.6) translate(0, 0) rotate(0deg); }
+}
+
+.animate-monsterTwitch {
+  animation: monsterTwitch 1.8s infinite ease-in-out;
+}
+
+@keyframes vatTwitchingIdle {
+  0% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.4)); }
+  25% { transform: scale(1.02) translate(-2px, 1px); filter: drop-shadow(0 0 25px rgba(244, 63, 94, 0.6)); }
+  50% { transform: scale(0.99) translate(1px, -1px); filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.5)); }
+  75% { transform: scale(1.025) translate(-1px, -2px); filter: drop-shadow(0 0 30px rgba(245, 158, 11, 0.7)); }
+  100% { transform: scale(1) translate(0, 0); filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.4)); }
+}
+
+.animate-vatTwitchingIdle {
+  animation: vatTwitchingIdle 2.4s infinite ease-in-out;
+}
