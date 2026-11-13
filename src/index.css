@@ -23,41 +23,88 @@
 
 @keyframes monsterLunge {
   0% {
-    transform: scale(0.65) translate(0, 20px);
-    filter: blur(6px) brightness(0.6);
+    transform: scale(0.12) translate(0, 50px);
+    filter: blur(12px) brightness(0.3);
+    opacity: 0.1;
   }
-  30% {
-    transform: scale(1.15) translate(4px, -8px);
-    filter: blur(2px) brightness(1.2);
+  15% {
+    transform: scale(0.7) translate(-15px, -20px);
+    filter: blur(4px) brightness(2.0);
+    opacity: 1;
   }
-  65% {
-    transform: scale(1.65) translate(-8px, 6px);
-    filter: blur(0px) brightness(1.4);
+  28% {
+    transform: scale(3.4) translate(10px, -15px);
+    filter: blur(0px) brightness(2.2);
   }
-  85% {
-    transform: scale(2.05) translate(3px, -4px);
+  42% {
+    transform: scale(2.6) translate(-12px, 12px) rotate(-2deg);
+    filter: brightness(1.5);
+  }
+  60% {
+    transform: scale(2.85) translate(8px, -8px) rotate(1.5deg);
+    filter: brightness(1.35);
+  }
+  78% {
+    transform: scale(2.45) translate(-6px, 6px) rotate(-1deg);
+    filter: brightness(1.2);
   }
   100% {
-    transform: scale(1.75) translate(0, 0);
+    transform: scale(2.4) translate(0, 0) rotate(0deg);
+    filter: brightness(1.1);
   }
 }
 
 .animate-monsterLunge {
-  animation: monsterLunge 2.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: monsterLunge 2.6s cubic-bezier(0.08, 0.95, 0.2, 1) forwards;
+}
+
+@keyframes shockwaveBlast {
+  0% {
+    transform: scale(0.1);
+    opacity: 1;
+    border-color: rgba(255, 255, 255, 0.9);
+  }
+  50% {
+    transform: scale(2.8);
+    opacity: 0.8;
+    border-color: rgba(239, 68, 68, 0.8);
+  }
+  100% {
+    transform: scale(5.2);
+    opacity: 0;
+    border-color: rgba(185, 28, 28, 0);
+  }
+}
+
+.animate-shockwaveBlast {
+  animation: shockwaveBlast 1.4s ease-out infinite;
+}
+
+@keyframes explosionFlash {
+  0% { opacity: 1; background-color: #ffffff; }
+  12% { opacity: 0.85; background-color: #ef4444; }
+  30% { opacity: 0.4; background-color: #7f1d1d; }
+  100% { opacity: 0; }
+}
+
+.animate-explosionFlash {
+  animation: explosionFlash 0.75s ease-out forwards;
 }
 
 @keyframes screenJolt {
   0% { transform: translate(0, 0) rotate(0deg); }
-  15% { transform: translate(-10px, 8px) rotate(-2deg); }
-  30% { transform: translate(12px, -8px) rotate(2deg); }
-  45% { transform: translate(-8px, -6px) rotate(-1.5deg); }
-  60% { transform: translate(8px, 6px) rotate(1.5deg); }
-  75% { transform: translate(-4px, 2px) rotate(-0.5deg); }
+  10% { transform: translate(-16px, 14px) rotate(-3.5deg); }
+  20% { transform: translate(18px, -14px) rotate(3deg); }
+  30% { transform: translate(-14px, -10px) rotate(-2.5deg); }
+  45% { transform: translate(12px, 10px) rotate(2deg); }
+  60% { transform: translate(-8px, 6px) rotate(-1.5deg); }
+  75% { transform: translate(6px, -4px) rotate(1deg); }
+  90% { transform: translate(-3px, 2px) rotate(-0.5deg); }
   100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 .animate-screenJolt {
-  animation: screenJolt 0.45s infinite ease-in-out;
+  animation: screenJolt 0.32s infinite ease-in-out;
 }
 
 @keyframes emergencyStrobe {

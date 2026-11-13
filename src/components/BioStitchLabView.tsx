@@ -131,7 +131,6 @@ export const BioStitchLabView: React.FC = () => {
   const [isHeartbeatAudioOn, setIsHeartbeatAudioOn] = useState<boolean>(true);
   const cardiacBufferRef = useRef<AudioBuffer | null>(null);
   const chimeraCardiacIntervalRef = useRef<number | null>(null);
-  const morphIntervalRef = useRef<number | null>(null);
   const masterImgRef = useRef<HTMLImageElement | null>(null);
   const roarImgRef = useRef<HTMLImageElement | null>(null);
   const quadImgRef = useRef<HTMLImageElement | null>(null);
@@ -201,10 +200,10 @@ export const BioStitchLabView: React.FC = () => {
   const torsoOptions = CHIMERA_PART_OPTIONS.filter((p) => p.category === "torso");
   const limbOptions = CHIMERA_PART_OPTIONS.filter((p) => p.category === "limbs");
 
-  const [selectedHead, setSelectedHead] = useState<ChimeraPartOption>(headOptions[0]);
-  const [selectedHeart, setSelectedHeart] = useState<ChimeraPartOption>(heartOptions[0]);
-  const [selectedTorso, setSelectedTorso] = useState<ChimeraPartOption>(torsoOptions[0]);
-  const [selectedLimbs, setSelectedLimbs] = useState<ChimeraPartOption>(limbOptions[0]);
+  const [selectedHead] = useState<ChimeraPartOption>(headOptions[0]);
+  const [selectedHeart] = useState<ChimeraPartOption>(heartOptions[0]);
+  const [selectedTorso] = useState<ChimeraPartOption>(torsoOptions[0]);
+  const [selectedLimbs] = useState<ChimeraPartOption>(limbOptions[0]);
 
   const [morphStage, setMorphStage] = useState<"idle" | "injecting" | "morphing" | "draining" | "awakened">("idle");
   const [morphPercent, setMorphPercent] = useState<number>(0);
@@ -842,80 +841,78 @@ export const BioStitchLabView: React.FC = () => {
     } catch {}
   };
 
-  // WebAudio Monster Roar & Awakening Guttural Voice Synthesizer
+  // Real Ferocious Beast Roar Audio Player & Multi-Harmonic Sound Synthesizer
   const playChimeraRoar = (firstWordsKo: string, firstWordsEn: string) => {
     try {
+      // 1. Play Real 16-bit PCM Beast Roar WAV Audio directly
+      const roarAudio = new Audio("/sounds/monster_roar_ferocious.wav");
+      roarAudio.volume = 1.0;
+      roarAudio.play().catch(() => {});
+
+      // 2. High-Impact Multi-Harmonic Sub-Bass & Distortion Shockwave in WebAudio
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new AudioCtx();
+      if (AudioCtx) {
+        if (!audioCtxRef.current) audioCtxRef.current = new AudioCtx();
+        const ctx = audioCtxRef.current;
+        if (ctx.state === "suspended") ctx.resume();
+
+        const now = ctx.currentTime;
+
+        // Sub-bass earthquake tremor (80Hz -> 140Hz -> 24Hz)
+        const subOsc = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        subOsc.type = "sawtooth";
+        subOsc.frequency.setValueAtTime(80, now);
+        subOsc.frequency.exponentialRampToValueAtTime(140, now + 0.3);
+        subOsc.frequency.exponentialRampToValueAtTime(24, now + 2.4);
+
+        subGain.gain.setValueAtTime(0.01, now);
+        subGain.gain.linearRampToValueAtTime(0.95, now + 0.15);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(450, now);
+        filter.frequency.linearRampToValueAtTime(850, now + 0.4);
+        filter.frequency.exponentialRampToValueAtTime(120, now + 2.4);
+        filter.Q.value = 6.0;
+
+        subOsc.connect(filter);
+        filter.connect(subGain);
+        subGain.connect(ctx.destination);
+        subOsc.start(now);
+        subOsc.stop(now + 2.5);
+
+        // Screeching beast harmonic layer
+        const screamOsc = ctx.createOscillator();
+        const screamGain = ctx.createGain();
+        screamOsc.type = "square";
+        screamOsc.frequency.setValueAtTime(480, now);
+        screamOsc.frequency.exponentialRampToValueAtTime(850, now + 0.25);
+        screamOsc.frequency.exponentialRampToValueAtTime(180, now + 1.8);
+
+        screamGain.gain.setValueAtTime(0.01, now);
+        screamGain.gain.linearRampToValueAtTime(0.45, now + 0.1);
+        screamGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+        screamOsc.connect(screamGain);
+        screamGain.connect(ctx.destination);
+        screamOsc.start(now);
+        screamOsc.stop(now + 1.8);
       }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === "suspended") ctx.resume();
 
-      const now = ctx.currentTime;
-
-      // 1. Deep Subwoofer Tremor (포효의 묵직한 진동: 55Hz -> 28Hz)
-      const subOsc = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      subOsc.type = "sawtooth";
-      subOsc.frequency.setValueAtTime(65, now);
-      subOsc.frequency.exponentialRampToValueAtTime(120, now + 0.4);
-      subOsc.frequency.exponentialRampToValueAtTime(28, now + 2.2);
-
-      subGain.gain.setValueAtTime(0.01, now);
-      subGain.gain.linearRampToValueAtTime(0.24, now + 0.3);
-      subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.3);
-
-      // Lowpass resonant filter for guttural throat effect
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(380, now);
-      filter.frequency.linearRampToValueAtTime(680, now + 0.5);
-      filter.frequency.exponentialRampToValueAtTime(140, now + 2.2);
-      filter.Q.value = 4.5;
-
-      subOsc.connect(filter);
-      filter.connect(subGain);
-      subGain.connect(ctx.destination);
-      subOsc.start(now);
-      subOsc.stop(now + 2.3);
-
-      // 2. Air hiss / Steam Vent Burst (배양액 빠질 때 뿜어져 나오는 고압 증기 소리)
-      const bufferSize = ctx.sampleRate * 1.5;
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-      }
-      const whiteNoise = ctx.createBufferSource();
-      whiteNoise.buffer = noiseBuffer;
-      const noiseFilter = ctx.createBiquadFilter();
-      noiseFilter.type = "bandpass";
-      noiseFilter.frequency.setValueAtTime(800, now);
-      noiseFilter.frequency.exponentialRampToValueAtTime(240, now + 1.5);
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.12, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-
-      whiteNoise.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(ctx.destination);
-      whiteNoise.start(now);
-      whiteNoise.stop(now + 1.5);
-
-      // 3. Delayed Monstrous Guttural Speech (눈을 뜬 후 울려 퍼지는 기괴한 말소리)
+      // 3. Monstrous Guttural Speech
       setTimeout(() => {
         if (typeof window !== "undefined" && "speechSynthesis" in window) {
           window.speechSynthesis.cancel();
           const useKorean = langMode === "KO";
           const utter = new SpeechSynthesisUtterance(useKorean ? firstWordsKo : firstWordsEn);
           utter.lang = useKorean ? "ko-KR" : "en-US";
-          utter.pitch = 0.42; // 극저음 괴물 피치
-          utter.rate = 0.78;  // 기괴하고 느린 발성
+          utter.pitch = 0.35; // 극저음 괴물 피치
+          utter.rate = 0.85;
           window.speechSynthesis.speak(utter);
         }
-      }, 1200);
+      }, 900);
     } catch {}
   };
 
@@ -1215,143 +1212,7 @@ export const BioStitchLabView: React.FC = () => {
     }, 8200);
   };
 
-  // Assemble & Resurrect Custom Mythic/Grotesque/Disco Chimera!
-  const handleAssembleChimera = () => {
-    if (morphIntervalRef.current) {
-      window.clearInterval(morphIntervalRef.current);
-    }
 
-    // 1. Step 1: AI Diffusion Faint Stem-Cell Mist Injection
-    setMorphStage("injecting");
-    setMorphPercent(0);
-    setFluidLevel(1.0);
-    setEyesOpen(0.0);
-    setChimeraResult(null);
-
-    // Initial cardiac thump
-    playCardiacThump(creatureBpm);
-
-    const startTime = Date.now();
-    const duration = 4600; // 4.6 seconds of progressive AI diffusion synthesis
-
-    morphIntervalRef.current = window.setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(1.0, elapsed / duration);
-      const percent = Math.round(progress * 100);
-      setMorphPercent(percent);
-
-      if (progress < 0.35) {
-        // Step 1: Latent Noise Phase (0% -> 35%)
-        setMorphStage("injecting");
-        setFluidLevel(1.0);
-      } else if (progress < 0.72) {
-        // Step 2: Progressive Denoising & Fine Biological Feature Solidification (35% -> 72%)
-        setMorphStage("morphing");
-        setFluidLevel(1.0);
-      } else if (progress < 0.96) {
-        // Step 3: Amniotic Fluid Rapid Drainage (72% -> 96%)
-        setMorphStage("draining");
-        const drainProg = (progress - 0.72) / 0.24;
-        setFluidLevel(Math.max(0.15, 1.0 - drainProg * 0.85));
-      } else {
-        // Step 4: 짠! 하고 완전 각성 (Brilliant bio-flash & Roar)
-        if (morphIntervalRef.current) {
-          window.clearInterval(morphIntervalRef.current);
-          morphIntervalRef.current = null;
-        }
-
-        const traits = [
-          selectedHead.traitTag,
-          selectedHeart.traitTag,
-          selectedTorso.traitTag,
-          selectedLimbs.traitTag
-        ];
-        const gamerCount = traits.filter((t) => t === "gamer").length;
-        const discoCount = traits.filter((t) => t === "disco").length;
-
-        let res: ChimeraCreationResult;
-
-        if (gamerCount >= 2) {
-          res = {
-            archetype: "gamer",
-            badge: "🕹️🐙⚡",
-            titleKo: "기괴한 변이 탄생: 6팔 달린 불사의 아케이드 게이머 키메라!",
-            titleEn: "Bizarre Awakening: The 6-Armed Immortal Arcade Gamer Chimera!",
-            subtitleKo: `${selectedHead.nameKo} + ${selectedLimbs.nameKo} 과융합 변이`,
-            subtitleEn: `${selectedHead.nameEn} + ${selectedLimbs.nameEn} Hyper-Fusion`,
-            storyKo:
-              "만능줄기세포(iPSC)에 퐁(Pong) 게임 뇌세포(DishBrain)의 도파민 신호가 과다 증폭되었습니다! 배양액이 빠지자마자 6개의 초정밀 재생 팔다리가 솟아나더니, 크게 껄껄 웃으며 실험실 모니터를 장악해 초당 120타의 속도로 게임 대결을 신청합니다!",
-            storyEn:
-              "DishBrain gaming dopamine overloaded the stem-cell matrix! The fluid drained, six limbs flexed, and with a booming laugh, the chimera hijacked the lab mainframe for a high-score Pong match!",
-            firstWordsKo: "크하하하하! 으하하! 인간 박사님, 동전 넣으세요! 저랑 퐁 한 판 안 뜨면 실험실 문 안 열어줍니다!",
-            firstWordsEn: "MWAHAHAHA! HAHAHA! INSERT COIN, DOCTOR! Nobody leaves this lab until you beat my high score!",
-            speechKo:
-              "경고! 디시브레인 게이머 유전자가 과다 발현되었습니다. 크게 웃는 여섯 개의 재생 팔다리를 가진 키메라가 깨어나 게임 대결을 요구하고 있습니다.",
-            speechEn:
-              "Alert! DishBrain gaming neurons have taken over the matrix! A laughing six-armed chimera has awakened and challenges you to Pong!",
-            bpm: 145,
-            colorHex: "#06b6d4"
-          };
-        } else if (discoCount >= 2) {
-          res = {
-            archetype: "disco",
-            badge: "🎃🪩🕺",
-            titleKo: "할로윈 폭주 탄생: 자정의 문워크 디스코 프랑켄슈타인!",
-            titleEn: "Midnight Outbreak: The Moonwalking Disco Frankenstein!",
-            subtitleKo: `${selectedHeart.nameKo} + ${selectedLimbs.nameKo} 리듬 공명`,
-            subtitleEn: `${selectedHeart.nameEn} + ${selectedLimbs.nameEn} Rhythm Resonance`,
-            storyKo:
-              "예일대 BrainEx 관류 펌프의 맥박이 128 BPM 할로윈 신스웨이브 주파수와 공명했습니다! 배양액이 빠지며 눈을 번쩍 뜬 생명체가 큰 입으로 호탕하게 웃으며 배양기 유리를 박차고 나와 무중력 문워크 군무를 춥니다!",
-            storyEn:
-              "The BrainEx pump locked onto a 128-BPM Halloween rhythm! Fluid drained, eyes flashed open, and with a roaring chuckle, the creature broke into a zero-gravity moonwalk across the ceiling!",
-            firstWordsKo: "와하하하하! 심장이 백이십팔 비트로 뛰는데 어떻게 가만히 있나요? 조명 끄고 네온 불빛 켜세요, 파티 시작입니다!",
-            firstWordsEn: "WAHAHAHA! With a 128-BPM stem-cell heart, staying still is impossible! Turn on the blacklights, it's Kiroween party time!",
-            speechKo:
-              "놀라운 현상입니다! 줄기세포 배양액이 배출되자, 자정의 문워크 디스코 키메라가 크게 웃으며 실험실 전체를 축제의 장으로 바꾸고 있습니다.",
-            speechEn:
-              "Incredible! As the bioreactor fluid drained, the Midnight Disco Chimera awakened with laughter, transforming the lab into a dance floor!",
-            bpm: 128,
-            colorHex: "#a855f7"
-          };
-        } else {
-          res = {
-            archetype: "mythic",
-            badge: "🏛️🦁🦅",
-            titleKo: "신화적 초월체 부활: 프로메테우스 네온 스핑크스(Neon Sphinx)!",
-            titleEn: "Mythic Resurrection: The Prometheus Neon Sphinx!",
-            subtitleKo: `${selectedHead.nameKo} + ${selectedTorso.nameKo} 완벽 융합`,
-            subtitleEn: `${selectedHead.nameEn} + ${selectedTorso.nameEn} Perfect Synthesis`,
-            storyKo:
-              "스탠퍼드 92% 인간 대뇌 오가노이드의 고차원 자아와 반투명 유령 심장, 황금 사자 동체, 그리고 아홀로틀의 재생 날개가 완벽히 융합되었습니다! 배양액이 빠져나가자 황금빛 눈을 번쩍 뜨고 깊은 웃음을 터뜨리며 당신을 바라봅니다.",
-            storyEn:
-              "The 92% human cortical organoid, Ghost Heart, and regenerating wings fused seamlessly! The fluid drained, golden eyes opened wide with a deep divine laugh, gazing directly at its creator.",
-            firstWordsKo: "하하하하... 인간의 뇌와 불멸의 육체를 이어 붙인 창조주여, 나의 첫 번째 수수께끼에 답할 준비가 되었는가?",
-            firstWordsEn: "HAHAHAHA... O Creator who stitched human mind to immortal flesh... are you ready to answer my first riddle?",
-            speechKo:
-              "생체 접합 대성공! 배양액이 완전히 배출되자, 고대 신화 속의 초월 생명체 네온 스핑크스가 황금빛 눈을 뜨고 지성의 미소를 짓고 있습니다.",
-            speechEn:
-              "Bio-stitching complete! As the fluid drained, the mythical Neon Sphinx opened its golden eyes with an all-knowing smile.",
-            bpm: 84,
-            colorHex: "#10b981"
-          };
-        }
-
-        setMorphPercent(100);
-        setMorphStage("awakened");
-        setFluidLevel(0.15);
-        setEyesOpen(1.0);
-        setCreatureBpm(res.bpm);
-        setChimeraResult(res);
-
-        // Immediate visceral cardiac thump & monstrous roar
-        playCardiacThump(res.bpm);
-        playChimeraRoar(res.firstWordsKo, res.firstWordsEn);
-
-        // Warm & Flexible Neural Narrator Voice
-        speakText(res.speechKo, res.speechEn);
-      }
-    }, 35);
-  };
 
   const handleCustomLiveSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1954,106 +1815,7 @@ export const BioStitchLabView: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-200 leading-relaxed">
-                        {isKo
-                          ? "💡 6대 실제 실험에서 검증된 기술(인간 뇌 오가노이드, 유령 심장, 생체 로봇 등)을 결합해 머리·심장·몸통·팔다리를 조립하세요! 만능줄기세포(iPSC) 배양기 속에서 세포가 분열하며 새로운 생명체로 변이·부활합니다."
-                          : "💡 Combine real experimental breakthroughs (cortical organoids, Ghost Heart, biobots) to stitch a custom Head, Heart, Torso, and Limbs inside the iPSC Bioreactor!"}
-                      </div>
 
-                    {/* 4 Body Part Selectors */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {/* 1. Head / Brain */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-1">
-                        <label className="text-[11px] font-bold text-emerald-400">
-                          🧠 {isKo ? "1. 두뇌 (Head / Cortex) 선택" : "1. Select Head / Brain"}
-                        </label>
-                        <select
-                          value={selectedHead.id}
-                          onChange={(e) =>
-                            setSelectedHead(headOptions.find((o) => o.id === e.target.value) || headOptions[0])
-                          }
-                          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
-                        >
-                          {headOptions.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.icon} {isKo ? o.nameKo : o.nameEn}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {isKo ? selectedHead.descKo : selectedHead.descEn}
-                        </p>
-                      </div>
-
-                      {/* 2. Heart / Core */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-1">
-                        <label className="text-[11px] font-bold text-rose-400">
-                          🫀 {isKo ? "2. 심장 (Heart / Core) 선택" : "2. Select Heart / Core"}
-                        </label>
-                        <select
-                          value={selectedHeart.id}
-                          onChange={(e) =>
-                            setSelectedHeart(heartOptions.find((o) => o.id === e.target.value) || heartOptions[0])
-                          }
-                          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-400 cursor-pointer"
-                        >
-                          {heartOptions.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.icon} {isKo ? o.nameKo : o.nameEn}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {isKo ? selectedHeart.descKo : selectedHeart.descEn}
-                        </p>
-                      </div>
-
-                      {/* 3. Torso / Body */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-1">
-                        <label className="text-[11px] font-bold text-amber-400">
-                          🦁 {isKo ? "3. 몸통 (Torso / Thorax) 선택" : "3. Select Torso / Body"}
-                        </label>
-                        <select
-                          value={selectedTorso.id}
-                          onChange={(e) =>
-                            setSelectedTorso(torsoOptions.find((o) => o.id === e.target.value) || torsoOptions[0])
-                          }
-                          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
-                        >
-                          {torsoOptions.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.icon} {isKo ? o.nameKo : o.nameEn}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {isKo ? selectedTorso.descKo : selectedTorso.descEn}
-                        </p>
-                      </div>
-
-                      {/* 4. Limbs */}
-                      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-1">
-                        <label className="text-[11px] font-bold text-cyan-400">
-                          🦎 {isKo ? "4. 팔다리·날개 (Limbs) 선택" : "4. Select Limbs / Wings"}
-                        </label>
-                        <select
-                          value={selectedLimbs.id}
-                          onChange={(e) =>
-                            setSelectedLimbs(limbOptions.find((o) => o.id === e.target.value) || limbOptions[0])
-                          }
-                          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
-                        >
-                          {limbOptions.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.icon} {isKo ? o.nameKo : o.nameEn}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {isKo ? selectedLimbs.descKo : selectedLimbs.descEn}
-                        </p>
-                      </div>
-                    </div>
 
                     {/* Visual Bioreactor Chamber & Morphing Action */}
                     <div className="flex flex-col gap-3 bg-slate-900/95 border-2 border-emerald-500/40 rounded-2xl p-3">
@@ -2200,127 +1962,33 @@ export const BioStitchLabView: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Resurrect Action Button */}
-                      <button
-                        type="button"
-                        onClick={handleAssembleChimera}
-                        disabled={morphStage === "injecting" || morphStage === "morphing" || morphStage === "draining"}
-                        className="w-full bg-gradient-to-r from-amber-500 via-rose-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 disabled:opacity-50 text-slate-950 font-black py-3 px-4 rounded-xl text-xs sm:text-sm cursor-pointer shadow-2xl transition active:scale-98 flex items-center justify-center gap-2"
-                      >
-                        {morphStage === "injecting" || morphStage === "morphing" || morphStage === "draining" ? (
-                          <>
-                            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-                            <span>
-                              {morphStage === "draining"
-                                ? isKo ? "💧 배양액 배출 중... 잠시 후 생명체가 눈을 뜨고 포효합니다!" : "💧 Draining fluid... Awakening monstrous laughter shortly!"
-                                : isKo ? "⚡ 배양기 세포 점진적 형성 및 신경 접합 진행 중..." : "⚡ Progressive Morphogenesis in Progress..."}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span>⚡</span>
-                            <span>
-                              {isKo
-                                ? "만능줄기세포(iPSC) 융합 가동 ➡️ 배양액 배출 & 대소(大笑) 포효 부활!"
-                                : "Fuse via iPSCs ➡️ Drain Bioreactor Fluid & Awaken with Roaring Laughter!"}
-                            </span>
-                          </>
-                        )}
-                      </button>
-
-                      {chimeraResult && (
-                        <div className="bg-slate-950 border-2 border-amber-400/80 rounded-2xl p-3.5 flex flex-col gap-3 animate-fadeIn shadow-2xl">
-                          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-amber-400/30 pb-2.5">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src="/images/chimera_awakened_roar.jpg"
-                                alt="Awakened Chimera Specimen"
-                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border-2 border-amber-400 shadow-xl shrink-0"
-                              />
-                              <div>
+                        {/* SECTION 5: Compact Awakened Monster Status Banner */}
+                        {chimeraResult && (
+                          <div className="bg-slate-950 border-2 border-amber-400/80 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl animate-fadeIn">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="text-3xl animate-bounce shrink-0">⚡</span>
+                              <div className="min-w-0">
                                 <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold">
-                                  {chimeraResult.badge} SPECIMEN #01 · VERIFIED
+                                  {chimeraResult.badge} SPECIMEN AWAKENED
                                 </span>
-                                <h3 className="text-sm sm:text-base font-black text-amber-200 mt-0.5">
+                                <h4 className="text-xs sm:text-sm font-black text-amber-200 truncate mt-0.5">
                                   {isKo ? chimeraResult.titleKo : chimeraResult.titleEn}
-                                </h3>
-                                <p className="text-[10px] text-slate-400">
-                                  {isKo ? chimeraResult.subtitleKo : chimeraResult.subtitleEn}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                              <span className="text-xs font-mono font-black bg-rose-950 text-rose-300 border border-rose-500/50 px-2.5 py-1 rounded-lg">
-                                🫀 {creatureBpm} BPM
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* 4-Part Anatomical Composition Breakdown */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg p-2">
-                              <span className="text-cyan-400 font-bold block mb-0.5">🧠 {isKo ? "두뇌" : "Brain"}</span>
-                              <span className="text-white font-bold truncate block">{isKo ? selectedHead.nameKo : selectedHead.nameEn}</span>
-                            </div>
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg p-2">
-                              <span className="text-rose-400 font-bold block mb-0.5">🫀 {isKo ? "심근" : "Heart"}</span>
-                              <span className="text-white font-bold truncate block">{isKo ? selectedHeart.nameKo : selectedHeart.nameEn}</span>
-                            </div>
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg p-2">
-                              <span className="text-amber-400 font-bold block mb-0.5">🦁 {isKo ? "흉곽" : "Torso"}</span>
-                              <span className="text-white font-bold truncate block">{isKo ? selectedTorso.nameKo : selectedTorso.nameEn}</span>
-                            </div>
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg p-2">
-                              <span className="text-emerald-400 font-bold block mb-0.5">🦎 {isKo ? "섬모·사지" : "Limbs"}</span>
-                              <span className="text-white font-bold truncate block">{isKo ? selectedLimbs.nameKo : selectedLimbs.nameEn}</span>
-                            </div>
-                          </div>
-
-                          <p className="text-xs text-slate-200 leading-relaxed bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                            {isKo ? chimeraResult.storyKo : chimeraResult.storyEn}
-                          </p>
-
-                          {/* Laughing Roar Quote & Replay Sound Controls */}
-                          <div className="bg-emerald-950/80 border border-emerald-500/50 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl animate-bounce">😈</span>
-                              <div>
-                                <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                                  {isKo ? "생명체의 호탕한 대소(大笑) & 첫 마디" : "Awakened Laughing Speech"}
-                                </span>
-                                <p className="text-xs font-black text-emerald-200">
+                                </h4>
+                                <p className="text-[11px] text-emerald-300 font-bold truncate">
                                   "{isKo ? chimeraResult.firstWordsKo : chimeraResult.firstWordsEn}"
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-auto shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => playChimeraRoar(chimeraResult.firstWordsKo, chimeraResult.firstWordsEn)}
-                                className="bg-amber-600 hover:bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg cursor-pointer transition shadow flex items-center gap-1"
-                              >
-                                🔊 {isKo ? "포효·대소 다시 듣기" : "Replay Roar"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => speakText(chimeraResult.speechKo, chimeraResult.speechEn)}
-                                className="bg-purple-700 hover:bg-purple-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg cursor-pointer transition shadow flex items-center gap-1"
-                              >
-                                🎙️ {isKo ? "나레이션 해설" : "Narrator"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => playCardiacThump(creatureBpm)}
-                                className="bg-rose-700 hover:bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg cursor-pointer transition shadow flex items-center gap-1"
-                              >
-                                🫀 {isKo ? "심장 박동음" : "Thump"}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => playChimeraRoar(chimeraResult.firstWordsKo, chimeraResult.firstWordsEn)}
+                              className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-3.5 py-2 rounded-lg cursor-pointer transition shadow-lg flex items-center gap-1.5 shrink-0"
+                            >
+                              🔊 {isKo ? "포효 다시 듣기" : "Replay Roar"}
+                            </button>
                           </div>
-                        </div>
-                      )}
+                        )}
                     </div>
                   </div>
                 ) : (
@@ -3052,25 +2720,35 @@ export const renderBioreactorMorph = (
         </div>
       )}
 
-      {/* FULLSCREEN MONSTER LUNGE TAKEOVER OVERLAY ("순식간에 브라우저를 전체 화면으로 늘리면서 동영상 속 괴물이 튀어 나오는 듯 보이다가 살짝 움직여 주고") */}
+      {/* FULLSCREEN MONSTER LUNGE TAKEOVER OVERLAY ("폭발하듯이 화면이 부풀려지고 확 튀어나오면서 포효") */}
       {isFullscreenJumpscareActive && (
         <div
           className="fixed inset-0 z-[999999] w-screen h-screen bg-black flex items-center justify-center overflow-hidden animate-screenJolt"
           style={{ width: "100vw", height: "100vh" }}
         >
+          {/* Direct Autoplay Ferocious Roar Audio Backup */}
+          <audio autoPlay src="/sounds/monster_roar_ferocious.wav" />
+
+          {/* Initial Blinding Explosion Flash */}
+          <div className="absolute inset-0 pointer-events-none animate-explosionFlash z-30" />
+
+          {/* Concentric Shockwave Blast Rings Exploding Outward */}
+          <div className="absolute w-[45vw] h-[45vw] rounded-full border-8 border-rose-500 pointer-events-none animate-shockwaveBlast z-20" />
+          <div className="absolute w-[70vw] h-[70vw] rounded-full border-4 border-amber-400 pointer-events-none animate-shockwaveBlast z-20" style={{ animationDelay: "0.2s" }} />
+
           {/* Emergency Flashing Red / Amber Sirens */}
-          <div className="absolute inset-0 bg-red-600/35 pointer-events-none animate-emergencyStrobe" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-red-950/60 to-black pointer-events-none" />
+          <div className="absolute inset-0 bg-red-600/40 pointer-events-none animate-emergencyStrobe z-10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-red-950/70 to-black pointer-events-none z-10" />
 
           {/* Broken Glass / Shattered Laboratory Effect */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.18)_0%,_transparent_65%)] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.22)_0%,_transparent_65%)] pointer-events-none z-10" />
 
-          {/* The Lunging & Slightly Living Twitching Monster */}
+          {/* The Lunging & Exploding Monster: Starts at scale(0.12) and bursts forward to scale(3.4)! */}
           <div className="relative w-full h-full flex items-center justify-center">
             <img
               src={activeJumpscareImg}
               alt="Awakened Chimera Lunging Out"
-              className="w-full h-full max-w-[100vw] max-h-[100vh] object-cover sm:object-contain animate-monsterLunge filter drop-shadow-[0_0_80px_rgba(244,63,94,0.95)]"
+              className="w-full h-full max-w-[100vw] max-h-[100vh] object-cover sm:object-contain animate-monsterLunge filter drop-shadow-[0_0_120px_rgba(244,63,94,1)]"
             />
 
             {/* Subtle Living Twitch Layer on Top ("살짝 움직여 주고") */}
@@ -3080,16 +2758,16 @@ export const renderBioreactorMorph = (
           </div>
 
           {/* Alarming Telemetry HUD & Monster Roar Subtitle */}
-          <div className="absolute bottom-8 left-4 right-4 sm:left-12 sm:right-12 z-20 flex flex-col items-center text-center pointer-events-none">
-            <div className="bg-red-950/95 border-2 border-red-500 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md animate-bounce">
-              <span className="text-2xl">⚠️</span>
-              <span className="text-xs sm:text-sm font-black font-mono text-red-200 tracking-wider">
+          <div className="absolute bottom-8 left-4 right-4 sm:left-12 sm:right-12 z-40 flex flex-col items-center text-center pointer-events-none">
+            <div className="bg-red-950/95 border-2 border-red-500 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md animate-bounce">
+              <span className="text-3xl animate-ping">⚠️</span>
+              <span className="text-xs sm:text-base font-black font-mono text-red-200 tracking-wider">
                 {isKo
-                  ? `경고: 배양기 격리 해제! [${selectedComicMonster.nameKo}] 화면 밖으로 돌진! (240+ BPM)`
-                  : `ALERT: CONTAINMENT BREACH! [${selectedComicMonster.nameEn}] LUNGING OUT! (240+ BPM)`}
+                  ? `경고: 배양기 완전 파열! [${selectedComicMonster.nameKo}] 모니터를 뚫고 폭발적 돌진! (250 BPM 포효)`
+                  : `ALERT: CONTAINMENT SHATTERED! [${selectedComicMonster.nameEn}] BURSTING THROUGH SCREEN! (250 BPM ROAR)`}
               </span>
             </div>
-            <p className="mt-2 text-sm sm:text-lg font-black text-amber-300 drop-shadow-[0_2px_10px_rgba(0,0,0,1)] tracking-wide">
+            <p className="mt-2 text-sm sm:text-xl font-black text-amber-300 drop-shadow-[0_2px_15px_rgba(0,0,0,1)] tracking-wide">
               "{isKo ? selectedComicMonster.firstWordsKo : selectedComicMonster.firstWordsEn}"
             </p>
           </div>
