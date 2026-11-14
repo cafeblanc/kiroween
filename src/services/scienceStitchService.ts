@@ -1,3 +1,5 @@
+import { assertAllowedApiEndpoint } from "../utils/security";
+
 export interface PubMedPaper {
   id: string;
   title: string;
@@ -30,7 +32,7 @@ export const scienceStitchService = {
     try {
       const encoded = encodeURIComponent(query);
       const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encoded}&format=json&pageSize=${limit}&resultType=core`;
-      const res = await fetch(url);
+      const res = await fetch(assertAllowedApiEndpoint(url));
       if (!res.ok) return [];
       const data = await res.json();
       const list = data?.resultList?.result || [];
@@ -55,7 +57,7 @@ export const scienceStitchService = {
     try {
       const cleanTopic = topic.trim().replace(/\s+/g, "_");
       const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanTopic)}`;
-      const res = await fetch(url);
+      const res = await fetch(assertAllowedApiEndpoint(url));
       if (res.ok) {
         const data = await res.json();
         return {
@@ -66,7 +68,7 @@ export const scienceStitchService = {
         };
       }
       const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(topic)}&format=json&origin=*`;
-      const sRes = await fetch(searchUrl);
+      const sRes = await fetch(assertAllowedApiEndpoint(searchUrl));
       if (!sRes.ok) return null;
       const sData = await sRes.json();
       const firstTitle = sData?.query?.search?.[0]?.title;
@@ -75,7 +77,7 @@ export const scienceStitchService = {
         return null;
       }
 
-      const sumRes = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle.replace(/\s+/g, "_"))}`);
+      const sumRes = await fetch(assertAllowedApiEndpoint(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle.replace(/\s+/g, "_"))}`));
       if (!sumRes.ok) return null;
       const sumData = await sumRes.json();
       return {

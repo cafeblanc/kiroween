@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shared button styles (bioluminescent / cyber / crimson themes). */
+@layer components {
+  .btn-bio {
+    @apply inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3 py-1 text-xs font-black text-obsidian shadow transition cursor-pointer
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-neural/70 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-bio-primary {
+    @apply bg-gradient-to-r from-bio to-neural hover:from-emerald-400 hover:to-cyan-400;
+  }
+  .btn-bio-cyber {
+    @apply bg-neural text-white hover:bg-cyan-500;
+  }
+  .btn-bio-danger {
+    @apply bg-gradient-to-r from-arterial to-amber-500 hover:from-red-400 hover:to-amber-400;
+  }
+  .btn-bio-ghost {
+    @apply border border-slate-600 bg-obsidian/80 text-white hover:border-neural/70;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -19,6 +39,151 @@
 
 .animate-pulse-glow {
   animation: pulseGlow 2.8s infinite ease-in-out;
+}
+
+@keyframes monster3DMovieBurst {
+  0% {
+    transform: scale(0.65);
+    filter: brightness(0.9);
+    opacity: 0.5;
+  }
+  35% {
+    transform: scale(1.22);
+    filter: brightness(1.25) contrast(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.12);
+    filter: brightness(1.15) contrast(1.1);
+    opacity: 1;
+  }
+}
+
+.animate-monster3DMovieBurst {
+  animation: monster3DMovieBurst 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Realistic Biological Morphogenesis Keyframes */
+@keyframes centerBubbleVortex {
+  0% {
+    transform: scale(0.15) rotate(0deg);
+    opacity: 0.2;
+    filter: blur(4px);
+  }
+  40% {
+    transform: scale(0.7) rotate(90deg);
+    opacity: 0.85;
+    filter: blur(1px);
+  }
+  80% {
+    transform: scale(1.15) rotate(220deg);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    transform: scale(1.35) rotate(360deg);
+    opacity: 0.9;
+  }
+}
+
+.animate-centerBubbleVortex {
+  animation: centerBubbleVortex 1.4s ease-out forwards;
+}
+
+@keyframes cellFluidUndulation {
+  0% {
+    transform: scale(0.6) translateY(12px) rotate(-1.5deg);
+    filter: blur(8px) contrast(1.1) brightness(0.8);
+    opacity: 0.3;
+  }
+  30% {
+    transform: scale(0.85) translateY(-6px) rotate(1.5deg);
+    filter: blur(3px) contrast(1.3) brightness(1.2);
+    opacity: 0.85;
+  }
+  65% {
+    transform: scale(1.05) translateY(5px) rotate(-1deg);
+    filter: blur(1px) contrast(1.4) brightness(1.3);
+    opacity: 1;
+  }
+  85% {
+    transform: scale(1.18) translateY(-3px) rotate(0.8deg);
+    filter: blur(0px) contrast(1.5) brightness(1.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.25) translateY(0px) rotate(0deg);
+    filter: blur(0px) contrast(1.6) brightness(1.5);
+    opacity: 0.95;
+  }
+}
+
+.animate-cellFluidUndulation {
+  animation: cellFluidUndulation 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes realisticCreatureEmerge {
+  0% {
+    transform: scale(0.55) translateY(25px);
+    filter: blur(12px) brightness(0.4);
+    opacity: 0.1;
+  }
+  35% {
+    transform: scale(0.85) translateY(12px);
+    filter: blur(5px) brightness(1.1);
+    opacity: 0.65;
+  }
+  70% {
+    transform: scale(1.15) translateY(-5px);
+    filter: blur(1px) brightness(1.35);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1.35) translateY(-18px);
+    filter: blur(0px) brightness(1.55) drop-shadow(0 0 45px rgba(16, 185, 129, 0.9));
+    opacity: 1;
+  }
+}
+
+.animate-realisticCreatureEmerge {
+  animation: realisticCreatureEmerge 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes monsterProgressiveLungeRoar {
+  0% {
+    transform: scale(0.35) translate(0, 30px);
+    filter: blur(8px) brightness(0.6);
+    opacity: 0.3;
+  }
+  20% {
+    transform: scale(0.75) translate(-4px, 10px);
+    filter: blur(3px) brightness(1.2);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(1.85) translate(6px, -10px);
+    filter: blur(0px) brightness(1.4);
+  }
+  65% {
+    transform: scale(3.25) scaleY(1.14) translate(0, -18px);
+    filter: brightness(2.1) drop-shadow(0 0 90px rgba(244, 63, 94, 1));
+  }
+  75% {
+    transform: scale(2.85) scaleY(1.08) translate(-6px, 6px) rotate(-1.5deg);
+    filter: brightness(1.6) drop-shadow(0 0 60px rgba(245, 158, 11, 0.9));
+  }
+  88% {
+    transform: scale(2.7) translate(4px, -4px) rotate(1deg);
+    filter: brightness(1.3);
+  }
+  100% {
+    transform: scale(2.65) translate(0, 0) rotate(0deg);
+    filter: brightness(1.15);
+  }
+}
+
+.animate-monsterProgressiveLungeRoar {
+  animation: monsterProgressiveLungeRoar 2.6s cubic-bezier(0.12, 0.92, 0.25, 1) forwards;
 }
 
 @keyframes monsterLunge {

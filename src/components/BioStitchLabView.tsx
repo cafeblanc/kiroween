@@ -6,7 +6,12 @@ import {
   ChimeraPartOption
 } from "../data/bioExperiments";
 import { COMIC_MONSTERS, ComicMonster } from "../data/comicMonsters";
-import { scienceStitchService, PubMedPaper, WikiContext } from "../services/scienceStitchService";
+import { REAL_STEM_CELL_PHOTOS } from "../data/stemCellPhotos";
+import { scienceStitchService } from "../services/scienceStitchService";
+import { generateMonsterVideo } from "../services/videoGenService";
+import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
+import { getBattleVideoForPair } from "./bioreactor/arena";
+import { GROWTH_STAGES } from "./bioreactor/growthStages";
 
 type LangMode = "KO" | "EN";
 
@@ -22,7 +27,7 @@ interface SynapseChatMessage {
   linkedCase?: BioExperimentCase;
 }
 
-interface ChimeraCreationResult {
+export interface ChimeraCreationResult {
   archetype: "mythic" | "gamer" | "disco";
   badge: string;
   titleKo: string;
@@ -115,7 +120,28 @@ export const BioStitchLabView: React.FC = () => {
   const [selectedCodeSpec, setSelectedCodeSpec] = useState<string>("stitcher");
   const [isCodeCopied, setIsCodeCopied] = useState<boolean>(false);
   const [isStitchModalOpen, setIsStitchModalOpen] = useState<boolean>(false);
-  const [activeModalTab, setActiveModalTab] = useState<"chimera_assembler" | "pubmed_dossier">("chimera_assembler");
+  const [activeModalTab, setActiveModalTab] = useState<"chimera_assembler" | "monster_arena">("chimera_assembler");
+
+  // Monster Clash Arena State (Real-Time Visual Combat Engine)
+  const [arenaFighter1, setArenaFighter1] = useState<ComicMonster>(COMIC_MONSTERS[0]);
+  const [arenaFighter2, setArenaFighter2] = useState<ComicMonster>(COMIC_MONSTERS[1]);
+  const [isArenaBattling, setIsArenaBattling] = useState<boolean>(false);
+  const [arenaWinner, setArenaWinner] = useState<ComicMonster | null>(null);
+  const [arenaHp1, setArenaHp1] = useState<number>(100);
+  const [arenaHp2, setArenaHp2] = useState<number>(100);
+  const [arenaPhase, setArenaPhase] = useState<"idle" | "f1_strike" | "f2_strike" | "clash" | "ko">("idle");
+  const [arenaDamagePopup, setArenaDamagePopup] = useState<{ target: 1 | 2; text: string } | null>(null);
+  const [aiBattleVideoUrl, setAiBattleVideoUrl] = useState<string | null>(null);
+  const [activeClashVideoUrl, setActiveClashVideoUrl] = useState<string | null>(null);
+  const [isGeneratingAiBattle, setIsGeneratingAiBattle] = useState<boolean>(false);
+  const [ai3DBurstVideoUrl, setAi3DBurstVideoUrl] = useState<string | null>(null);
+  const [isGeneratingAi3D, setIsGeneratingAi3D] = useState<boolean>(false);
+  const [ai3DStatus, setAi3DStatus] = useState<string>("");
+  const [hfTokenInput, setHfTokenInput] = useState<string>("");
+  const [aiGenStatus, setAiGenStatus] = useState<string>("");
+  const arenaTimersRef = useRef<number[]>([]);
+  const f1VideoRef = useRef<HTMLVideoElement | null>(null);
+  const f2VideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Block 1: Video & Confocal Microscopy Photo
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -128,7 +154,7 @@ export const BioStitchLabView: React.FC = () => {
   const pulseIntervalRef = useRef<number | null>(null);
 
   // High-Impact Ear-Stimulating Cardiac Thump Engine & Real Specimen Assets
-  const [isHeartbeatAudioOn, setIsHeartbeatAudioOn] = useState<boolean>(true);
+  const isHeartbeatAudioOn = true;
   const cardiacBufferRef = useRef<AudioBuffer | null>(null);
   const chimeraCardiacIntervalRef = useRef<number | null>(null);
   const masterImgRef = useRef<HTMLImageElement | null>(null);
@@ -205,37 +231,262 @@ export const BioStitchLabView: React.FC = () => {
   const [selectedTorso] = useState<ChimeraPartOption>(torsoOptions[0]);
   const [selectedLimbs] = useState<ChimeraPartOption>(limbOptions[0]);
 
-  const [morphStage, setMorphStage] = useState<"idle" | "injecting" | "morphing" | "draining" | "awakened">("idle");
+  type MorphStageType =
+    | "idle"
+    | "bubbling"
+    | "cellular"
+    | "morphing"
+    | "draining"
+    | "awakened"
+    | "stage1_cleavage"
+    | "stage2_division"
+    | "stage3_organ"
+    | "stage4_neural"
+    | "stage5_hypertrophy";
+
+  const [morphStage, setMorphStage] = useState<MorphStageType>("idle");
   const [morphPercent, setMorphPercent] = useState<number>(0);
   const [fluidLevel, setFluidLevel] = useState<number>(1.0); // 1.0 (가득 참) -> 0.15 (빠짐)
   const [eyesOpen, setEyesOpen] = useState<number>(0.0); // 0 (감김) -> 1 (번쩍 뜨임)
   const [creatureBpm, setCreatureBpm] = useState<number>(76);
-  const [chimeraResult, setChimeraResult] = useState<ChimeraCreationResult | null>(null);
   const bioreactorCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Custom Monster Prompt & 12 Comic Monster Characters Engine
+  type ChimeraScreenMode = "photos" | "videos" | "bioreactor";
+  const [chimeraScreen, setChimeraScreen] = useState<ChimeraScreenMode>("photos");
   const [selectedComicMonster, setSelectedComicMonster] = useState<ComicMonster>(COMIC_MONSTERS[0]);
-  const [customMonsterPrompt, setCustomMonsterPrompt] = useState<string>(COMIC_MONSTERS[0].promptKo);
-  const [activeVideoSrc, setActiveVideoSrc] = useState<string>(COMIC_MONSTERS[0].videoSrc);
-  const [activeJumpscareImg, setActiveJumpscareImg] = useState<string>(COMIC_MONSTERS[0].jumpscareImg);
-  const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
   const [isFullscreenJumpscareActive, setIsFullscreenJumpscareActive] = useState<boolean>(false);
-  const chimeraVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  const handleSelectComicMonster = (monster: ComicMonster) => {
+  // 15초 정밀 6단계 타임랩스: 실제 진행/영상/BPM/각성은 BioreactorScreen(GrowthTimelapseEngine 훅 기반)이 담당
+  const [bioreactorRunId, setBioreactorRunId] = useState<number>(0);
+  const [awakenSignal, setAwakenSignal] = useState<number>(0);
+
+  const BIOREACTOR_MORPH_STAGES: MorphStageType[] = [
+    "stage1_cleavage",
+    "stage2_division",
+    "stage3_organ",
+    "stage4_neural",
+    "stage5_hypertrophy",
+  ];
+
+  const handleSelectAndAwakenMonster = (monster: ComicMonster) => {
     setSelectedComicMonster(monster);
-    setCustomMonsterPrompt(isKo ? monster.promptKo : monster.promptEn);
-    setActiveVideoSrc(monster.videoSrc);
-    setActiveJumpscareImg(monster.jumpscareImg);
-    setCreatureBpm(monster.bpm);
-    if (isHeartbeatAudioOn) playCardiacThump(monster.bpm);
+    setAi3DBurstVideoUrl(null);
+    setAi3DStatus("");
+    setEyesOpen(0.2);
+    setFluidLevel(1.0);
+    setMorphStage("stage1_cleavage");
+    setMorphPercent(16);
+    setCreatureBpm(GROWTH_STAGES[0].targetBpm);
+    setAwakenSignal(0);
+    setBioreactorRunId((n) => n + 1); // 화면을 재마운트하여 15초 시퀀스를 처음부터 재시작
+    setChimeraScreen("bioreactor"); // 즉시 독립된 3번 배양기 화면으로 전환!
   };
 
-  // Block 4B: Live PubMed + Wikipedia Dossier
-  const [livePapers, setLivePapers] = useState<PubMedPaper[]>([]);
-  const [liveWiki, setLiveWiki] = useState<WikiContext | null>(null);
-  const [isLoadingPapers, setIsLoadingPapers] = useState<boolean>(false);
-  const [customStitchQuery, setCustomStitchQuery] = useState<string>("");
+  // BioreactorScreen -> 단계 변경 (BPM 58 -> 260)
+  const handleBioreactorStageChange = (stage: number, bpm: number) => {
+    setCreatureBpm(bpm);
+    setMorphStage(BIOREACTOR_MORPH_STAGES[Math.min(stage, 5) - 1] ?? "stage1_cleavage");
+    setMorphPercent(Math.round((stage / GROWTH_STAGES.length) * 100) - (stage === GROWTH_STAGES.length ? 5 : 0));
+  };
+
+  // BioreactorScreen -> 6단계 완료 또는 수동 트리거로 AwakeningRoar 시작
+  const handleBioreactorAwaken = () => {
+    setMorphStage("awakened");
+    setMorphPercent(100);
+    setFluidLevel(0.15);
+    setEyesOpen(1.0);
+  };
+
+  // 즉시 각성(유리 균열 + 하모닉 포효 + 성체 각성 영상) 트리거
+  const handleTrigger3DBurstNow = () => {
+    setAwakenSignal((n) => n + 1);
+  };
+
+  // 16x16 BattleMatrix 기반 결투 영상 선택
+  const selectPrebuiltBattleVideo = (f1: ComicMonster, f2: ComicMonster) =>
+    getBattleVideoForPair(f1.id, f2.id);
+
+
+  // 실시간 물리 격돌 아레나 전투 엔진 (두 괴수가 실제로 돌진·타격·HP 감소·KO 폭발)
+  const handleStartArenaBattle = () => {
+    arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
+    arenaTimersRef.current = [];
+
+    setActiveClashVideoUrl(selectPrebuiltBattleVideo(arenaFighter1, arenaFighter2));
+    setIsArenaBattling(true);
+    setArenaWinner(null);
+    setArenaHp1(100);
+    setArenaHp2(100);
+    setArenaPhase("idle");
+    setArenaDamagePopup(null);
+
+    // 성체 전투 구간으로 두 비디오 점프
+    if (f1VideoRef.current && f1VideoRef.current.duration) {
+      f1VideoRef.current.currentTime = f1VideoRef.current.duration * 0.68;
+      f1VideoRef.current.play().catch(() => {});
+    }
+    if (f2VideoRef.current && f2VideoRef.current.duration) {
+      f2VideoRef.current.currentTime = f2VideoRef.current.duration * 0.68;
+      f2VideoRef.current.play().catch(() => {});
+    }
+
+    // 매번 예측 불가능한 진짜 랜덤 전투 시뮬레이션 (선공, 치명타, 역전 KO 모두 랜덤!)
+    let hp1 = 100;
+    let hp2 = 100;
+    const firstAttacker = Math.random() < 0.5 ? 1 : 2;
+    const secondAttacker = firstAttacker === 1 ? 2 : 1;
+
+    const rollDmg = (critBonus = 0) => {
+      const isCrit = Math.random() < 0.35 + critBonus;
+      const dmg = isCrit ? 36 + Math.floor(Math.random() * 20) : 18 + Math.floor(Math.random() * 17);
+      return { dmg, isCrit };
+    };
+
+    // 라운드 1 (0.35s): 랜덤 선공자의 첫 타격!
+    const r1 = rollDmg();
+    if (firstAttacker === 1) hp2 = Math.max(15, hp2 - r1.dmg);
+    else hp1 = Math.max(15, hp1 - r1.dmg);
+    const r1Hp1 = hp1;
+    const r1Hp2 = hp2;
+
+    arenaTimersRef.current.push(window.setTimeout(() => {
+      setArenaPhase(firstAttacker === 1 ? "f1_strike" : "f2_strike");
+      setArenaHp1(r1Hp1);
+      setArenaHp2(r1Hp2);
+      setArenaDamagePopup({
+        target: firstAttacker === 1 ? 2 : 1,
+        text: r1.isCrit ? `💥 -${r1.dmg * 12}! 치명타 선공!` : `-${r1.dmg * 10}! 선제 타격`,
+      });
+      playCardiacThump(180);
+      playChimeraRoar(firstAttacker === 1 ? arenaFighter1.roarAudio : arenaFighter2.roarAudio);
+    }, 350));
+
+    // 라운드 2 (1.5s): 반격자 돌진!
+    const r2 = rollDmg(0.1);
+    if (secondAttacker === 1) hp2 = Math.max(12, hp2 - r2.dmg);
+    else hp1 = Math.max(12, hp1 - r2.dmg);
+    const r2Hp1 = hp1;
+    const r2Hp2 = hp2;
+
+    arenaTimersRef.current.push(window.setTimeout(() => {
+      setArenaPhase(secondAttacker === 1 ? "f1_strike" : "f2_strike");
+      setArenaHp1(r2Hp1);
+      setArenaHp2(r2Hp2);
+      setArenaDamagePopup({
+        target: secondAttacker === 1 ? 2 : 1,
+        text: r2.isCrit ? `⚡ -${r2.dmg * 12}! 극대 반격!` : `-${r2.dmg * 10}! 반격`,
+      });
+      playCardiacThump(200);
+      playChimeraRoar(secondAttacker === 1 ? arenaFighter1.roarAudio : arenaFighter2.roarAudio);
+    }, 1500));
+
+    // 라운드 3 (2.75s): 정면 대충돌 (양측 난타전!)
+    const r3a = rollDmg();
+    const r3b = rollDmg();
+    hp1 = Math.max(8, hp1 - r3a.dmg);
+    hp2 = Math.max(8, hp2 - r3b.dmg);
+    const r3Hp1 = hp1;
+    const r3Hp2 = hp2;
+    const clashEdge = r3b.dmg >= r3a.dmg ? 2 : 1;
+
+    arenaTimersRef.current.push(window.setTimeout(() => {
+      setArenaPhase("clash");
+      setArenaHp1(r3Hp1);
+      setArenaHp2(r3Hp2);
+      setArenaDamagePopup({
+        target: clashEdge,
+        text: `💥 정면 대충돌! (-${Math.max(r3a.dmg, r3b.dmg) * 10})`,
+      });
+      playCardiacThump(240);
+    }, 2750));
+
+    // 라운드 4 (4.0s): 최종 결판! (남은 HP + 막판 랜덤 역전 변수로 승자 결정)
+    const f1FinalScore = hp1 + Math.floor(Math.random() * 45);
+    const f2FinalScore = hp2 + Math.floor(Math.random() * 45);
+    const f1Wins = f1FinalScore >= f2FinalScore;
+
+    arenaTimersRef.current.push(window.setTimeout(() => {
+      setArenaPhase("ko");
+      if (f1Wins) {
+        setArenaHp2(0);
+        setArenaDamagePopup({ target: 2, text: "💀 K.O. 필살 일격!" });
+        setArenaWinner(arenaFighter1);
+        playChimeraRoar(arenaFighter1.roarAudio);
+      } else {
+        setArenaHp1(0);
+        setArenaDamagePopup({ target: 1, text: "💀 K.O. 필살 일격!" });
+        setArenaWinner(arenaFighter2);
+        playChimeraRoar(arenaFighter2.roarAudio);
+      }
+      setActiveClashVideoUrl(null);
+      setIsArenaBattling(false);
+    }, 5400));
+  };
+
+  // 무료/오픈소스 AI 동영상 생성 API (HuggingFace LTX-Video / Luma / 서버 프록시) 실제 호출
+  const handleGenerateAiBattleVideo = async () => {
+    setIsGeneratingAiBattle(true);
+    setAiBattleVideoUrl(null);
+    setAiGenStatus(isKo ? "⏳ AI 서버에 격돌 동영상 생성 요청 중..." : "⏳ Generating live AI combat video...");
+
+    const prompt = `Epic cinematic 3D monster battle: ${arenaFighter1.promptEn} violently clashing and roaring against ${arenaFighter2.promptEn} inside a shattered sci-fi laboratory arena, sparks, shockwave, dynamic camera movement, photorealistic movie CGI.`;
+
+    const res = await generateMonsterVideo({
+      prompt,
+      provider: "huggingface_wan2",
+      apiKey: hfTokenInput.trim() || undefined,
+    });
+
+    if (res.success && res.videoUrl) {
+      setAiBattleVideoUrl(res.videoUrl);
+      setAiGenStatus(isKo ? "✅ AI 격돌 동영상 생성 완료!" : "✅ AI Combat Video Ready!");
+      playChimeraRoar(arenaFighter1.roarAudio);
+    } else {
+      setAiGenStatus(
+        isKo
+          ? "⚠️ API 키(무료 HF 토큰) 미설정 — 실시간 물리 듀얼 격돌 모드로 자동 실행합니다."
+          : "⚠️ No HF Token — running Real-Time Dual Video Clash mode."
+      );
+      handleStartArenaBattle();
+    }
+    setIsGeneratingAiBattle(false);
+  };
+
+  // 3D 각성 괴수 실사 동영상 API 생성 (고정된 프레임 내부에서 살아 움직이며 포효하는 괴수 AI 비디오 생성)
+  const handleGenerateAi3DBurstVideo = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsGeneratingAi3D(true);
+    setAi3DStatus(isKo ? "⏳ AI 동영상 API로 살아 움직이는 괴수 생성 중..." : "⏳ Generating live 3D creature video...");
+
+    const prompt = `Close-up cinematic 3D monster movie shot: ${selectedComicMonster.promptEn} opening its jaws wide, roaring fiercely and moving limbs dynamically toward the camera inside a sci-fi bioreactor, photorealistic CGI, 4k, smooth motion.`;
+
+    const res = await generateMonsterVideo({
+      prompt,
+      provider: "huggingface_wan2",
+      apiKey: hfTokenInput.trim() || undefined,
+    });
+
+    if (res.success && res.videoUrl) {
+      setAi3DBurstVideoUrl(res.videoUrl);
+      setAi3DStatus(isKo ? "✅ AI 3D 괴수 동영상 생성 완료!" : "✅ AI Creature Video Ready!");
+      playChimeraRoar(selectedComicMonster.roarAudio);
+    } else {
+      setAi3DStatus(
+        isKo
+          ? "⚠️ 상단 결투장 또는 설정에 무료 HF 토큰을 입력하시면 실시간 신규 AI 영상이 생성됩니다. (현재 내장 성체 영상 재생)"
+          : "⚠️ Enter HF Token to generate custom AI video (playing built-in adult video)."
+      );
+    }
+    setIsGeneratingAi3D(false);
+  };
+
+  // 배양기 화면에서 이전 12개 선택 화면으로 복귀 핸들러
+  const handleReturnToSelection = () => {
+    setIsFullscreenJumpscareActive(false);
+    setMorphStage("idle");
+    setChimeraScreen("videos");
+  };
 
   // Top-right mini ECG canvas
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -458,8 +709,8 @@ export const BioStitchLabView: React.FC = () => {
           ctx.globalAlpha = 0.55 + Math.sin(frame * 0.035) * 0.15;
           ctx.drawImage(activePhoto, photoX, photoY, targetW, targetH);
           ctx.restore();
-        } else if (morphStage === "injecting") {
-          // 1. Step 1: AI Diffusion Latent Noise Phase (희미한 안개 속 원시 형태: 32px -> 14px 블러 점진 해제)
+        } else if (morphStage === "bubbling" || morphStage === "cellular") {
+          // 1. Step 1: Center Bubbling & Stem-Cell Undulation Phase
           const blurPx = Math.max(12, Math.round(32 - (Math.min(100, morphPercent) / 35) * 18));
           ctx.save();
           ctx.filter = `blur(${blurPx}px) contrast(${1.4 + (morphPercent / 35) * 0.4}) brightness(${0.55 + (morphPercent / 35) * 0.35})`;
@@ -569,7 +820,7 @@ export const BioStitchLabView: React.FC = () => {
       }
 
       // 5-B. 4 FLOATING REAL LABORATORY MICROSCOPY LENSES (점진적 융합 변형)
-      if (qImg && qImg.complete && qImg.naturalWidth > 0 && (morphStage === "injecting" || (morphStage === "morphing" && morphPercent < 65))) {
+      if (qImg && qImg.complete && qImg.naturalWidth > 0 && (morphStage === "bubbling" || morphStage === "cellular" || (morphStage === "morphing" && morphPercent < 65))) {
         const qw = qImg.naturalWidth;
         const qh = qImg.naturalHeight;
         const panels = [
@@ -579,7 +830,7 @@ export const BioStitchLabView: React.FC = () => {
           { sx: qw / 2, sy: qh / 2, label: "🦎 이동성 섬모 생체 로봇", color: "#34d399" }
         ];
 
-        const convergeProgress = morphStage === "injecting" ? (morphPercent / 100) * 0.4 : 0.4 + (morphPercent / 65) * 0.6;
+        const convergeProgress = (morphStage === "bubbling" || morphStage === "cellular") ? (morphPercent / 100) * 0.4 : 0.4 + (morphPercent / 65) * 0.6;
         const orbitR = Math.max(15, 115 * (1 - convergeProgress * 0.88));
         const lensRadius = Math.max(16, 38 * (1 - convergeProgress * 0.52));
 
@@ -741,26 +992,6 @@ export const BioStitchLabView: React.FC = () => {
   }, [activeExp.id]);
 
   // Fetch live PubMed & Wiki when dossier tab is opened
-  useEffect(() => {
-    if (!isStitchModalOpen) return;
-    let cancelled = false;
-    setIsLoadingPapers(true);
-
-    Promise.all([
-      scienceStitchService.fetchPubMedPapers(activeExp.pubMedSearchQuery, 3),
-      scienceStitchService.fetchWikipediaContext(activeExp.wikiTitle, isKo ? "ko" : "en")
-    ]).then(([papers, wiki]) => {
-      if (cancelled) return;
-      setLivePapers(papers);
-      setLiveWiki(wiki);
-      setIsLoadingPapers(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isStitchModalOpen, activeExp.id, isKo]);
-
   // WebAudio Sound Effects
   const triggerBioBeep = (freqStart = 520, freqEnd = 180, duration = 0.15) => {
     // If it's the 520Hz hospital beep default call, route directly to visceral cardiac thump!
@@ -794,6 +1025,7 @@ export const BioStitchLabView: React.FC = () => {
   };
 
   // WebAudio High-Impact Organic Biological Cardiac Thump Engine ("쿵쾅! 쿵쾅!")
+  // 점점 빨라지는 BPM에 맞춰 볼륨과 서브베이스 파워도 [작은 심장소리 ---> 거대한 흉곽 쿵쾅 심장소리]로 점진적 변모!
   const playCardiacThump = (bpm: number) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -812,25 +1044,28 @@ export const BioStitchLabView: React.FC = () => {
       src.buffer = cardiacBufferRef.current;
 
       // Realistic speed scaling with BPM (faster BPM = tighter, snappier thuds)
-      const speedRate = Math.max(0.85, Math.min(1.5, 0.92 + (bpm / 200) * 0.35));
+      const speedRate = Math.max(0.85, Math.min(1.55, 0.90 + (bpm / 200) * 0.38));
       src.playbackRate.setValueAtTime(speedRate, ctx.currentTime);
 
-      // Deep analog chest wall absorption filter: 180Hz cutoff (filters out all high-pitch machine tones!)
+      // Deep analog chest wall absorption filter: 140Hz (작은 배아 둔탁음) -> 240Hz (거대 괴수 선명한 타격음)
       const lowpass = ctx.createBiquadFilter();
       lowpass.type = "lowpass";
-      lowpass.frequency.setValueAtTime(180, ctx.currentTime);
-      lowpass.Q.setValueAtTime(1.2, ctx.currentTime);
+      const cutoffFreq = Math.min(240, Math.max(140, 130 + (bpm / 200) * 85));
+      lowpass.frequency.setValueAtTime(cutoffFreq, ctx.currentTime);
+      lowpass.Q.setValueAtTime(1.4, ctx.currentTime);
 
-      // Sub-bass peaking boost filter: 46Hz (+8.5dB massive chest thud boost!)
+      // Sub-bass peaking boost filter: 42Hz (+2.0dB 배아 미세 박동 -> +15.0dB 거대 괴수 흉곽 진동 폭격!)
       const bassBoost = ctx.createBiquadFilter();
       bassBoost.type = "peaking";
-      bassBoost.frequency.setValueAtTime(46, ctx.currentTime);
-      bassBoost.Q.setValueAtTime(1.6, ctx.currentTime);
-      bassBoost.gain.setValueAtTime(8.5, ctx.currentTime);
+      bassBoost.frequency.setValueAtTime(42, ctx.currentTime);
+      bassBoost.Q.setValueAtTime(1.8, ctx.currentTime);
+      const bassGain = Math.min(16.0, Math.max(2.0, 2.0 + ((bpm - 50) / 210) * 14.0));
+      bassBoost.gain.setValueAtTime(bassGain, ctx.currentTime);
 
       const gainNode = ctx.createGain();
-      // Massive punchy output volume (일부러 더 쿵쾅쿵쾅하게!)
-      gainNode.gain.setValueAtTime(3.2, ctx.currentTime);
+      // 점진적 볼륨 증폭: 58 BPM (0.22 미세한 작은 심장소리) ---> 260 BPM (2.2 거대한 괴수 쿵쾅 심장소리!)
+      const dynamicVolume = Math.min(2.4, Math.max(0.22, 0.20 + Math.pow(Math.max(0, bpm - 50) / 210, 1.35) * 2.1));
+      gainNode.gain.setValueAtTime(dynamicVolume, ctx.currentTime);
 
       src.connect(bassBoost);
       bassBoost.connect(lowpass);
@@ -841,15 +1076,24 @@ export const BioStitchLabView: React.FC = () => {
     } catch {}
   };
 
-  // Real Ferocious Beast Roar Audio Player & Multi-Harmonic Sound Synthesizer
-  const playChimeraRoar = (firstWordsKo: string, firstWordsEn: string) => {
+  // Maximum Output Beast Roar Player & Multi-Harmonic Sound Synthesizer (최대 출력 포효 사운드 엔진)
+  const playChimeraRoar = (customRoarPath?: string) => {
     try {
-      // 1. Play Real 16-bit PCM Beast Roar WAV Audio directly
-      const roarAudio = new Audio("/sounds/monster_roar_ferocious.wav");
-      roarAudio.volume = 1.0;
-      roarAudio.play().catch(() => {});
+      const audioPath = customRoarPath || selectedComicMonster.roarAudio || "/sounds/monster_roar_ferocious.wav";
 
-      // 2. High-Impact Multi-Harmonic Sub-Bass & Distortion Shockwave in WebAudio
+      // 1. Channel A: Native HTML Audio at 100% Volume
+      const roarAudioA = new Audio(audioPath);
+      roarAudioA.volume = 1.0;
+      roarAudioA.play().catch(() => {});
+
+      // Channel B: Parallel delayed channel (+12ms) for massive stereo chorus widening and double punch
+      setTimeout(() => {
+        const roarAudioB = new Audio(audioPath);
+        roarAudioB.volume = 1.0;
+        roarAudioB.play().catch(() => {});
+      }, 12);
+
+      // 2. High-Impact WebAudio Master Compressor & Overdrive for MAXIMUM OUTPUT
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
         if (!audioCtxRef.current) audioCtxRef.current = new AudioCtx();
@@ -858,61 +1102,80 @@ export const BioStitchLabView: React.FC = () => {
 
         const now = ctx.currentTime;
 
-        // Sub-bass earthquake tremor (80Hz -> 140Hz -> 24Hz)
-        const subOsc = ctx.createOscillator();
-        const subGain = ctx.createGain();
-        subOsc.type = "sawtooth";
-        subOsc.frequency.setValueAtTime(80, now);
-        subOsc.frequency.exponentialRampToValueAtTime(140, now + 0.3);
-        subOsc.frequency.exponentialRampToValueAtTime(24, now + 2.4);
+        // Dynamics Compressor to maximize loudness and punch without digital clipping
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.setValueAtTime(-18, now);
+        comp.knee.setValueAtTime(8, now);
+        comp.ratio.setValueAtTime(14, now);
+        comp.attack.setValueAtTime(0.002, now);
+        comp.release.setValueAtTime(0.18, now);
 
-        subGain.gain.setValueAtTime(0.01, now);
-        subGain.gain.linearRampToValueAtTime(0.95, now + 0.15);
-        subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+        // Master Gain Boost Node (+9.5 dB overdrive boost)
+        const masterGain = ctx.createGain();
+        masterGain.gain.setValueAtTime(2.8, now);
 
-        const filter = ctx.createBiquadFilter();
-        filter.type = "lowpass";
-        filter.frequency.setValueAtTime(450, now);
-        filter.frequency.linearRampToValueAtTime(850, now + 0.4);
-        filter.frequency.exponentialRampToValueAtTime(120, now + 2.4);
-        filter.Q.value = 6.0;
+        comp.connect(masterGain);
+        masterGain.connect(ctx.destination);
 
-        subOsc.connect(filter);
-        filter.connect(subGain);
-        subGain.connect(ctx.destination);
-        subOsc.start(now);
-        subOsc.stop(now + 2.5);
+        // Fetch & decode raw WAV for unconstrained WebAudio hardware amplification
+        fetch(audioPath)
+          .then((res) => res.arrayBuffer())
+          .then((buf) => ctx.decodeAudioData(buf))
+          .then((decoded) => {
+            const node = ctx.createBufferSource();
+            node.buffer = decoded;
+            node.connect(comp);
+            node.start(ctx.currentTime);
+          })
+          .catch(() => {});
 
-        // Screeching beast harmonic layer
-        const screamOsc = ctx.createOscillator();
-        const screamGain = ctx.createGain();
-        screamOsc.type = "square";
-        screamOsc.frequency.setValueAtTime(480, now);
-        screamOsc.frequency.exponentialRampToValueAtTime(850, now + 0.25);
-        screamOsc.frequency.exponentialRampToValueAtTime(180, now + 1.8);
+        // Only play synthetic beast oscillators for non-piggy monsters (귀여운 꿀꿀이는 원음 그대로 맑게 출력)
+        const isCutePig = audioPath.includes("piggy") || selectedComicMonster.id === "flying_piggy";
 
-        screamGain.gain.setValueAtTime(0.01, now);
-        screamGain.gain.linearRampToValueAtTime(0.45, now + 0.1);
-        screamGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+        if (!isCutePig) {
+          // Earth-shaking sub-bass tremor (sawtooth 85Hz -> 160Hz -> 20Hz at peak gain)
+          const subOsc = ctx.createOscillator();
+          const subGain = ctx.createGain();
+          subOsc.type = "sawtooth";
+          subOsc.frequency.setValueAtTime(85, now);
+          subOsc.frequency.exponentialRampToValueAtTime(160, now + 0.3);
+          subOsc.frequency.exponentialRampToValueAtTime(20, now + 2.4);
 
-        screamOsc.connect(screamGain);
-        screamGain.connect(ctx.destination);
-        screamOsc.start(now);
-        screamOsc.stop(now + 1.8);
-      }
+          subGain.gain.setValueAtTime(0.01, now);
+          subGain.gain.linearRampToValueAtTime(1.8, now + 0.15); // Maximum gain
+          subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
 
-      // 3. Monstrous Guttural Speech
-      setTimeout(() => {
-        if (typeof window !== "undefined" && "speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-          const useKorean = langMode === "KO";
-          const utter = new SpeechSynthesisUtterance(useKorean ? firstWordsKo : firstWordsEn);
-          utter.lang = useKorean ? "ko-KR" : "en-US";
-          utter.pitch = 0.35; // 극저음 괴물 피치
-          utter.rate = 0.85;
-          window.speechSynthesis.speak(utter);
+          const filter = ctx.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.setValueAtTime(450, now);
+          filter.frequency.linearRampToValueAtTime(900, now + 0.4);
+          filter.frequency.exponentialRampToValueAtTime(120, now + 2.4);
+          filter.Q.value = 6.0;
+
+          subOsc.connect(filter);
+          filter.connect(subGain);
+          subGain.connect(ctx.destination);
+          subOsc.start(now);
+          subOsc.stop(now + 2.5);
+
+          // Piercing screeching beast resonance layer
+          const screamOsc = ctx.createOscillator();
+          const screamGain = ctx.createGain();
+          screamOsc.type = "square";
+          screamOsc.frequency.setValueAtTime(500, now);
+          screamOsc.frequency.exponentialRampToValueAtTime(950, now + 0.25);
+          screamOsc.frequency.exponentialRampToValueAtTime(160, now + 1.8);
+
+          screamGain.gain.setValueAtTime(0.01, now);
+          screamGain.gain.linearRampToValueAtTime(0.85, now + 0.1);
+          screamGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+          screamOsc.connect(screamGain);
+          screamGain.connect(ctx.destination);
+          screamOsc.start(now);
+          screamOsc.stop(now + 1.8);
         }
-      }, 900);
+      }
     } catch {}
   };
 
@@ -1074,156 +1337,6 @@ export const BioStitchLabView: React.FC = () => {
       linkedCase: exp
     };
     setMessages((prev) => [...prev, msg]);
-  };
-
-  // Custom Monster Prompt Progressive Video Synthesis & Fullscreen Lunge Engine
-  const handleStartCustomVideoSynthesis = () => {
-    // Resume AudioContext on user gesture if needed
-    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume().catch(() => {});
-    }
-
-    // Attempt browser Fullscreen API on user click gesture
-    try {
-      if (document.documentElement && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    } catch (_) {}
-
-    const promptLower = customMonsterPrompt.toLowerCase();
-    const isCyber =
-      promptLower.includes("촉수") ||
-      promptLower.includes("사이버") ||
-      promptLower.includes("크라켄") ||
-      promptLower.includes("퐁") ||
-      promptLower.includes("dishbrain") ||
-      promptLower.includes("로봇") ||
-      promptLower.includes("robot") ||
-      promptLower.includes("tentacle") ||
-      promptLower.includes("슬라임") ||
-      promptLower.includes("개구리") ||
-      promptLower.includes("유령");
-
-    const videoUrl = selectedComicMonster.videoSrc || (isCyber ? "/videos/chimera_awakening_cyber.mp4" : "/videos/chimera_awakening_dragon.mp4");
-    const jumpscareImg = selectedComicMonster.jumpscareImg || (isCyber ? "/images/chimera_jumpscare_cyber.jpg" : "/images/chimera_jumpscare_dragon.jpg");
-
-    setActiveVideoSrc(videoUrl);
-    setActiveJumpscareImg(jumpscareImg);
-    setIsVideoPlaying(true);
-    setMorphStage("injecting");
-    setMorphPercent(15);
-    setChimeraResult(null);
-
-    if (chimeraVideoRef.current) {
-      chimeraVideoRef.current.currentTime = 0;
-      chimeraVideoRef.current.loop = false;
-      chimeraVideoRef.current.play().catch(() => {});
-    }
-
-    // Dynamic Accelerating Heartbeat Loop & Crescendo Gain (점점 빨라지며 소리가 커짐)
-    // 0.0s: 54 BPM (시작 두근거림)
-    setCreatureBpm(54);
-    if (isHeartbeatAudioOn) playCardiacThump(54);
-
-    // 1.5s: 90 BPM (점진적 가속)
-    setTimeout(() => {
-      setCreatureBpm(90);
-      setMorphStage("morphing");
-      setMorphPercent(45);
-      if (isHeartbeatAudioOn) playCardiacThump(90);
-    }, 1500);
-
-    // 3.0s: 140 BPM (심장 흥분 및 전기 시냅스 점화)
-    setTimeout(() => {
-      setCreatureBpm(140);
-      setMorphPercent(75);
-      if (isHeartbeatAudioOn) playCardiacThump(140);
-    }, 3000);
-
-    // 4.3s: 185 BPM (배양액 급속 배출 & 긴장감 극대화)
-    setTimeout(() => {
-      setCreatureBpm(185);
-      setMorphStage("draining");
-      setMorphPercent(95);
-      if (isHeartbeatAudioOn) playCardiacThump(185);
-    }, 4300);
-
-    // 5.3s: 240+ BPM (심장 박동 최고조 폭주)
-    setTimeout(() => {
-      setCreatureBpm(240);
-      if (isHeartbeatAudioOn) playCardiacThump(240);
-    }, 5300);
-
-    // 5.7s: FULLSCREEN MONSTER BURST (순식간에 전체 화면으로 늘어나며 동영상 속 괴물이 튀어나와 살짝 움직임!)
-    setTimeout(() => {
-      setIsFullscreenJumpscareActive(true);
-      if (isHeartbeatAudioOn) playCardiacThump(250);
-
-      const wordsKo = selectedComicMonster.firstWordsKo || (isCyber
-        ? "크하하하하! 으하하! 깨어났다! 내 촉수와 사이버네틱 뇌가 이 실험실을 지배한다!"
-        : "크와아아아악! 하하하하! 배양기 유리를 깨고 내가 부활했다!");
-      const wordsEn = selectedComicMonster.firstWordsEn || (isCyber
-        ? "MWAHAHAHA! I HAVE AWAKENED! MY TENTACLES OVERLOAD THE MAINFRAME!"
-        : "ROAAARRR! HAHAHA! I AM FREE FROM THE VAT!");
-
-      playChimeraRoar(wordsKo, wordsEn);
-
-      const res: ChimeraCreationResult = {
-        archetype: isCyber ? "gamer" : "mythic",
-        badge: selectedComicMonster.badge || (isCyber ? "🐙⚡🤖" : "🐉🔥⚡"),
-        titleKo: `${selectedComicMonster.nameKo} (생체 각성)`,
-        titleEn: `${selectedComicMonster.nameEn} (Bio-Awakened)`,
-        subtitleKo: `사용자 묘사 "${customMonsterPrompt}" 기반 생체 각성 성공`,
-        subtitleEn: `Based on prompt: "${customMonsterPrompt}"`,
-        storyKo: `당신이 입력한 묘사("${customMonsterPrompt}")에 따라 만능줄기세포와 유전자 가위가 반응했습니다! 배양액 속에서 점진적으로 윤곽을 드러내던 생명체가 한계에 달한 심장 박동(240+ BPM)과 함께 유리를 박차고 앞으로 돌진하여 화면 전체를 뒤덮었습니다!`,
-        storyEn: `The stem cells resonated with your description: "${customMonsterPrompt}"! Solidifying through progressive fluid synthesis, it accelerated to 240+ BPM and lunged directly out of the containment chamber!`,
-        firstWordsKo: wordsKo,
-        firstWordsEn: wordsEn,
-        speechKo: `경고! ${selectedComicMonster.nameKo} 격리 해제! 괴물이 모니터 전체를 뒤덮고 거대한 포효를 내지릅니다!`,
-        speechEn: `Alert! ${selectedComicMonster.nameEn} containment breach! The monster engulfed the screen with a ferocious roar!`,
-        bpm: 185,
-        colorHex: selectedComicMonster.colorHex || (isCyber ? "#06b6d4" : "#f43f5e")
-      };
-
-      setChimeraResult(res);
-      setMorphStage("awakened");
-      setMorphPercent(100);
-      setFluidLevel(0.15);
-      setEyesOpen(1.0);
-    }, 5700);
-
-    // 8.2s: 순식간에 다시 원래 브라우저 크기로 복귀! (종료 후에도 동영상이 움찔거리며 계속 움직임)
-    setTimeout(() => {
-      setIsFullscreenJumpscareActive(false);
-
-      // Exit fullscreen if active
-      try {
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
-        }
-      } catch (_) {}
-
-      // Keep video playing and looping with alive breathing twitch
-      setIsVideoPlaying(true);
-      if (chimeraVideoRef.current) {
-        chimeraVideoRef.current.loop = true;
-        chimeraVideoRef.current.play().catch(() => {});
-      }
-    }, 8200);
-  };
-
-
-
-  const handleCustomLiveSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customStitchQuery.trim()) return;
-    setIsLoadingPapers(true);
-    const q = customStitchQuery.trim();
-    const dossier = await scienceStitchService.stitchLiveQuery(q, isKo);
-    setLivePapers(dossier.papers);
-    setLiveWiki(dossier.wiki);
-    setIsLoadingPapers(false);
-    triggerBioBeep();
   };
 
   const handleSendChat = async (e: React.FormEvent) => {
@@ -1416,15 +1529,15 @@ export const BioStitchLabView: React.FC = () => {
                   </button>
                 </div>
 
-                <span className="bg-black/85 backdrop-blur-md text-amber-300 text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md border border-amber-500/40 font-mono font-bold shadow truncate max-w-full">
-                  {activeExp.pmidOrDoi}
+                <span className="bg-black/85 backdrop-blur-md text-cyan-300 text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md border border-cyan-500/40 font-mono font-bold shadow truncate max-w-full">
+                  {isKo ? "SF 상상 생명공학 시뮬레이션" : "SF Bio-Simulation Studio"}
                 </span>
               </div>
 
               {/* Active Case Floating Scientific Banner */}
               <div className="bg-slate-950/90 backdrop-blur-md border-l-4 border-emerald-400 px-2.5 py-1.5 rounded-r-lg shadow-xl">
                 <p className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
-                  {activeExp.codeName} · {activeExp.institution}
+                  {activeExp.codeName} · SF BIO-STITCH LAB
                 </p>
                 {langMode !== "EN" && (
                   <p className="text-xs sm:text-sm font-extrabold text-white leading-snug mt-0.5">
@@ -1641,50 +1754,95 @@ export const BioStitchLabView: React.FC = () => {
                 onClick={() => setIsStitchModalOpen(false)}
               >
                 <div
-                  className="relative w-full max-w-5xl max-h-[94vh] bg-slate-950/98 border-2 border-emerald-400/90 rounded-3xl p-4 sm:p-6 shadow-2xl overflow-y-auto overflow-x-hidden flex flex-col gap-4 text-slate-100"
+                  className="relative w-full max-w-6xl h-[92vh] bg-slate-950/98 border-2 border-emerald-400/90 rounded-2xl p-2.5 sm:p-3.5 shadow-2xl overflow-y-auto overflow-x-hidden flex flex-col gap-2 text-slate-100"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Modal Header & Mode Tabs */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-2.5 gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* 1-LINE SLIM HEADER BAR (글씨는 맨 윗줄 1줄만! 나머지 전체는 영상으로 꽉 채움) */}
+                  <div className="flex items-center justify-between gap-1.5 border-b border-slate-800 pb-2 shrink-0 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => setActiveModalTab("chimera_assembler")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer transition flex items-center gap-1.5 ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer transition flex items-center gap-1 whitespace-nowrap ${
                           activeModalTab === "chimera_assembler"
-                            ? "bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 shadow-lg"
+                            ? "bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 shadow"
                             : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
                         }`}
                       >
                         <span>⚡</span>
-                        <span>
-                          {isKo
-                            ? "1. 신화적 키메라 생명체 조립 & 부활 배양기"
-                            : "1. Mythic Chimera Bio-Assembler"}
-                        </span>
+                        <span>{isKo ? "키메라 배양실" : "Bio-Assembler"}</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setActiveModalTab("pubmed_dossier")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer transition flex items-center gap-1.5 ${
-                          activeModalTab === "pubmed_dossier"
-                            ? "bg-cyan-500 text-slate-950 shadow-lg"
+                        onClick={() => setActiveModalTab("monster_arena")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer transition flex items-center gap-1 whitespace-nowrap ${
+                          activeModalTab === "monster_arena"
+                            ? "bg-rose-600 text-white shadow shadow-rose-600/30"
                             : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
                         }`}
                       >
-                        <span>🔬</span>
-                        <span>
-                          {isKo
-                            ? "2. 현재 사례 줄기세포 분석 & 실시간 PubMed 논문"
-                            : "2. Case iPSC Bridge & Live PubMed"}
-                        </span>
+                        <span>⚔️</span>
+                        <span>{isKo ? "괴수 결투장" : "Clash Arena"}</span>
                       </button>
+
+                      {activeModalTab === "chimera_assembler" && (
+                        <>
+                          <span className="text-slate-700 px-0.5">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setChimeraScreen("photos")}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
+                              chimeraScreen === "photos"
+                                ? "bg-amber-500 text-slate-950"
+                                : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
+                            }`}
+                          >
+                            📷 {isKo ? "세포 8종" : "8 Cells"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setChimeraScreen("videos")}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
+                              chimeraScreen === "videos"
+                                ? "bg-cyan-500 text-slate-950"
+                                : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
+                            }`}
+                          >
+                            🎬 {isKo ? "괴수 16종" : "16 Videos"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setChimeraScreen("bioreactor");
+                              if (morphStage === "idle") {
+                                handleSelectAndAwakenMonster(selectedComicMonster);
+                              }
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
+                              chimeraScreen === "bioreactor"
+                                ? "bg-emerald-500 text-slate-950"
+                                : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
+                            }`}
+                          >
+                            🧪 {isKo ? "15초 배양기" : "Bioreactor"}
+                          </button>
+                          {chimeraScreen === "bioreactor" && (
+                            <button
+                              type="button"
+                              onClick={handleTrigger3DBurstNow}
+                              className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition whitespace-nowrap animate-pulse shadow"
+                            >
+                              💥 {isKo ? "3D 돌출 포효" : "3D Burst"}
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     <button
                       type="button"
                       onClick={() => setIsStitchModalOpen(false)}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded-lg text-xs font-bold cursor-pointer self-end sm:self-auto"
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer shrink-0 whitespace-nowrap"
                     >
                       ✕ {isKo ? "닫기" : "Close"}
                     </button>
@@ -1692,426 +1850,465 @@ export const BioStitchLabView: React.FC = () => {
 
                   {/* TAB 1: MYTHIC CHIMERA ASSEMBLER & VIDEO-LIKE BIOREACTOR MORPHING */}
                   {activeModalTab === "chimera_assembler" ? (
-                    <div className="flex flex-col gap-4">
-                      {/* SECTION 1: 12 COMIC FRANKENSTEIN MONSTERS GRID */}
-                      <div className="bg-slate-900/90 border-2 border-amber-500/40 rounded-2xl p-3 sm:p-4 flex flex-col gap-3 shadow-xl">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">🎭</span>
-                            <h3 className="text-xs sm:text-sm font-black text-amber-300">
-                              {isKo ? "12가지 코믹 괴물 캐릭터 연구소 (12 Comic Frankenstein Monsters)" : "12 Comic Frankenstein Monsters Laboratory"}
-                            </h3>
-                          </div>
-                          <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold">
-                            12 COMIC SPECIMENS
-                          </span>
-                        </div>
+                    <div className="flex flex-col flex-1 min-h-0">
 
-                        <p className="text-[11px] text-slate-300 leading-relaxed">
-                          {isKo
-                            ? "원하는 코믹 괴물 캐릭터를 클릭하여 선택하세요! 캐릭터를 누르면 외형 묘사와 심장 박동수(BPM), 대사가 즉시 세팅되며, 아래 [▶️ 진행] 버튼을 누르면 배양액 속에서 점진적으로 동영상이 나타나고 마지막에 화면 전체로 돌진합니다!"
-                            : "Click any comic monster to load its description, heartbeat, and hilarious roar! Then click [▶️ Proceed] to witness progressive video emergence and full-screen lunge!"}
-                        </p>
+                      {/* ============================================================== */}
+                      {/* 독립 화면 1: 실제 사진 보여 주는 화면 (Real Specimen Photo Gallery) */}
+                      {/* ============================================================== */}
+                      {chimeraScreen === "photos" && (
+                        <div className="flex flex-col gap-3.5 animate-fadeIn">
+                          <div className="bg-slate-900/90 border-2 border-amber-500/40 rounded-2xl p-3 sm:p-4 flex flex-col gap-3 shadow-xl">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">📷</span>
+                                <h3 className="text-xs sm:text-sm font-black text-amber-300">
+                                  {isKo ? "1. 실제 생체 줄기세포 현미경 사진관 (8 Real Confocal Specimen Photos)" : "1. 8 Real Stem-Cell Confocal Photos"}
+                                </h3>
+                              </div>
+                              <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold">
+                                8 REAL STEM-CELL PHOTOS
+                              </span>
+                            </div>
 
-                        {/* 12 Character Cards Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                          {COMIC_MONSTERS.map((monster) => {
-                            const isSelected = selectedComicMonster.id === monster.id;
-                            return (
-                              <button
-                                key={monster.id}
-                                type="button"
-                                onClick={() => handleSelectComicMonster(monster)}
-                                className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 cursor-pointer relative overflow-hidden ${
-                                  isSelected
-                                    ? "bg-amber-950/60 border-amber-400 ring-2 ring-amber-400/50 shadow-lg scale-[1.02]"
-                                    : "bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-xl sm:text-2xl">{monster.icon}</span>
-                                  <span
-                                    className="text-[9px] font-mono px-1.5 py-0.5 rounded font-black border"
-                                    style={{
-                                      backgroundColor: `${monster.colorHex}22`,
-                                      color: monster.colorHex,
-                                      borderColor: `${monster.colorHex}66`
-                                    }}
+                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                              {isKo
+                                ? "실제 체외 배양기 및 공초점 레이저 형광 현미경으로 촬영된 8가지 핵심 줄기세포 조직 사진입니다. 원하는 생체 조직 사진을 클릭하면 즉시 해당 유전자가 결합된 괴수의 15초 배양기 성장 타임랩스가 가동됩니다."
+                                : "Authentic confocal laser fluorescence & in-vitro bioreactor microscopy photographs. Click any photo to initiate 15-second virtual time-lapse growth of the corresponding chimera!"}
+                            </p>
+
+                            {/* 8 Real Stem-Cell Confocal Photos Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                              {REAL_STEM_CELL_PHOTOS.map((photo) => {
+                                const targetMonster = COMIC_MONSTERS.find((m) => m.id === photo.targetMonsterId) || COMIC_MONSTERS[0];
+                                const isSelected = selectedComicMonster.id === targetMonster.id;
+                                return (
+                                  <div
+                                    key={photo.id}
+                                    className={`group rounded-xl border p-2.5 text-left transition flex flex-col justify-between gap-2.5 relative overflow-hidden ${
+                                      isSelected
+                                        ? "bg-amber-950/70 border-amber-400 ring-2 ring-amber-400/60 shadow-2xl"
+                                        : "bg-slate-950/85 border-slate-800 hover:border-amber-400/60 hover:bg-slate-900/90"
+                                    }`}
                                   >
-                                    {monster.badge}
-                                  </span>
-                                </div>
+                                    {/* Real Photo Thumbnail */}
+                                    <div
+                                      onClick={() => handleSelectAndAwakenMonster(targetMonster)}
+                                      className="relative w-full h-36 rounded-lg overflow-hidden border border-slate-700/60 bg-black cursor-pointer group-hover:border-amber-400/80 transition"
+                                    >
+                                      <img
+                                        src={photo.imgSrc}
+                                        alt={photo.titleKo}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                      />
+                                      <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/85 px-1.5 py-0.5 rounded text-[10px] font-bold border border-amber-400/40">
+                                        <span className="text-amber-300 font-mono">{photo.categoryKo}</span>
+                                      </div>
+                                      <div className="absolute bottom-1 right-1 bg-black/85 text-cyan-300 font-mono text-[9px] px-1.5 py-0.5 rounded font-bold border border-cyan-500/30">
+                                        🔬 {photo.magnification} · {photo.stainType}
+                                      </div>
+                                    </div>
 
-                                <div>
-                                  <h4 className="text-[11px] sm:text-xs font-black text-white truncate">
-                                    {isKo ? monster.nameKo : monster.nameEn}
-                                  </h4>
-                                  <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5 leading-tight">
-                                    {isKo ? monster.taglineKo : monster.taglineEn}
-                                  </p>
-                                </div>
+                                    <div>
+                                      <h4 className="text-[11px] sm:text-xs font-black text-white line-clamp-1 flex items-center justify-between">
+                                        <span>{isKo ? photo.titleKo : photo.titleEn}</span>
+                                      </h4>
+                                      <p className="text-[10px] text-slate-400 line-clamp-2 mt-1 leading-tight">
+                                        {isKo ? photo.descriptionKo : photo.descriptionEn}
+                                      </p>
+                                      <div className="mt-1.5 text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                                        <span>🧬 배양 파생:</span>
+                                        <span className="font-bold underline">{photo.targetMonsterName}</span>
+                                      </div>
+                                    </div>
 
-                                <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-800/80">
-                                  <span className="text-rose-400 font-mono font-bold">🫀 {monster.bpm} BPM</span>
-                                  {isSelected && (
-                                    <span className="text-amber-400 font-bold text-[9px] animate-pulse">
-                                      ✓ {isKo ? "선택됨" : "Selected"}
-                                    </span>
-                                  )}
-                                </div>
+                                    <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-800/80">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSelectAndAwakenMonster(targetMonster)}
+                                        className="w-full bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 text-[10px] font-black py-1.5 rounded-lg cursor-pointer transition shadow flex items-center justify-center gap-1"
+                                      >
+                                        <span>⚡</span>
+                                        <span>{isKo ? `이 세포로 [${photo.targetMonsterName}] 15초 배양 시작` : `Awaken ${photo.targetMonsterName}`}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ============================================================== */}
+                      {/* 독립 화면 2: 16가지 동영상 선택 화면 (16 Dynamic Specimen Videos) */}
+                      {/* ============================================================== */}
+                      {chimeraScreen === "videos" && (
+                        <div className="flex flex-col gap-3.5 animate-fadeIn">
+                          <div className="bg-slate-900/90 border-2 border-cyan-500/40 rounded-2xl p-3 sm:p-4 flex flex-col gap-3 shadow-xl">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">🎬</span>
+                                <h3 className="text-xs sm:text-sm font-black text-cyan-300">
+                                  {isKo ? "2. 16가지 동영상 선택 화면 (16 Dynamic Specimen Videos)" : "2. 16 Dynamic Specimen Videos"}
+                                </h3>
+                              </div>
+                              <span className="text-[10px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/40 font-bold">
+                                16 DYNAMIC VIDEOS
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                              {isKo
+                                ? "원하는 동영상을 클릭하면 배양기 화면으로 즉시 전환되며, 배양기 중심 기포 발생 → 줄기세포 일렁임 → 3D 돌출 포효가 자동으로 진행됩니다!"
+                                : "Click any video card below to switch directly to the Bioreactor Chamber and start central bubbling, stem-cell undulation, and 3D roaring lunge!"}
+                            </p>
+
+                            {/* 12 Video Cards Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                              {COMIC_MONSTERS.map((monster) => {
+                                const isSelected = selectedComicMonster.id === monster.id;
+                                return (
+                                  <div
+                                    key={monster.id}
+                                    onClick={() => handleSelectAndAwakenMonster(monster)}
+                                    className={`group rounded-xl border p-2 text-left transition flex flex-col justify-between gap-2 cursor-pointer relative overflow-hidden ${
+                                      isSelected
+                                        ? "bg-cyan-950/70 border-cyan-400 ring-2 ring-cyan-400/60 shadow-2xl scale-[1.01]"
+                                        : "bg-slate-950/85 border-slate-800 hover:border-cyan-400/60 hover:bg-slate-900/90 hover:scale-[1.01]"
+                                    }`}
+                                  >
+                                    {/* Video Preview Container */}
+                                    <div className="relative w-full h-32 sm:h-36 rounded-lg overflow-hidden border border-slate-700 bg-black">
+                                      <video
+                                        src={monster.videoSrc}
+                                        muted
+                                        loop
+                                        autoPlay
+                                        playsInline
+                                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                      />
+                                      <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/85 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                        <span>{monster.icon}</span>
+                                        <span style={{ color: monster.colorHex }}>{monster.badge}</span>
+                                      </div>
+                                      <div className="absolute bottom-1 right-1 bg-black/85 text-cyan-300 font-mono text-[9px] px-1.5 py-0.5 rounded font-bold border border-cyan-500/30">
+                                        🫀 {monster.bpm} BPM
+                                      </div>
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition pointer-events-none">
+                                        <span className="w-8 h-8 rounded-full bg-cyan-500/80 text-black flex items-center justify-center text-xs font-black shadow-lg">
+                                          ▶
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <h4 className="text-[11px] sm:text-xs font-black text-white truncate flex items-center justify-between">
+                                        <span>{isKo ? monster.nameKo : monster.nameEn}</span>
+                                        <span className="text-[9px] text-cyan-400 font-bold bg-cyan-500/20 px-1 rounded">
+                                          동영상
+                                        </span>
+                                      </h4>
+                                      <p className="text-[10px] text-slate-400 line-clamp-1 mt-1 leading-tight">
+                                        {isKo ? monster.taglineKo : monster.taglineEn}
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-800/80">
+                                      <span className="text-cyan-400 font-bold text-[9px] flex items-center gap-1">
+                                        ⚡ 클릭 즉시 배양기 3D 각성
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ============================================================== */}
+                      {/* 독립 화면 3: 배양기 화면 (전체 화면 꽉 찬 영상 뷰포트) */}
+                      {/* ============================================================== */}
+                      {chimeraScreen === "bioreactor" && (
+                        <BioreactorScreen
+                          key={`${selectedComicMonster.id}-${bioreactorRunId}`}
+                          monster={selectedComicMonster}
+                          awakenSignal={awakenSignal}
+                          onStageChange={handleBioreactorStageChange}
+                          onAwaken={handleBioreactorAwaken}
+                          onHeartbeat={(bpm) => {
+                            if (isHeartbeatAudioOn) playCardiacThump(bpm);
+                          }}
+                          onReturn={handleReturnToSelection}
+                          controls={
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectAndAwakenMonster(selectedComicMonster);
+                                }}
+                                className="bg-slate-900/90 hover:bg-slate-800 text-emerald-300 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-500/40 cursor-pointer"
+                              >
+                                ▶ {isKo ? "15초 재시작" : "Replay 15s"}
                               </button>
-                            );
-                          })}
-                        </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTrigger3DBurstNow();
+                                }}
+                                className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full shadow-lg shadow-rose-600/40 cursor-pointer animate-pulse"
+                              >
+                                💥 {isKo ? "지금 3D 튀어나오기!" : "3D Burst Now!"}
+                              </button>
+                            </>
+                          }
+                        />
+                      )}
+                    </div>
+                  ) : (
+                  /* TAB 2: MONSTER CLASH ARENA (실시간 물리 영상 격돌 + AI 동영상 생성 API 연동) */
+                  <div className="flex flex-col flex-1 min-h-0 gap-2 animate-fadeIn">
+                    {/* 1-Line Top Arena Fight Control Bar */}
+                    <div className="flex items-center justify-between gap-2 bg-slate-900/95 border border-rose-500/40 px-2.5 py-1.5 rounded-xl shrink-0 overflow-x-auto no-scrollbar">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <select
+                          value={arenaFighter1.id}
+                          onChange={(e) => {
+                            const found = COMIC_MONSTERS.find((m) => m.id === e.target.value);
+                            if (found) { setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); }
+                          }}
+                          className="bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[160px]"
+                        >
+                          {COMIC_MONSTERS.map((m) => (
+                            <option key={m.id} value={m.id}>🔵 {m.nameKo}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs font-black text-rose-500 px-0.5">VS</span>
+                        <select
+                          value={arenaFighter2.id}
+                          onChange={(e) => {
+                            const found = COMIC_MONSTERS.find((m) => m.id === e.target.value);
+                            if (found) { setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); }
+                          }}
+                          className="bg-slate-950 border border-rose-500/60 text-rose-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[160px]"
+                        >
+                          {COMIC_MONSTERS.map((m) => (
+                            <option key={m.id} value={m.id}>🔴 {m.nameKo}</option>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* SECTION 2: CUSTOM MONSTER PROMPT & PROCEED BUTTON */}
-                      <div className="bg-gradient-to-r from-slate-900/95 via-purple-950/40 to-slate-900/95 border-2 border-emerald-400/60 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col gap-3">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">🧬</span>
-                            <span className="text-xs sm:text-sm font-black text-emerald-300">
-                              {isKo ? "사용자 맞춤형 괴물 묘사 & 동영상 점진적 각성 시스템" : "Custom Monster Description & Progressive Emergence Video"}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 font-bold">
-                            AI BIO-VIDEO DIFFUSION
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <input
+                          type="password"
+                          value={hfTokenInput}
+                          onChange={(e) => setHfTokenInput(e.target.value)}
+                          placeholder={isKo ? "HF 무료 토큰(선택)" : "HF Token (opt)"}
+                          className="w-28 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400"
+                        />
+                        <button
+                          type="button"
+                          disabled={isArenaBattling || isGeneratingAiBattle}
+                          onClick={handleStartArenaBattle}
+                          className="btn-bio btn-bio-danger"
+                        >
+                          {isArenaBattling ? "⚔️ 격돌 중..." : "⚔️ 실시간 결투!"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isArenaBattling || isGeneratingAiBattle}
+                          onClick={handleGenerateAiBattleVideo}
+                          className="btn-bio btn-bio-cyber"
+                        >
+                          {isGeneratingAiBattle ? "⏳ 생성 중..." : "🎬 AI 영상 생성"}
+                        </button>
+                      </div>
+                    </div>
 
-                        {/* Prompt Input Box & Proceed Button */}
-                        <div className="flex flex-col sm:flex-row gap-2 items-stretch">
-                          <input
-                            type="text"
-                            value={customMonsterPrompt}
-                            onChange={(e) => setCustomMonsterPrompt(e.target.value)}
-                            placeholder={isKo ? "괴물의 외형을 묘사하세요 (위 12종 코믹 캐릭터를 클릭해도 자동 반영됩니다)" : "Describe your monster..."}
-                            className="flex-1 bg-slate-950 border border-emerald-500/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                    {/* Full-Viewport Unified Clash Stage (화면 흔들림 없이 안정 고정) */}
+                    <div className="relative flex-1 min-h-[72vh] rounded-2xl overflow-hidden border-2 border-rose-500/50 bg-black shadow-2xl flex items-center justify-center">
+                      {aiBattleVideoUrl ? (
+                        /* AI 생성 실제 격돌 동영상 전체 화면 재생 */
+                        <div className="relative w-full h-full">
+                          <video
+                            src={aiBattleVideoUrl}
+                            autoPlay
+                            loop
+                            playsInline
+                            controls
+                            className="w-full h-full object-cover"
                           />
                           <button
                             type="button"
-                            onClick={handleStartCustomVideoSynthesis}
-                            disabled={morphStage === "injecting" || morphStage === "morphing" || morphStage === "draining"}
-                            className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs sm:text-sm cursor-pointer shadow-lg transition active:scale-95 flex items-center justify-center gap-2 shrink-0"
+                            onClick={() => setAiBattleVideoUrl(null)}
+                            className="btn-bio btn-bio-ghost absolute top-3 right-3 rounded-full"
                           >
-                            {morphStage === "injecting" || morphStage === "morphing" || morphStage === "draining" ? (
-                              <>
-                                <span className="w-2.5 h-2.5 rounded-full bg-slate-950 animate-ping" />
-                                <span>{isKo ? "각성 진행 중..." : "Awakening..."}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>▶️</span>
-                                <span>{isKo ? "진행 (동영상 생성 & 심장가속 & 전체화면 돌진)" : "Proceed (Video Emergence & Lunge)"}</span>
-                              </>
-                            )}
+                            ✕ 실시간 아레나로 복귀
                           </button>
                         </div>
-
-                        {/* Quick Highlight Fun Fact */}
-                        <div className="bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2 text-[11px] text-slate-300">
-                          <span className="text-amber-400 font-bold shrink-0">💡 {selectedComicMonster.nameKo} 비하인드:</span>
-                          <span className="truncate">{isKo ? selectedComicMonster.funFactKo : selectedComicMonster.funFactEn}</span>
-                        </div>
-                      </div>
-
-
-
-                    {/* Visual Bioreactor Chamber & Morphing Action */}
-                    <div className="flex flex-col gap-3 bg-slate-900/95 border-2 border-emerald-500/40 rounded-2xl p-3">
-                      {/* Interactive Cylindrical Glass Chamber Viewport */}
-                      <div className="relative rounded-xl overflow-hidden border border-emerald-500/50 bg-slate-950 h-[340px] sm:h-[420px] flex items-center justify-center shadow-2xl">
-                        {isVideoPlaying ? (
-                          <div className={`relative w-full h-full flex items-center justify-center bg-black overflow-hidden ${morphStage === "awakened" ? "animate-vatTwitchingIdle" : ""}`}>
-                            <video
-                              ref={chimeraVideoRef}
-                              src={activeVideoSrc}
-                              autoPlay
-                              playsInline
-                              muted
-                              loop={morphStage === "awakened"}
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Glass Bioreactor Reflections & Grid Overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-emerald-950/30 pointer-events-none" />
-                            <div className="absolute inset-0 border-2 border-emerald-400/30 pointer-events-none" />
-                          </div>
-                        ) : (
-                          <canvas
-                            ref={bioreactorCanvasRef}
-                            width={680}
-                            height={420}
-                            className="absolute inset-0 w-full h-full object-cover"
-                          />
-                        )}
-
-                        {/* Top HUD Telemetry */}
-                        <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
-                          <span className="text-[10px] font-mono bg-black/80 text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1.5 shadow-lg">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                            CYLINDRICAL BIOREACTOR TUBE #01 · IPSC AMNIOTIC VAT
-                          </span>
-
-                          <span className="text-[10px] font-mono bg-black/85 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/40 shadow-lg">
-                            {morphStage === "idle"
-                              ? isKo ? "배양액: 100% (준비 완료)" : "FLUID: 100% (READY)"
-                              : morphStage === "injecting"
-                              ? isKo ? "🧬 줄기세포 입자 일렁임..." : "🧬 STEM-CELL MIST FLUCTUATION"
-                              : morphStage === "morphing"
-                              ? isKo ? "⚡ 장기·근육 점진적 형성 중..." : "⚡ PROGRESSIVE MORPHOGENESIS"
-                              : morphStage === "draining"
-                              ? isKo ? "💧 배양액 급속 배출 중! (Draining)" : "💧 DRAINING BIOREACTOR FLUID!"
-                              : isKo ? "✨ 각성 완료: 호탕한 대소(大笑) 폭발!" : "✨ AWAKENED: MONSTROUS ROARING LAUGHTER!"}
-                          </span>
-                        </div>
-
-                        {/* Center Morph Stage Pill */}
-                        <div className="relative z-10 flex flex-col items-center text-center pointer-events-none mt-20">
-                          {morphStage !== "idle" && morphStage !== "awakened" && (
-                            <span className="text-xs font-mono bg-black/90 text-cyan-300 px-3 py-1.5 rounded-full border border-cyan-400/50 shadow-2xl animate-pulse">
-                              {morphStage === "injecting"
-                                ? isKo ? `🧬 야마나카 줄기세포 주입 및 AI 확산 형성... (${morphPercent}%)` : `🧬 Injecting iPSCs & Progressive Forming... (${morphPercent}%)`
-                                : morphStage === "morphing"
-                                ? isKo ? `⚡ 뼈대·장기·근육 결합 및 시냅스 점화... (${morphPercent}%)` : `⚡ Coagulating Organs & Neural Synapses... (${morphPercent}%)`
-                                : isKo ? `💧 배양액 배출 및 자율 생체 호흡 가동 중... (${morphPercent}%)` : `💧 Draining Amniotic Fluid & Initiating Bio-Breathing... (${morphPercent}%)`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Real-time Dynamic Heartbeat Rate (BPM) Interactive Controller */}
-                      <div className="bg-slate-950/95 border border-rose-500/40 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="text-xs font-black text-rose-400 flex items-center gap-1">
-                            🫀 {isKo ? "실시간 심장박동 속도 (BPM 조절):" : "Realtime Heart Rate (BPM Control):"}
-                          </span>
-                          <span className="text-sm font-black font-mono text-rose-300 bg-rose-950/90 px-2.5 py-0.5 rounded border border-rose-500/50 shrink-0">
-                            {creatureBpm} BPM
-                          </span>
-                          <input
-                            type="range"
-                            min="38"
-                            max="210"
-                            value={creatureBpm}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setCreatureBpm(val);
-                              if (isHeartbeatAudioOn) playCardiacThump(val);
-                            }}
-                            className="w-28 sm:w-44 accent-rose-500 cursor-pointer"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextState = !isHeartbeatAudioOn;
-                              setIsHeartbeatAudioOn(nextState);
-                              if (nextState) playCardiacThump(creatureBpm);
-                            }}
-                            className={`text-[10px] font-black px-2.5 py-1 rounded transition border flex items-center gap-1 cursor-pointer ${
-                              isHeartbeatAudioOn
-                                ? "bg-rose-600 border-rose-400 text-white shadow-md shadow-rose-900/60 animate-pulse"
-                                : "bg-slate-900 border-slate-700 text-slate-400 hover:text-white"
-                            }`}
-                          >
-                            <span>🫀</span>
-                            <span>{isHeartbeatAudioOn ? (isKo ? "생체 심장박동 (쿵쾅!) ON" : "Biological Heartbeat ON") : (isKo ? "맥박 소리 OFF" : "Pulse Sound OFF")}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCreatureBpm(42);
-                              if (isHeartbeatAudioOn) playCardiacThump(42);
-                            }}
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 42 ? "bg-sky-600 border-sky-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-sky-300 border-slate-700"}`}
-                          >
-                            ❄️ 42 {isKo ? "(동면·서맥)" : "(Bradycardia)"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCreatureBpm(76);
-                              if (isHeartbeatAudioOn) playCardiacThump(76);
-                            }}
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 76 ? "bg-emerald-600 border-emerald-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-emerald-300 border-slate-700"}`}
-                          >
-                            🌿 76 {isKo ? "(정상)" : "(Normal)"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCreatureBpm(130);
-                              if (isHeartbeatAudioOn) playCardiacThump(130);
-                            }}
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 130 ? "bg-amber-600 border-amber-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700"}`}
-                          >
-                            🔥 130 {isKo ? "(흥분)" : "(Elevated)"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCreatureBpm(185);
-                              if (isHeartbeatAudioOn) playCardiacThump(185);
-                            }}
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition border ${creatureBpm === 185 ? "bg-rose-600 border-rose-400 text-white" : "bg-slate-800 hover:bg-slate-700 text-rose-400 border-slate-700"}`}
-                          >
-                            ⚡ 185 {isKo ? "(벼락 과부하)" : "(Tachycardia)"}
-                          </button>
-                        </div>
-                      </div>
-
-                        {/* SECTION 5: Compact Awakened Monster Status Banner */}
-                        {chimeraResult && (
-                          <div className="bg-slate-950 border-2 border-amber-400/80 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl animate-fadeIn">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="text-3xl animate-bounce shrink-0">⚡</span>
-                              <div className="min-w-0">
-                                <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold">
-                                  {chimeraResult.badge} SPECIMEN AWAKENED
-                                </span>
-                                <h4 className="text-xs sm:text-sm font-black text-amber-200 truncate mt-0.5">
-                                  {isKo ? chimeraResult.titleKo : chimeraResult.titleEn}
-                                </h4>
-                                <p className="text-[11px] text-emerald-300 font-bold truncate">
-                                  "{isKo ? chimeraResult.firstWordsKo : chimeraResult.firstWordsEn}"
-                                </p>
+                      ) : (
+                        <>
+                          {/* Top HP Bars HUD */}
+                          <div className="absolute top-3 inset-x-3 z-30 flex items-center justify-between gap-4 pointer-events-none">
+                            {/* Fighter 1 HP */}
+                            <div className="flex-1 bg-black/75 backdrop-blur p-2 rounded-xl border border-cyan-500/50">
+                              <div className="flex justify-between text-xs font-black text-cyan-300 mb-1">
+                                <span className="truncate">{arenaFighter1.icon} {arenaFighter1.nameKo}</span>
+                                <span>{arenaHp1}%</span>
+                              </div>
+                              <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300"
+                                  style={{ width: `${arenaHp1}%` }}
+                                />
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => playChimeraRoar(chimeraResult.firstWordsKo, chimeraResult.firstWordsEn)}
-                              className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-3.5 py-2 rounded-lg cursor-pointer transition shadow-lg flex items-center gap-1.5 shrink-0"
-                            >
-                              🔊 {isKo ? "포효 다시 듣기" : "Replay Roar"}
-                            </button>
+                            <div className="text-xl sm:text-2xl font-black text-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,1)] shrink-0">
+                              VS
+                            </div>
+
+                            {/* Fighter 2 HP */}
+                            <div className="flex-1 bg-black/75 backdrop-blur p-2 rounded-xl border border-rose-500/50">
+                              <div className="flex justify-between text-xs font-black text-rose-300 mb-1">
+                                <span>{arenaHp2}%</span>
+                                <span className="truncate">{arenaFighter2.nameKo} {arenaFighter2.icon}</span>
+                              </div>
+                              <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden flex justify-end">
+                                <div
+                                  className="h-full bg-gradient-to-l from-rose-500 to-amber-400 transition-all duration-300"
+                                  style={{ width: `${arenaHp2}%` }}
+                                />
+                              </div>
+                            </div>
                           </div>
-                        )}
-                    </div>
-                  </div>
-                ) : (
-                  /* TAB 2: CASE IPSC BRIDGE & LIVE PUBMED DOSSIER */
-                  <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-stretch">
-                      <div className="bg-slate-900/90 border border-rose-500/40 rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[10px] font-mono text-rose-400 font-bold">
-                          1. {isKo ? "숙주 생체 조직 (TISSUE A)" : "HOST SUBSTRATE (TISSUE A)"}
-                        </span>
-                        <p className="text-xs font-bold text-white mt-1">
-                          {isKo ? activeExp.koreanHostTissueA : activeExp.hostTissueA}
-                        </p>
-                      </div>
 
-                      <div className="bg-emerald-950/60 border-2 border-emerald-400 rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[10px] font-mono text-emerald-300 font-black">
-                          2. 🧬 {isKo ? "만능줄기세포(iPSC) 접합 브릿지" : "iPSC STEM-CELL BRIDGE"}
-                        </span>
-                        <p className="text-xs font-extrabold text-white mt-1">
-                          {isKo ? activeExp.stemCellBridge.koreanLineage : activeExp.stemCellBridge.lineage}
-                        </p>
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {activeExp.stemCellBridge.factors.map((f) => (
-                            <span
-                              key={f}
-                              className="text-[9px] font-mono bg-slate-950/90 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded"
-                            >
-                              {f}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                          {/* Unified Arena Background */}
+                          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(244,63,94,0.22)_0%,_rgba(15,23,42,0.95)_75%,_#000_100%)] pointer-events-none z-0" />
 
-                      <div className="bg-slate-900/90 border border-cyan-500/40 rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[10px] font-mono text-cyan-400 font-bold">
-                          3. {isKo ? "이식·융합 조직 (TISSUE B)" : "DONOR / CHIMERA (TISSUE B)"}
-                        </span>
-                        <p className="text-xs font-bold text-white mt-1">
-                          {isKo ? activeExp.koreanDonorTissueB : activeExp.donorTissueB}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 leading-relaxed">
-                      <strong className="text-emerald-400">
-                        ⚡ {isKo ? "줄기세포 접합 메커니즘: " : "Bio-Stitch Mechanism: "}
-                      </strong>
-                      {isKo
-                        ? activeExp.stemCellBridge.koreanFusionMechanism
-                        : activeExp.stemCellBridge.fusionMechanism}
-                    </div>
-
-                    <form onSubmit={handleCustomLiveSearch} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customStitchQuery}
-                        onChange={(e) => setCustomStitchQuery(e.target.value)}
-                        placeholder={
-                          isKo
-                            ? "PubMed 및 위키피디아 실시간 학술 검색 (예: cerebral organoid, xenobot)..."
-                            : "Search live PubMed & Wikipedia (e.g., brain organoid, xenobot)..."
-                        }
-                        className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
-                      />
-                      <button
-                        type="submit"
-                        className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs cursor-pointer shrink-0"
-                      >
-                        🔬 {isKo ? "실시간 논문 검색" : "Live PubMed Search"}
-                      </button>
-                    </form>
-
-                    <div className="flex flex-col gap-2">
-                      {isLoadingPapers && (
-                        <span className="text-[11px] text-emerald-400 animate-pulse">
-                          {isKo
-                            ? "실시간 PubMed / EuropePMC 및 백과사전 데이터베이스 조회 중..."
-                            : "Querying live scientific databases..."}
-                        </span>
-                      )}
-
-                      {liveWiki && (
-                        <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300 flex items-start gap-2.5">
-                          {liveWiki.thumbnailUrl && (
-                            <img
-                              src={liveWiki.thumbnailUrl}
-                              alt={liveWiki.title}
-                              className="w-12 h-12 rounded object-cover shrink-0 border border-slate-700"
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-white text-[11px]">📚 {liveWiki.title}</p>
-                            <p className="text-[11px] text-slate-300 line-clamp-2 mt-0.5">{liveWiki.extract}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 gap-2">
-                        {livePapers.map((p) => (
-                          <div
-                            key={p.id}
-                            className="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 text-xs"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-emerald-300 line-clamp-1">{p.title}</span>
-                              {p.pmid && (
-                                <a
-                                  href={`https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 shrink-0"
-                                >
-                                  PMID:{p.pmid} ↗
-                                </a>
+                          {activeClashVideoUrl ? (
+                            /* Option A: Unified Single-Frame Cinematic Monster Clash MP4 */
+                            <div className="relative w-full h-full">
+                              <video
+                                key={activeClashVideoUrl}
+                                src={activeClashVideoUrl}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover"
+                              />
+                              {arenaDamagePopup && (
+                                <div className="absolute inset-0 bg-red-600/25 flex items-center justify-center animate-pulse pointer-events-none z-20">
+                                  <span className="text-3xl sm:text-5xl font-black text-amber-300 drop-shadow-[0_4px_12px_rgba(0,0,0,1)]">
+                                    {arenaDamagePopup.text}
+                                  </span>
+                                </div>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              {p.authorString} · <span className="text-amber-300">{p.journalTitle} ({p.pubYear})</span>
-                            </p>
+                          ) : (
+                          /* Dual Confrontation Stage: Two Monsters Actually Lunging & Clashing */
+                          <div className="relative w-full h-full flex items-center justify-between overflow-hidden">
+                            {/* LEFT FIGHTER */}
+                            <div
+                              className={`relative h-full transition-all duration-300 ease-out overflow-hidden ${
+                                arenaWinner?.id === arenaFighter1.id
+                                  ? "w-full z-20 scale-[1.28]"
+                                  : arenaWinner?.id === arenaFighter2.id
+                                  ? "w-0 opacity-0 scale-50"
+                                  : arenaPhase === "f1_strike" || arenaPhase === "clash"
+                                  ? "w-[56%] translate-x-12 scale-110 z-20 brightness-125"
+                                  : arenaPhase === "f2_strike"
+                                  ? "w-[48%] -translate-x-6 scale-95 brightness-150 saturate-200"
+                                  : "w-1/2"
+                              }`}
+                            >
+                              <video
+                                ref={f1VideoRef}
+                                key={arenaFighter1.id + "-f1"}
+                                src={arenaFighter1.videoSrc}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                onLoadedMetadata={(e) => {
+                                  const v = e.currentTarget;
+                                  if (v.duration) v.currentTime = v.duration * 0.65;
+                                }}
+                                className="w-full h-full object-cover scale-[1.18]"
+                              />
+                              <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-black/80 to-transparent pointer-events-none" />
+                              {arenaDamagePopup?.target === 1 && (
+                                <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center animate-ping pointer-events-none z-30">
+                                  <span className="text-3xl sm:text-5xl font-black text-amber-300 drop-shadow-[0_4px_12px_rgba(0,0,0,1)]">
+                                    {arenaDamagePopup.text}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* RIGHT FIGHTER (Mirrored to face Left Fighter) */}
+                            <div
+                              className={`relative h-full transition-all duration-300 ease-out overflow-hidden ${
+                                arenaWinner?.id === arenaFighter2.id
+                                  ? "w-full z-20 scale-[1.28]"
+                                  : arenaWinner?.id === arenaFighter1.id
+                                  ? "w-0 opacity-0 scale-50"
+                                  : arenaPhase === "f2_strike" || arenaPhase === "clash"
+                                  ? "w-[56%] -translate-x-12 scale-110 z-20 brightness-125"
+                                  : arenaPhase === "f1_strike"
+                                  ? "w-[48%] translate-x-6 scale-95 brightness-150 saturate-200"
+                                  : "w-1/2"
+                              }`}
+                            >
+                              <video
+                                ref={f2VideoRef}
+                                key={arenaFighter2.id + "-f2"}
+                                src={arenaFighter2.videoSrc}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                onLoadedMetadata={(e) => {
+                                  const v = e.currentTarget;
+                                  if (v.duration) v.currentTime = v.duration * 0.65;
+                                }}
+                                className="w-full h-full object-cover scale-[1.18] scale-x-[-1]"
+                              />
+                              <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-black/80 to-transparent pointer-events-none" />
+                              {arenaDamagePopup?.target === 2 && (
+                                <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center animate-ping pointer-events-none z-30">
+                                  <span className="text-3xl sm:text-5xl font-black text-amber-300 drop-shadow-[0_4px_12px_rgba(0,0,0,1)]">
+                                    {arenaDamagePopup.text}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                          )}
+
+                          {/* Victory Banner */}
+                          {arenaWinner && (
+                            <div className="absolute bottom-4 inset-x-4 z-30 flex items-center justify-center pointer-events-none">
+                              <div className="bg-black/85 backdrop-blur-md border-2 border-amber-400 px-6 py-2.5 rounded-2xl shadow-[0_0_40px_rgba(251,191,36,0.6)] flex items-center gap-3">
+                                <span className="text-3xl">👑</span>
+                                <span className="text-base sm:text-xl font-black text-amber-300">
+                                  {arenaWinner.nameKo} — K.O. 최종 승리!
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Optional AI Status Toast */}
+                          {aiGenStatus && (
+                            <div className="absolute bottom-3 left-3 z-30 bg-black/80 text-cyan-300 text-xs font-mono px-3 py-1 rounded-lg border border-cyan-500/40">
+                              {aiGenStatus}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2720,56 +2917,78 @@ export const renderBioreactorMorph = (
         </div>
       )}
 
-      {/* FULLSCREEN MONSTER LUNGE TAKEOVER OVERLAY ("폭발하듯이 화면이 부풀려지고 확 튀어나오면서 포효") */}
+      {/* FULLSCREEN MONSTER 3D MOVIE BURST OVERLAY (테두리 100% 고정, 내부 영상만 살아 움직임 + AI 동영상 API 생성 지원) */}
       {isFullscreenJumpscareActive && (
         <div
-          className="fixed inset-0 z-[999999] w-screen h-screen bg-black flex items-center justify-center overflow-hidden animate-screenJolt"
+          onClick={() => setIsFullscreenJumpscareActive(false)}
+          className="fixed inset-0 z-[999999] w-screen h-screen bg-slate-950/95 flex flex-col items-center justify-center p-3 sm:p-5 overflow-hidden cursor-pointer gap-2"
           style={{ width: "100vw", height: "100vh" }}
         >
-          {/* Direct Autoplay Ferocious Roar Audio Backup */}
-          <audio autoPlay src="/sounds/monster_roar_ferocious.wav" />
+          <audio autoPlay src={selectedComicMonster.roarAudio} />
 
-          {/* Initial Blinding Explosion Flash */}
-          <div className="absolute inset-0 pointer-events-none animate-explosionFlash z-30" />
+          {/* 1-Line Fixed Top Control Bar */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-6xl flex items-center justify-between gap-2 bg-slate-900/95 border border-emerald-500/40 px-3 py-1.5 rounded-xl shrink-0"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-black text-emerald-300">
+                {selectedComicMonster.icon} {selectedComicMonster.nameKo}
+              </span>
+              {ai3DStatus && (
+                <span className="text-[11px] font-mono text-cyan-300 hidden md:inline">{ai3DStatus}</span>
+              )}
+            </div>
 
-          {/* Concentric Shockwave Blast Rings Exploding Outward */}
-          <div className="absolute w-[45vw] h-[45vw] rounded-full border-8 border-rose-500 pointer-events-none animate-shockwaveBlast z-20" />
-          <div className="absolute w-[70vw] h-[70vw] rounded-full border-4 border-amber-400 pointer-events-none animate-shockwaveBlast z-20" style={{ animationDelay: "0.2s" }} />
-
-          {/* Emergency Flashing Red / Amber Sirens */}
-          <div className="absolute inset-0 bg-red-600/40 pointer-events-none animate-emergencyStrobe z-10" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-red-950/70 to-black pointer-events-none z-10" />
-
-          {/* Broken Glass / Shattered Laboratory Effect */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.22)_0%,_transparent_65%)] pointer-events-none z-10" />
-
-          {/* The Lunging & Exploding Monster: Starts at scale(0.12) and bursts forward to scale(3.4)! */}
-          <div className="relative w-full h-full flex items-center justify-center">
-            <img
-              src={activeJumpscareImg}
-              alt="Awakened Chimera Lunging Out"
-              className="w-full h-full max-w-[100vw] max-h-[100vh] object-cover sm:object-contain animate-monsterLunge filter drop-shadow-[0_0_120px_rgba(244,63,94,1)]"
-            />
-
-            {/* Subtle Living Twitch Layer on Top ("살짝 움직여 주고") */}
-            <div className="absolute inset-0 flex items-center justify-center animate-monsterTwitch pointer-events-none">
-              <div className="w-[85vw] h-[85vh] rounded-full border-4 border-rose-500/40 animate-pulse pointer-events-none" />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="password"
+                value={hfTokenInput}
+                onChange={(e) => setHfTokenInput(e.target.value)}
+                placeholder={isKo ? "HF 무료 토큰(선택)" : "HF Token (opt)"}
+                className="w-32 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400"
+              />
+              <button
+                type="button"
+                disabled={isGeneratingAi3D}
+                onClick={handleGenerateAi3DBurstVideo}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black px-3 py-1 rounded-lg cursor-pointer transition shadow whitespace-nowrap disabled:opacity-50"
+              >
+                {isGeneratingAi3D ? "⏳ AI 영상 생성 중..." : "🎬 AI 살아 움직이는 3D 영상 생성"}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsFullscreenJumpscareActive(false);
+                }}
+                className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-lg cursor-pointer shadow whitespace-nowrap"
+              >
+                ✕ {isKo ? "배양기 복귀" : "Close"}
+              </button>
             </div>
           </div>
 
-          {/* Alarming Telemetry HUD & Monster Roar Subtitle */}
-          <div className="absolute bottom-8 left-4 right-4 sm:left-12 sm:right-12 z-40 flex flex-col items-center text-center pointer-events-none">
-            <div className="bg-red-950/95 border-2 border-red-500 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md animate-bounce">
-              <span className="text-3xl animate-ping">⚠️</span>
-              <span className="text-xs sm:text-base font-black font-mono text-red-200 tracking-wider">
-                {isKo
-                  ? `경고: 배양기 완전 파열! [${selectedComicMonster.nameKo}] 모니터를 뚫고 폭발적 돌진! (250 BPM 포효)`
-                  : `ALERT: CONTAINMENT SHATTERED! [${selectedComicMonster.nameEn}] BURSTING THROUGH SCREEN! (250 BPM ROAR)`}
-              </span>
-            </div>
-            <p className="mt-2 text-sm sm:text-xl font-black text-amber-300 drop-shadow-[0_2px_15px_rgba(0,0,0,1)] tracking-wide">
-              "{isKo ? selectedComicMonster.firstWordsKo : selectedComicMonster.firstWordsEn}"
-            </p>
+          {/* 100% FIXED OUTER FRAME: 테두리는 고정된 상태에서 안의 동영상만 살아서 재생 */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-6xl flex-1 min-h-0 rounded-2xl overflow-hidden border-2 border-emerald-400/80 shadow-2xl bg-black"
+          >
+            <video
+              key={ai3DBurstVideoUrl || selectedComicMonster.videoSrc}
+              src={ai3DBurstVideoUrl || selectedComicMonster.videoSrc}
+              autoPlay
+              loop
+              muted
+              playsInline
+              onLoadedMetadata={(e) => {
+                if (!ai3DBurstVideoUrl) {
+                  const v = e.currentTarget;
+                  if (v.duration) v.currentTime = v.duration * 0.55;
+                }
+              }}
+              className="w-full h-full object-cover scale-[1.16] filter brightness-150 contrast-115 saturate-125"
+            />
           </div>
         </div>
       )}
