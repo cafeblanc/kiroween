@@ -1421,18 +1421,42 @@ export const BioStitchLabView: React.FC = () => {
     <div className="h-[100dvh] max-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col w-full max-w-full overflow-hidden box-border">
       {/* Top Header with Seamless Language Switcher (한국어 / English / 한·영 병기) */}
       <header className="border-b border-emerald-500/30 px-2.5 sm:px-4 py-2 flex justify-between items-center bg-slate-900/95 backdrop-blur shadow-lg w-full shrink-0 z-30">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
-          <h1 className="text-xs sm:text-sm font-black tracking-wide text-emerald-300 truncate">
-            PROMETHEUS-iPSC{" "}
-            <span className="text-slate-300 font-semibold hidden sm:inline">
-              | {isKo ? "현대판 프랑켄슈타인 만능줄기세포 실험실" : "Modern Bio-Frankenstein Stem-Cell Lab"}
-            </span>
+          <h1 className="text-xs sm:text-sm font-black tracking-wide text-emerald-300 truncate shrink-0">
+            PROMETHEUS-iPSC
           </h1>
-          <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full hidden lg:flex items-center gap-1 shrink-0">
-            <span>🧬 iPSC 98%</span>
-            <span>· Kiroween Frankenstein Track</span>
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="bg-emerald-600 text-slate-950 text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded flex items-center gap-1 uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping"></span>
+              <span>BIO-FEED</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsHelpOpen(true)}
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
+            >
+              <span>❓</span>
+              <span>{isKo ? "사용법(Help)" : "Help"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSoundOn((prev) => !prev)}
+              className={`text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded border transition font-bold cursor-pointer shadow ${
+                !isSoundOn
+                  ? "bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300"
+                  : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-300 animate-pulse"
+              }`}
+            >
+              {isSoundOn
+                ? isKo
+                  ? "🔊 내레이터 켜짐"
+                  : "🔊 Narrator ON"
+                : isKo
+                ? "🔇 내레이터 소리 켜기"
+                : "🔇 Tap for Voice"}
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -1457,14 +1481,6 @@ export const BioStitchLabView: React.FC = () => {
               🇺🇸 ENG
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsKiroSpecModalOpen(true)}
-            className="bg-purple-950/90 hover:bg-purple-900 text-purple-300 border border-purple-500/50 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold cursor-pointer transition shadow"
-          >
-            📐 .kiro Plan
-          </button>
         </div>
       </header>
 
@@ -1509,53 +1525,6 @@ export const BioStitchLabView: React.FC = () => {
                   "radial-gradient(circle at center, transparent 28%, rgba(2, 6, 23, 0.88) 100%), repeating-linear-gradient(0deg, rgba(16, 185, 129, 0.04) 0px, rgba(16, 185, 129, 0.04) 1px, transparent 1px, transparent 3px)"
               }}
             />
-
-            {/* Top-Left: BIO-FEED Badge + [❓ Help] Button + Real Journal Citation */}
-            <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 flex flex-col items-start gap-1.5 max-w-[66%]">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <div className="flex items-center bg-black/85 backdrop-blur-md rounded-md p-0.5 border border-emerald-500/40 shadow-lg gap-1">
-                  <span className="bg-emerald-600 text-slate-950 text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded flex items-center gap-1 uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping"></span>
-                    <span>BIO-FEED</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsHelpOpen(true);
-                    }}
-                    className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
-                  >
-                    <span>❓</span>
-                    <span>{isKo ? "사용법(Help)" : "Help"}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Top-Right: Sound Narrator Toggle */}
-            <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-20 flex flex-col items-end gap-1.5">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsSoundOn((prev) => !prev);
-                }}
-                className={`text-[10px] sm:text-[11px] px-2.5 py-1 rounded-md border transition font-bold cursor-pointer shadow-lg ${
-                  !isSoundOn
-                    ? "bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300"
-                    : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-300 animate-pulse"
-                }`}
-              >
-                {isSoundOn
-                  ? isKo
-                    ? "🔊 내레이터 해설 켜짐"
-                    : "🔊 Narrator ON"
-                  : isKo
-                  ? "🔇 내레이터 소리 켜기"
-                  : "🔇 Tap for Voice"}
-              </button>
-            </div>
 
             {/* MOBILE FLOATING OVERLAY */}
             <div
