@@ -31,7 +31,7 @@ export const BioreactorContainer: React.FC<
 
   return (
     <div
-      className="fixed-frame-border relative w-full aspect-video rounded-2xl border-2 border-neural/40 shadow-[0_0_24px_rgba(6,182,212,0.25),inset_0_0_32px_rgba(6,182,212,0.15)]"
+      className="fixed-frame-border relative w-full h-full border border-neural/40 shadow-[0_0_24px_rgba(6,182,212,0.25),inset_0_0_32px_rgba(6,182,212,0.15)]"
       style={{ backgroundColor: '#020617', transform: 'none', animation: 'none' }}
       data-testid="bioreactor-container"
       data-stage={currentStage}
@@ -41,7 +41,7 @@ export const BioreactorContainer: React.FC<
       data-progress={progress}
     >
       {/* Inner viewport: clips every effect to the frame. */}
-      <div className="absolute inset-0 overflow-hidden rounded-2xl" data-testid="bioreactor-viewport">
+      <div className="absolute inset-0 overflow-hidden" data-testid="bioreactor-viewport">
         {/* Video container: absolutely positioned, fixed to the frame. */}
         <div className="absolute inset-0" data-testid="bioreactor-video-container">
           <LazyVideo

@@ -165,14 +165,14 @@ export const BioreactorScreen: React.FC<BioreactorScreenProps> = ({
 
   return (
     <div
-      className="relative flex-1 min-h-[75vh] rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center p-2 sm:p-4 animate-fadeIn"
+      className="relative flex-1 w-full h-full overflow-hidden bg-slate-950 flex items-stretch justify-stretch animate-fadeIn"
       data-testid="bioreactor-screen"
       data-stage={stage}
       data-bpm={bpm}
     >
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,_rgba(16,185,129,0.38)_0%,_rgba(6,182,212,0.22)_35%,_rgba(15,23,42,0.85)_70%,_#020617_100%)] pointer-events-none" />
 
-      <div ref={videoHostRef} className="relative w-full max-w-5xl cursor-pointer" onClick={onReturn}>
+      <div ref={videoHostRef} className="relative w-full h-full cursor-pointer" onClick={onReturn}>
         <BioreactorContainer
           videoUrl={videoUrl}
           stageProgress={growth.stageProgress}

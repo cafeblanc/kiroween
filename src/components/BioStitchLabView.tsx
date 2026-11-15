@@ -1246,9 +1246,15 @@ export const BioStitchLabView: React.FC = () => {
     };
   }, [isSoundOn, activeExp.id, langMode]);
 
-  // Active WebAudio Cardiac Loop for Chimera Assembler (Strictly dynamic to creatureBpm)
+  // Active WebAudio Cardiac Loop for Chimera Assembler (Only active during bioreactor growth)
   useEffect(() => {
-    if (!isStitchModalOpen || activeModalTab !== "chimera_assembler" || !isHeartbeatAudioOn) {
+    if (
+      !isStitchModalOpen ||
+      activeModalTab !== "chimera_assembler" ||
+      chimeraScreen !== "bioreactor" ||
+      morphStage === "awakened" ||
+      !isHeartbeatAudioOn
+    ) {
       if (chimeraCardiacIntervalRef.current) {
         window.clearInterval(chimeraCardiacIntervalRef.current);
         chimeraCardiacIntervalRef.current = null;
@@ -1270,7 +1276,7 @@ export const BioStitchLabView: React.FC = () => {
         chimeraCardiacIntervalRef.current = null;
       }
     };
-  }, [isStitchModalOpen, activeModalTab, isHeartbeatAudioOn, creatureBpm]);
+  }, [isStitchModalOpen, activeModalTab, chimeraScreen, morphStage, isHeartbeatAudioOn, creatureBpm]);
 
   // Desktop chat scroll
   useEffect(() => {
@@ -1747,15 +1753,15 @@ export const BioStitchLabView: React.FC = () => {
             {/* BLOCK 4 OVERLAY: [Tab 1] Mythic Chimera 4-Part Video Morphing Assembler & [Tab 2] Live PubMed Dossier */}
             {isStitchModalOpen && (
               <div
-                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+                className="fixed inset-0 z-50 flex flex-col bg-slate-950"
                 onClick={() => setIsStitchModalOpen(false)}
               >
                 <div
-                  className="relative w-full max-w-6xl h-[92vh] bg-slate-950/98 border-2 border-emerald-400/90 rounded-2xl p-2.5 sm:p-3.5 shadow-2xl overflow-y-auto overflow-x-hidden flex flex-col gap-2 text-slate-100"
+                  className="relative w-full h-full bg-slate-950 flex flex-col overflow-hidden text-slate-100"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* 1-LINE SLIM HEADER BAR (글씨는 맨 윗줄 1줄만! 나머지 전체는 영상으로 꽉 채움) */}
-                  <div className="flex items-center justify-between gap-1.5 border-b border-slate-800 pb-2 shrink-0 overflow-x-auto no-scrollbar">
+                  <div className="flex items-center justify-between gap-1.5 border-b border-slate-800 px-3 py-1.5 shrink-0 overflow-x-auto no-scrollbar bg-slate-950/95">
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
@@ -1794,7 +1800,11 @@ export const BioStitchLabView: React.FC = () => {
 
                   {/* TAB 1: MYTHIC CHIMERA ASSEMBLER & VIDEO-LIKE BIOREACTOR MORPHING */}
                   {activeModalTab === "chimera_assembler" ? (
-                    <div className="flex flex-col flex-1 min-h-0">
+                    <div
+                      className={`flex flex-col flex-1 min-h-0 ${
+                        chimeraScreen === "bioreactor" ? "overflow-hidden" : "overflow-y-auto p-3"
+                      }`}
+                    >
 
                       {/* ============================================================== */}
                       {/* 독립 화면 1: 실제 사진 보여 주는 화면 (Real Specimen Photo Gallery) */}

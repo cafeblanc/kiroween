@@ -165,8 +165,9 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
   }, [monster, playRoar]);
 
   const visibleCracks = Math.ceil(state.glassCrackProgress * CRACKS.length);
-  const popScale = 0.55 + Math.sin(Math.min(1, state.glassCrackProgress * 1.15) * (Math.PI / 2)) * 0.65;
-  const popZ = Math.round(state.glassCrackProgress * 220);
+  const popScale = 0.65 + Math.sin(Math.min(1, state.glassCrackProgress * 1.15) * (Math.PI / 2)) * 0.58;
+  const popZ = Math.round(state.glassCrackProgress * 260);
+  const videoSrc = safeVideoUrl(monster.growthReference || monster.awakeningVideo || DEFAULT_VIDEO);
 
   return (
     <div
@@ -183,7 +184,7 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
             ? {
                 transform: `translateZ(${popZ}px) scale(${popScale.toFixed(3)})`,
                 transformStyle: 'preserve-3d',
-                filter: `drop-shadow(0 0 40px ${monster.color || '#ef4444'})`,
+                filter: `drop-shadow(0 0 48px ${monster.color || '#ef4444'})`,
                 transition: 'transform 50ms linear',
               }
             : undefined
@@ -193,10 +194,16 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
           <video
             ref={videoRef}
             className="absolute inset-0 w-full h-full object-cover"
-            src={safeVideoUrl(monster.awakeningVideo || DEFAULT_VIDEO)}
+            src={videoSrc}
             autoPlay
             muted
             playsInline
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              if (monster.growthReference && Number.isFinite(v.duration) && v.duration > 0) {
+                v.currentTime = v.duration * 0.72;
+              }
+            }}
             onError={() => setVideoFailed(true)}
           />
         ) : (
