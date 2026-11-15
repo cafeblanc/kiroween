@@ -1362,15 +1362,20 @@ export const BioStitchLabView: React.FC = () => {
       (c) =>
         lower.includes(c.shortTitle.toLowerCase()) ||
         lower.includes(c.koreanShortTitle.toLowerCase()) ||
-        (lower.includes("쥐") && c.id.includes("xenocortication")) ||
-        (lower.includes("mouse") && c.id.includes("xenocortication")) ||
-        (lower.includes("92") && c.id.includes("xenocortication")) ||
-        (lower.includes("심장") && c.id.includes("ghost-heart")) ||
-        (lower.includes("heart") && c.id.includes("ghost-heart")) ||
-        (lower.includes("돼지") && (c.id.includes("brainex") || c.id.includes("chimera"))) ||
-        (lower.includes("pong") && c.id.includes("dishbrain")) ||
-        (lower.includes("게임") && c.id.includes("dishbrain")) ||
-        (lower.includes("로봇") && c.id.includes("anthrobots"))
+        ((lower.includes("쥐") || lower.includes("mouse") || lower.includes("92") || lower.includes("스탠퍼드")) &&
+          c.id.includes("xenocortication")) ||
+        ((lower.includes("유령") || lower.includes("심장") || lower.includes("ghost") || lower.includes("heart")) &&
+          c.id.includes("ghost-heart")) ||
+        ((lower.includes("사후") || lower.includes("죽은 뇌") || lower.includes("예일") || lower.includes("brainex")) &&
+          c.id.includes("brainex")) ||
+        ((lower.includes("돼지") || lower.includes("pig") || lower.includes("인간-돼지")) &&
+          c.id.includes("human-pig-chimera")) ||
+        ((lower.includes("영장류") || lower.includes("원숭이") || lower.includes("형광") || lower.includes("monkey")) &&
+          c.id.includes("chimeric-monkey")) ||
+        ((lower.includes("아홀로틀") || lower.includes("도롱뇽") || lower.includes("사지") || lower.includes("axolotl")) &&
+          c.id.includes("axolotl")) ||
+        ((lower.includes("pong") || lower.includes("게임") || lower.includes("dishbrain")) &&
+          c.id.includes("dishbrain"))
     );
 
     if (matchedCase) {
@@ -1378,8 +1383,8 @@ export const BioStitchLabView: React.FC = () => {
       const replyMsg: SynapseChatMessage = {
         id: (Date.now() + 1).toString() + "-ai",
         sender: "ai",
-        textKo: `🧬 [실험 전환 → ${matchedCase.koreanShortTitle}]: ${matchedCase.koreanSummary}`,
-        textEn: `🧬 [Specimen Switched → ${matchedCase.shortTitle}]: ${matchedCase.eerieRealitySummary}`,
+        textKo: `🧬 [${matchedCase.koreanShortTitle}] ${matchedCase.koreanHeadline}`,
+        textEn: `🧬 [${matchedCase.shortTitle}] ${matchedCase.headline}`,
         pmidBadge: matchedCase.pmidOrDoi,
         timestamp: new Date().toLocaleTimeString(),
         linkedCase: matchedCase
@@ -1393,24 +1398,21 @@ export const BioStitchLabView: React.FC = () => {
     setIsQueryingApi(false);
 
     const topPaper = dossier.papers[0];
-    const wikiSnippet = dossier.wiki?.extract
-      ? dossier.wiki.extract.slice(0, 200) + "..."
-      : isKo
-      ? "만능줄기세포(iPSC) 분화 및 생체 조직 융합 경로가 확인되었습니다."
-      : "Direct pluripotent stem-cell differentiation pathway analyzed.";
 
     const aiReply: SynapseChatMessage = {
       id: (Date.now() + 2).toString() + "-ai",
       sender: "ai",
       textKo: dossier.stemCellSynthesisKo,
       textEn: dossier.stemCellSynthesisEn,
-      subTextKo: topPaper
-        ? `📄 검증된 PubMed 논문: "${topPaper.title}" (${topPaper.journalTitle}, ${topPaper.pubYear}) — ${wikiSnippet}`
-        : `📚 아카이브 기록: ${wikiSnippet}`,
-      subTextEn: topPaper
-        ? `📄 Verified PubMed Study: "${topPaper.title}" (${topPaper.journalTitle}, ${topPaper.pubYear}) — ${wikiSnippet}`
-        : `📚 Archival Record: ${wikiSnippet}`,
-      pmidBadge: topPaper?.pmid ? `PMID: ${topPaper.pmid}` : "PubMed / EuropePMC Live",
+      subTextKo:
+        dossier.wiki && topPaper
+          ? `📄 관련 PubMed 논문: "${topPaper.title}" (${topPaper.journalTitle}, ${topPaper.pubYear})`
+          : undefined,
+      subTextEn:
+        dossier.wiki && topPaper
+          ? `📄 Related PubMed Study: "${topPaper.title}" (${topPaper.journalTitle}, ${topPaper.pubYear})`
+          : undefined,
+      pmidBadge: topPaper?.pmid ? `PMID: ${topPaper.pmid}` : dossier.wiki ? "Wikipedia Live" : "Search",
       timestamp: new Date().toLocaleTimeString()
     };
 
