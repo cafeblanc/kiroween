@@ -10,8 +10,10 @@ import { REAL_STEM_CELL_PHOTOS } from "../data/stemCellPhotos";
 import {
   scienceStitchService,
   detectQuestionIntent,
-  toConciseCore
+  toConciseCore,
+  translateTextToLanguage
 } from "../services/scienceStitchService";
+import { CustomMonsterStudio } from "./bioreactor/CustomMonsterStudio";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { getBattleVideoForPair } from "./bioreactor/arena";
@@ -221,7 +223,7 @@ export const BioStitchLabView: React.FC = () => {
     {
       id: "init-1",
       sender: "ai",
-      textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 실제 실험을 내레이터와 함께 살펴보거나, [🧬 전설의 괴수 부활 전투] 버튼을 눌러 새로운 생명체를 배양·대결해 보세요!",
+      textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 실제 실험을 내레이터와 함께 살펴보거나, [🧬 전설의 괴수 배양 & 전투] 버튼을 눌러 새로운 생명체를 배양·대결해 보세요!",
       textEn: "🧬 PROMETHEUS-iPSC Lab Online. Explore the 6 real-world stem-cell experiments with the narrator, or open [🧬 Mythic Chimera Assembler] to stitch and resurrect a custom creature!",
       subTextKo: "질문을 입력하면 실시간으로 PubMed 논문과 백과사전을 검색해 답변합니다.",
       subTextEn: "Type any question to query live PubMed papers and Wikipedia archives.",
@@ -1377,6 +1379,39 @@ export const BioStitchLabView: React.FC = () => {
     setMessages((prev) => [...prev, msg]);
   };
 
+  const appendTranslatedAiReply = async (msg: SynapseChatMessage) => {
+    const lang = selectedLangCode || "ko";
+    if (lang === "ko") {
+      setMessages((prev) => [...prev, msg]);
+      return;
+    }
+    if (lang === "en") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          ...msg,
+          textKo: msg.textEn,
+          subTextKo: msg.subTextEn,
+        },
+      ]);
+      return;
+    }
+    const [translatedMain, translatedSub] = await Promise.all([
+      translateTextToLanguage(msg.textKo, lang),
+      msg.subTextKo ? translateTextToLanguage(msg.subTextKo, lang) : Promise.resolve(undefined),
+    ]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        ...msg,
+        textKo: translatedMain,
+        textEn: translatedMain,
+        subTextKo: translatedSub,
+        subTextEn: translatedSub,
+      },
+    ]);
+  };
+
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isQueryingApi) return;
@@ -1401,13 +1436,13 @@ export const BioStitchLabView: React.FC = () => {
         id: (Date.now() + 1).toString() + "-ai",
         sender: "ai",
         textKo:
-          "우측 하단에서 7개 실제 줄기세포 실험을 전환하고, 좌측 하단 [전설의 괴수 부활 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
+          "우측 하단에서 7개 실제 줄기세포 실험을 전환하고, 좌측 하단 [전설의 괴수 배양 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
         textEn:
           "Switch between 7 real stem-cell cases at the bottom-right, or open the Monster Resurrection Battle at the bottom-left to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
         pmidBadge: "LAB GUIDE",
         timestamp: new Date().toLocaleTimeString()
       };
-      setMessages((prev) => [...prev, replyMsg]);
+      await appendTranslatedAiReply(replyMsg);
       return;
     }
 
@@ -1480,12 +1515,12 @@ export const BioStitchLabView: React.FC = () => {
         timestamp: new Date().toLocaleTimeString(),
         linkedCase: targetCase
       };
-      setMessages((prev) => [...prev, replyMsg]);
+      await appendTranslatedAiReply(replyMsg);
       return;
     }
 
     setIsQueryingApi(true);
-    const dossier = await scienceStitchService.stitchLiveQuery(rawQuery, isKo);
+    const dossier = await scienceStitchService.stitchLiveQuery(rawQuery, selectedLangCode !== "en");
     setIsQueryingApi(false);
 
     const topPaper = dossier.papers[0];
@@ -1507,7 +1542,7 @@ export const BioStitchLabView: React.FC = () => {
       timestamp: new Date().toLocaleTimeString()
     };
 
-    setMessages((prev) => [...prev, aiReply]);
+    await appendTranslatedAiReply(aiReply);
   };
 
   return (
@@ -1861,6 +1896,11 @@ export const BioStitchLabView: React.FC = () => {
                               })}
                             </div>
                           </div>
+
+                          <CustomMonsterStudio
+                            isKo={isKo}
+                            onAwakenCustomMonster={handleSelectAndAwakenMonster}
+                          />
                         </div>
                       )}
 
@@ -1948,6 +1988,7 @@ export const BioStitchLabView: React.FC = () => {
                               })}
                             </div>
                           </div>
+
                         </div>
                       )}
 
@@ -2250,7 +2291,7 @@ export const BioStitchLabView: React.FC = () => {
                       ? "조립 실험실 닫기"
                       : "Close Lab"
                     : isKo
-                    ? "전설의 괴수 부활 전투"
+                    ? "전설의 괴수 배양 & 전투"
                     : "Mythic Beast Revival & Battle"}
                 </span>
               </button>
@@ -2411,9 +2452,9 @@ export const BioStitchLabView: React.FC = () => {
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
                 <span className="text-lg shrink-0">⚡</span>
                 <div>
-                  <p className="font-bold text-amber-400 mb-0.5">2. 전설의 괴수 부활 전투</p>
+                  <p className="font-bold text-amber-400 mb-0.5">2. 전설의 괴수 배양 & 전투</p>
                   <p className="text-slate-300 leading-snug">
-                    좌측 하단 <strong>전설의 괴수 부활 전투</strong> 버튼을 누르면 전체 화면 배양실이 열리며, 전설·외계·프랑켄슈타인·인간 표본 15초 배양 후 3D 각성과 결투장으로 이어집니다.
+                    좌측 하단 <strong>전설의 괴수 배양 & 전투</strong> 버튼을 누르면 전체 화면 배양실이 열리며, 전설·외계·프랑켄슈타인·인간 표본 15초 배양 후 3D 각성과 결투장으로 이어집니다.
                   </p>
                 </div>
               </div>

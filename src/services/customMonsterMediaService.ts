@@ -1,0 +1,411 @@
+export interface MonsterBodyParts {
+  head: string;
+  hornsOrCrown: string;
+  torso: string;
+  arms: string;
+  legs: string;
+  tail: string;
+  auraAndSkin: string;
+}
+
+export interface MonsterStudioPreset {
+  id: string;
+  nameKo: string;
+  nameEn: string;
+  icon: string;
+  colorHex: string;
+  baseImageSrc: string;
+  defaultParts: MonsterBodyParts;
+}
+
+export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
+  {
+    id: "myth_dragon",
+    nameKo: "화염룡 드래곤",
+    nameEn: "Pyroclastic Dragon",
+    icon: "🐉",
+    colorHex: "#f97316",
+    baseImageSrc: "/images/chimera_myth_basilisk.jpg",
+    defaultParts: {
+      head: "날카로운 송곳니와 용암처럼 빛나는 황금빛 파충류 눈을 가진 용의 머리",
+      hornsOrCrown: "뒤로 뻗은 검은 흑요석 쌍뿔과 목 주변의 붉은 화염 갈기",
+      torso: "초고온 케라틴 비늘 갑옷으로 덮인 거대한 흉곽과 맥동하는 용암 심장",
+      arms: "강철을 찢는 거대한 발톱과 박쥐 날개막이 연결된 앞다리",
+      legs: "지면을 부수는 두꺼운 파충류 뒷다리와 쇠사슬 같은 힘줄",
+      tail: "끝에 창날 모양의 화염 가시가 달린 길고 묵직한 비늘 꼬리",
+      auraAndSkin: "틈새마다 붉은 마그마 빛이 새어 나오는 숯검정 용린 피부와 불꽃 입자",
+    },
+  },
+  {
+    id: "myth_kraken",
+    nameKo: "심해 거수 크라켄",
+    nameEn: "Abyssal Kraken",
+    icon: "🐙",
+    colorHex: "#8b5cf6",
+    baseImageSrc: "/images/chimera_alien_cthulhu.jpg",
+    defaultParts: {
+      head: "거대한 외투막 두부와 3개의 발광 심해안(Deep-sea Eyes)을 지닌 머리",
+      hornsOrCrown: "머리 위로 솟은 보라빛 생체 발광 지느러미 왕관",
+      torso: "반투명 심해 연골과 보랏빛 신경절이 비치는 거대 몸통",
+      arms: "흡반마다 날카로운 갈고리가 돋아난 8개의 거대 촉수 팔",
+      legs: "수압을 가르는 분사 추진 사이펀과 얽힌 하부 촉수 다리",
+      tail: "후방으로 길게 뻗어 전기 충격을 방출하는 채찍형 발광 촉수",
+      auraAndSkin: "어둠 속에서 네온 보라색과 청록색으로 맥동하는 점액질 생체발광 피부",
+    },
+  },
+  {
+    id: "alien_xenomorph",
+    nameKo: "제노모프 바이오 타이탄",
+    nameEn: "Xenomorph Bio-Titan",
+    icon: "👽",
+    colorHex: "#10b981",
+    baseImageSrc: "/images/chimera_alien_xenomorph.jpg",
+    defaultParts: {
+      head: "매끈하게 뒤로 길게 뻗은 검은 키틴질 두개골과 이중 턱(Inner Jaw)",
+      hornsOrCrown: "등과 머리를 따라 솟은 예리한 생체 방열 볏(Crest)",
+      torso: "갈비뼈 형태의 검은 외골격 장갑과 초강산 혈관 파이프가 드러난 몸통",
+      arms: "긴 면도날 같은 발톱이 달린 3관절 포식자 팔",
+      legs: "역관절 구조로 도약력이 극대화된 민첩한 외계 다리",
+      tail: "전갈처럼 등 위로 치켜든 칼날형 절지 꼬리",
+      auraAndSkin: "형광 연두빛 산성 체액이 흐르는 젖은 흑요석 키틴 외피",
+    },
+  },
+  {
+    id: "alien_void_slug",
+    nameKo: "보이드 어비스 레비아탄",
+    nameEn: "Void Abyss Leviathan",
+    icon: "🛸",
+    colorHex: "#06b6d4",
+    baseImageSrc: "/images/chimera_microscopy_quad.jpg",
+    defaultParts: {
+      head: "눈 대신 우주 성운처럼 소용돌이치는 시안빛 감각 기관이 모인 머리",
+      hornsOrCrown: "머리 주변을 떠다니는 반투명 생체발광 촉모 왕관",
+      torso: "내부 장기와 별빛 같은 미토콘드리아가 투명하게 비치는 유체 몸통",
+      arms: "실처럼 뻗어 먹이를 포획하는 다중 발광 촉수 팔",
+      legs: "무중력 유영에 최적화된 물결치는 지느러미 하체",
+      tail: "공간을 가르는 듯한 긴 반투명 유령 꼬리",
+      auraAndSkin: "형광 시안·에메랄드 빛 포자가 흩날리는 반투명 우주 생물 피부",
+    },
+  },
+  {
+    id: "myth_frankenstein",
+    nameKo: "모던 바이오 프랑켄슈타인",
+    nameEn: "Modern Bio-Frankenstein",
+    icon: "🧟",
+    colorHex: "#38bdf8",
+    baseImageSrc: "/images/frankenstein_chimera.jpg",
+    defaultParts: {
+      head: "사각형 이마에 수술 봉합선과 짙은 다크서클, 고뇌에 찬 눈빛의 머리",
+      hornsOrCrown: "목 양옆에 박힌 두 개의 고전압 금속 전극 볼트",
+      torso: "다종의 생체 근육이 외과 봉합선으로 정교하게 접합된 거구 몸통",
+      arms: "강철 같은 악력을 지닌 흉터투성이의 두꺼운 양팔",
+      legs: "묵직한 실험실 부츠를 딛고 서 있는 압도적 크기의 다리",
+      tail: "꼬리 없이 등 뒤로 이어진 생명유지 장치 케이블과 생체 튜브",
+      auraAndSkin: "창백한 푸른빛 피부 위로 푸른 전기 스파크가 튀는 소생 실험체",
+    },
+  },
+  {
+    id: "human_prometheus",
+    nameKo: "합성 인간 호모 프로메테우스",
+    nameEn: "Homo Prometheus",
+    icon: "🧬",
+    colorHex: "#34d399",
+    baseImageSrc: "/images/yale_brainex_perfusion_lab.jpg",
+    defaultParts: {
+      head: "투명한 바이오 글래스 헬멧 안에서 뇌 오가노이드가 빛나는 인간형 두부",
+      hornsOrCrown: "관자놀이에 연결된 금빛 신경 인터페이스 센서",
+      torso: "인공 심장과 투명 혈관 네트워크가 비치는 강화 인간 흉부",
+      arms: "정밀 나노 근섬유로 재구성된 양팔",
+      legs: "인간과 동일한 비율의 고탄력 생체공학 다리",
+      tail: "꼬리 대신 척추를 따라 빛나는 에메랄드 신경 척수 라인",
+      auraAndSkin: "반투명 합성 피부 아래로 에메랄드 신경 펄스가 흐르는 차세대 인간",
+    },
+  },
+];
+
+export function composeDescriptionFromParts(
+  preset: MonsterStudioPreset,
+  parts: MonsterBodyParts,
+): string {
+  return [
+    `[베이스 종족: ${preset.nameKo}]`,
+    `• 머리: ${parts.head}`,
+    `• 뿔·왕관·전극: ${parts.hornsOrCrown}`,
+    `• 몸통: ${parts.torso}`,
+    `• 팔·촉수: ${parts.arms}`,
+    `• 다리·하체: ${parts.legs}`,
+    `• 꼬리·후면: ${parts.tail}`,
+    `• 피부·오라: ${parts.auraAndSkin}`,
+  ].join("\n");
+}
+
+function detectVisualTheme(description: string, fallbackHex: string) {
+  const lower = description.toLowerCase();
+  if (/(화염|용암|불꽃|마그마|드래곤|fire|flame|lava)/.test(lower)) {
+    return { primary: "#f97316", secondary: "#ef4444", particleMode: "ember" as const };
+  }
+  if (/(전기|번개|스파크|볼트|프랑켄|electric|volt|spark)/.test(lower)) {
+    return { primary: "#38bdf8", secondary: "#a855f7", particleMode: "electric" as const };
+  }
+  if (/(심해|바다|물|크라켄|보라|촉수|abyss|kraken|tentacle)/.test(lower)) {
+    return { primary: "#a855f7", secondary: "#06b6d4", particleMode: "bubble" as const };
+  }
+  if (/(산성|키틴|제노|독|외계|acid|xenomorph|chitin)/.test(lower)) {
+    return { primary: "#10b981", secondary: "#84cc16", particleMode: "spore" as const };
+  }
+  return { primary: fallbackHex || "#10b981", secondary: "#22d3ee", particleMode: "spore" as const };
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (!src.startsWith("data:") && !src.startsWith("blob:")) {
+      img.crossOrigin = "anonymous";
+    }
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.src = src;
+  });
+}
+
+function drawCoverImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  w: number,
+  h: number,
+  scale: number = 1,
+  offsetX: number = 0,
+  offsetY: number = 0,
+) {
+  const imgRatio = img.width / Math.max(1, img.height);
+  const canvasRatio = w / h;
+  let drawW = w;
+  let drawH = h;
+  if (imgRatio > canvasRatio) {
+    drawH = h * scale;
+    drawW = drawH * imgRatio;
+  } else {
+    drawW = w * scale;
+    drawH = drawW / imgRatio;
+  }
+  const dx = (w - drawW) / 2 + offsetX;
+  const dy = (h - drawH) / 2 + offsetY;
+  ctx.drawImage(img, dx, dy, drawW, drawH);
+}
+
+export async function generateCustomMonsterImage(params: {
+  preset: MonsterStudioPreset;
+  description: string;
+}): Promise<{ imageUrl: string; themeHex: string }> {
+  const { preset, description } = params;
+  const theme = detectVisualTheme(description, preset.colorHex);
+  const size = 768;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D canvas context unavailable");
+
+  const baseImg = await loadImageElement(preset.baseImageSrc);
+  ctx.fillStyle = "#020617";
+  ctx.fillRect(0, 0, size, size);
+
+  // Base creature image with subtle contrast & saturation boost
+  ctx.save();
+  ctx.filter = "contrast(1.12) saturate(1.22)";
+  drawCoverImage(ctx, baseImg, size, size, 1.04);
+  ctx.restore();
+
+  // Radial bioluminescent aura tint based on body-part description keywords
+  const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.14, size / 2, size / 2, size * 0.56);
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(0.7, `${theme.primary}33`);
+  grad.addColorStop(1, "rgba(2, 6, 23, 0.88)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle anatomical part synthesis accents (horns / electro-arcs / embers / spores)
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < 42; i++) {
+    const px = ((i * 197) % size);
+    const py = ((i * 313) % size);
+    const r = 2 + (i % 6);
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 === 0 ? `${theme.primary}99` : `${theme.secondary}88`;
+    ctx.fill();
+  }
+
+  if (theme.particleMode === "electric") {
+    ctx.strokeStyle = "#7dd3fc";
+    ctx.lineWidth = 2.2;
+    for (let arc = 0; arc < 5; arc++) {
+      ctx.beginPath();
+      let x = 120 + arc * 130;
+      let y = 90;
+      ctx.moveTo(x, y);
+      for (let step = 0; step < 6; step++) {
+        x += (step % 2 === 0 ? 1 : -1) * (18 + arc * 4);
+        y += 38;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Clean HUD frame border (no cluttered text over the creature)
+  ctx.strokeStyle = `${theme.primary}aa`;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 10, size - 20, size - 20);
+
+  return {
+    imageUrl: canvas.toDataURL("image/png"),
+    themeHex: theme.primary,
+  };
+}
+
+export async function generateVideoFromMonsterImage(params: {
+  imageUrl: string;
+  description: string;
+  accentColor: string;
+  durationSec?: number;
+  onProgress?: (pct: number) => void;
+}): Promise<{ videoUrl: string; mimeType: string; durationSec: number }> {
+  if (typeof MediaRecorder === "undefined") {
+    throw new Error("이 브라우저는 MediaRecorder 동영상 인코딩을 지원하지 않습니다.");
+  }
+
+  const { imageUrl, description, accentColor, durationSec = 5, onProgress } = params;
+  const theme = detectVisualTheme(description, accentColor);
+  const width = 640;
+  const height = 640;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D canvas context unavailable");
+
+  const img = await loadImageElement(imageUrl);
+
+  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+    ? "video/webm;codecs=vp9"
+    : MediaRecorder.isTypeSupported("video/webm")
+    ? "video/webm"
+    : "";
+
+  const stream = canvas.captureStream(30);
+  const recorder = mimeType
+    ? new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2_500_000 })
+    : new MediaRecorder(stream);
+
+  const chunks: BlobPart[] = [];
+  recorder.ondataavailable = (ev) => {
+    if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+  };
+
+  const particles = Array.from({ length: 34 }, (_, i) => ({
+    x: (i * 73) % width,
+    y: (i * 137) % height,
+    speedY: 0.8 + (i % 5) * 0.45,
+    size: 2 + (i % 4),
+    phase: i * 0.7,
+  }));
+
+  return new Promise((resolve, reject) => {
+    recorder.onerror = () => reject(new Error("동영상 인코딩 중 오류가 발생했습니다."));
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+      const videoUrl = URL.createObjectURL(blob);
+      onProgress?.(100);
+      resolve({
+        videoUrl,
+        mimeType: mimeType || "video/webm",
+        durationSec,
+      });
+    };
+
+    const startTime = performance.now();
+    const totalMs = durationSec * 1000;
+    recorder.start(100);
+
+    const renderFrame = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / totalMs);
+      onProgress?.(Math.round(progress * 98));
+
+      const t = elapsed / 1000;
+      // Breathing pulse + cinematic slow zoom/pan
+      const breath = 1.04 + Math.sin(t * 2.6) * 0.035 + progress * 0.05;
+      const driftX = Math.sin(t * 1.1) * 10;
+      const driftY = Math.cos(t * 0.9) * 8;
+
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, width, height);
+      drawCoverImage(ctx, img, width, height, breath, driftX, driftY);
+
+      // Pulsing bio-aura
+      const pulseAlpha = Math.round((0.18 + (Math.sin(t * 3.5) + 1) * 0.1) * 255)
+        .toString(16)
+        .padStart(2, "0");
+      const aura = ctx.createRadialGradient(
+        width / 2,
+        height / 2,
+        width * 0.16,
+        width / 2,
+        height / 2,
+        width * 0.54,
+      );
+      aura.addColorStop(0, "rgba(0,0,0,0)");
+      aura.addColorStop(1, `${theme.primary}${pulseAlpha}`);
+      ctx.fillStyle = aura;
+      ctx.fillRect(0, 0, width, height);
+
+      // Animated particles (embers / bubbles / spores / electric sparks)
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      for (const p of particles) {
+        const py =
+          theme.particleMode === "bubble" || theme.particleMode === "ember"
+            ? (p.y - t * 42 * p.speedY + height * 10) % height
+            : (p.y + Math.sin(t * 2 + p.phase) * 18 + height) % height;
+        const px = (p.x + Math.sin(t * 1.8 + p.phase) * 16 + width) % width;
+        ctx.beginPath();
+        ctx.arc(px, py, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `${theme.secondary}cc`;
+        ctx.fill();
+      }
+
+      if (theme.particleMode === "electric" && Math.sin(t * 12) > 0.25) {
+        ctx.strokeStyle = "#bae6fd";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let lx = 100 + ((Math.floor(t * 8) * 97) % 420);
+        let ly = 40;
+        ctx.moveTo(lx, ly);
+        for (let s = 0; s < 5; s++) {
+          lx += (s % 2 === 0 ? 22 : -22);
+          ly += 52;
+          ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Subtle moving scanline
+      const scanY = ((t * 140) % height);
+      ctx.fillStyle = `${theme.primary}22`;
+      ctx.fillRect(0, scanY, width, 4);
+
+      if (elapsed < totalMs) {
+        requestAnimationFrame(renderFrame);
+      } else {
+        recorder.stop();
+      }
+    };
+
+    requestAnimationFrame(renderFrame);
+  });
+}

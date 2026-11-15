@@ -119,6 +119,29 @@ function isWikiRelevant(topic: string, wiki: WikiContext): boolean {
   return tokens.some((tok) => haystack.includes(tok));
 }
 
+export async function translateTextToLanguage(
+  text: string,
+  targetLang: string,
+): Promise<string> {
+  if (!text || !targetLang || targetLang === "ko") return text;
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(
+      targetLang,
+    )}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(assertAllowedApiEndpoint(url));
+    if (!res.ok) return text;
+    const data = await res.json();
+    if (!Array.isArray(data?.[0])) return text;
+    const translated = data[0]
+      .map((seg: unknown) => (Array.isArray(seg) && typeof seg[0] === "string" ? seg[0] : ""))
+      .join("")
+      .trim();
+    return translated || text;
+  } catch {
+    return text;
+  }
+}
+
 export const scienceStitchService = {
   async fetchPubMedPapers(query: string, limit: number = 3): Promise<PubMedPaper[]> {
     try {
