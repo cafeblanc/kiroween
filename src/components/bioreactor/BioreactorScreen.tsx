@@ -186,7 +186,7 @@ export const BioreactorScreen: React.FC<BioreactorScreenProps> = ({
             bpm={bpm}
             stage={stage}
           />
-          {isAwakening && <AwakeningRoar monster={definition} />}
+          {isAwakening && <AwakeningRoar monster={definition} fullscreen onComplete={onReturn} />}
           <div className="absolute left-3 top-3 z-10">
             <StageProgressHUD stage={stage} progress={growth.stageProgress} bpm={bpm} />
           </div>

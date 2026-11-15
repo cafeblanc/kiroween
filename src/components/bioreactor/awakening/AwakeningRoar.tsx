@@ -62,7 +62,7 @@ const CRACKS: string[] = [
   'M80 100 L70 82 L76 68 L60 56',
 ];
 
-export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, onComplete }) => {
+export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscreen = false, onComplete }) => {
   const [state, setState] = useState<AwakeningRoarState>({
     isRoaring: false,
     glassCrackProgress: 0,
@@ -165,31 +165,50 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, onComplet
   }, [monster, playRoar]);
 
   const visibleCracks = Math.ceil(state.glassCrackProgress * CRACKS.length);
+  const popScale = 0.55 + Math.sin(Math.min(1, state.glassCrackProgress * 1.15) * (Math.PI / 2)) * 0.65;
+  const popZ = Math.round(state.glassCrackProgress * 220);
 
   return (
     <div
-      className="absolute inset-0 overflow-hidden bg-[#020617] pointer-events-none"
+      className={`${
+        fullscreen ? 'fixed inset-0 z-[100]' : 'absolute inset-0'
+      } overflow-hidden bg-[#020617] pointer-events-none`}
+      style={fullscreen ? { perspective: '1200px' } : undefined}
       data-testid="awakening-roar"
     >
-      {!videoFailed ? (
-        <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          src={safeVideoUrl(monster.awakeningVideo || DEFAULT_VIDEO)}
-          autoPlay
-          muted
-          playsInline
-          onError={() => setVideoFailed(true)}
-        />
-      ) : (
-        <div
-          className="absolute inset-0 animate-pulse"
-          style={{
-            background: `radial-gradient(circle at 50% 50%, ${monster.color || '#ef4444'}88, #020617 70%)`,
-          }}
-          data-testid="awakening-fallback"
-        />
-      )}
+      <div
+        className="absolute inset-0 w-full h-full"
+        style={
+          fullscreen
+            ? {
+                transform: `translateZ(${popZ}px) scale(${popScale.toFixed(3)})`,
+                transformStyle: 'preserve-3d',
+                filter: `drop-shadow(0 0 40px ${monster.color || '#ef4444'})`,
+                transition: 'transform 50ms linear',
+              }
+            : undefined
+        }
+      >
+        {!videoFailed ? (
+          <video
+            ref={videoRef}
+            className="absolute inset-0 w-full h-full object-cover"
+            src={safeVideoUrl(monster.awakeningVideo || DEFAULT_VIDEO)}
+            autoPlay
+            muted
+            playsInline
+            onError={() => setVideoFailed(true)}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 animate-pulse"
+            style={{
+              background: `radial-gradient(circle at 50% 50%, ${monster.color || '#ef4444'}88, #020617 70%)`,
+            }}
+            data-testid="awakening-fallback"
+          />
+        )}
+      </div>
 
       {/* Roar flash, contained inside the frame (no outer border shake). */}
       <div

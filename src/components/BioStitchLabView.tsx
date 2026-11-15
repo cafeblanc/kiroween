@@ -254,12 +254,12 @@ export const BioStitchLabView: React.FC = () => {
   // Custom Monster Prompt & 12 Comic Monster Characters Engine
   type ChimeraScreenMode = "photos" | "videos" | "bioreactor";
   const [chimeraScreen, setChimeraScreen] = useState<ChimeraScreenMode>("photos");
+  const [returnChimeraScreen, setReturnChimeraScreen] = useState<ChimeraScreenMode>("photos");
   const [selectedComicMonster, setSelectedComicMonster] = useState<ComicMonster>(COMIC_MONSTERS[0]);
   const [isFullscreenJumpscareActive, setIsFullscreenJumpscareActive] = useState<boolean>(false);
 
   // 15초 정밀 6단계 타임랩스: 실제 진행/영상/BPM/각성은 BioreactorScreen(GrowthTimelapseEngine 훅 기반)이 담당
   const [bioreactorRunId, setBioreactorRunId] = useState<number>(0);
-  const [awakenSignal, setAwakenSignal] = useState<number>(0);
 
   const BIOREACTOR_MORPH_STAGES: MorphStageType[] = [
     "stage1_cleavage",
@@ -270,6 +270,9 @@ export const BioStitchLabView: React.FC = () => {
   ];
 
   const handleSelectAndAwakenMonster = (monster: ComicMonster) => {
+    if (chimeraScreen !== "bioreactor") {
+      setReturnChimeraScreen(chimeraScreen);
+    }
     setSelectedComicMonster(monster);
     setAi3DBurstVideoUrl(null);
     setAi3DStatus("");
@@ -278,7 +281,6 @@ export const BioStitchLabView: React.FC = () => {
     setMorphStage("stage1_cleavage");
     setMorphPercent(16);
     setCreatureBpm(GROWTH_STAGES[0].targetBpm);
-    setAwakenSignal(0);
     setBioreactorRunId((n) => n + 1); // 화면을 재마운트하여 15초 시퀀스를 처음부터 재시작
     setChimeraScreen("bioreactor"); // 즉시 독립된 3번 배양기 화면으로 전환!
   };
@@ -290,17 +292,12 @@ export const BioStitchLabView: React.FC = () => {
     setMorphPercent(Math.round((stage / GROWTH_STAGES.length) * 100) - (stage === GROWTH_STAGES.length ? 5 : 0));
   };
 
-  // BioreactorScreen -> 6단계 완료 또는 수동 트리거로 AwakeningRoar 시작
+  // BioreactorScreen -> 6단계 완료로 AwakeningRoar 시작
   const handleBioreactorAwaken = () => {
     setMorphStage("awakened");
     setMorphPercent(100);
     setFluidLevel(0.15);
     setEyesOpen(1.0);
-  };
-
-  // 즉시 각성(유리 균열 + 하모닉 포효 + 성체 각성 영상) 트리거
-  const handleTrigger3DBurstNow = () => {
-    setAwakenSignal((n) => n + 1);
   };
 
   // 16x16 BattleMatrix 기반 결투 영상 선택
@@ -481,11 +478,11 @@ export const BioStitchLabView: React.FC = () => {
     setIsGeneratingAi3D(false);
   };
 
-  // 배양기 화면에서 이전 12개 선택 화면으로 복귀 핸들러
+  // 배양기 화면에서 이전 선택 화면으로 복귀 핸들러
   const handleReturnToSelection = () => {
     setIsFullscreenJumpscareActive(false);
     setMorphStage("idle");
-    setChimeraScreen("videos");
+    setChimeraScreen(returnChimeraScreen);
   };
 
   // Top-right mini ECG canvas
@@ -1784,59 +1781,6 @@ export const BioStitchLabView: React.FC = () => {
                         <span>⚔️</span>
                         <span>{isKo ? "괴수 결투장" : "Clash Arena"}</span>
                       </button>
-
-                      {activeModalTab === "chimera_assembler" && (
-                        <>
-                          <span className="text-slate-700 px-0.5">|</span>
-                          <button
-                            type="button"
-                            onClick={() => setChimeraScreen("photos")}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
-                              chimeraScreen === "photos"
-                                ? "bg-amber-500 text-slate-950"
-                                : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
-                            }`}
-                          >
-                            📷 {isKo ? "세포 8종" : "8 Cells"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setChimeraScreen("videos")}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
-                              chimeraScreen === "videos"
-                                ? "bg-cyan-500 text-slate-950"
-                                : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
-                            }`}
-                          >
-                            🎬 {isKo ? "괴수 16종" : "16 Videos"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setChimeraScreen("bioreactor");
-                              if (morphStage === "idle") {
-                                handleSelectAndAwakenMonster(selectedComicMonster);
-                              }
-                            }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
-                              chimeraScreen === "bioreactor"
-                                ? "bg-emerald-500 text-slate-950"
-                                : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
-                            }`}
-                          >
-                            🧪 {isKo ? "15초 배양기" : "Bioreactor"}
-                          </button>
-                          {chimeraScreen === "bioreactor" && (
-                            <button
-                              type="button"
-                              onClick={handleTrigger3DBurstNow}
-                              className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 hover:bg-rose-500 text-white cursor-pointer transition whitespace-nowrap animate-pulse shadow"
-                            >
-                              💥 {isKo ? "3D 돌출 포효" : "3D Burst"}
-                            </button>
-                          )}
-                        </>
-                      )}
                     </div>
 
                     <button
@@ -2033,37 +1977,12 @@ export const BioStitchLabView: React.FC = () => {
                         <BioreactorScreen
                           key={`${selectedComicMonster.id}-${bioreactorRunId}`}
                           monster={selectedComicMonster}
-                          awakenSignal={awakenSignal}
                           onStageChange={handleBioreactorStageChange}
                           onAwaken={handleBioreactorAwaken}
                           onHeartbeat={(bpm) => {
                             if (isHeartbeatAudioOn) playCardiacThump(bpm);
                           }}
                           onReturn={handleReturnToSelection}
-                          controls={
-                            <>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectAndAwakenMonster(selectedComicMonster);
-                                }}
-                                className="bg-slate-900/90 hover:bg-slate-800 text-emerald-300 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-500/40 cursor-pointer"
-                              >
-                                ▶ {isKo ? "15초 재시작" : "Replay 15s"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTrigger3DBurstNow();
-                                }}
-                                className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full shadow-lg shadow-rose-600/40 cursor-pointer animate-pulse"
-                              >
-                                💥 {isKo ? "지금 3D 튀어나오기!" : "3D Burst Now!"}
-                              </button>
-                            </>
-                          }
                         />
                       )}
                     </div>

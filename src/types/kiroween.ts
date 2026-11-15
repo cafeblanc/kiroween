@@ -190,6 +190,7 @@ export interface StageProgressHUDState {
 
 export interface AwakeningRoarProps {
   monster: MonsterDefinition;
+  fullscreen?: boolean;
   onComplete?: () => void;
 }
 
