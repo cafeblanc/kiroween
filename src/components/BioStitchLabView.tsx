@@ -1353,11 +1353,22 @@ export const BioStitchLabView: React.FC = () => {
       timestamp: new Date().toLocaleTimeString(),
       linkedCase: exp
     };
-    setMessages((prev) => [...prev, msg]);
+    void appendTranslatedAiReply(msg);
+  };
+
+  const getEffectiveTargetLang = (): string => {
+    if (selectedLangCode && selectedLangCode !== "ko") return selectedLangCode;
+    if (typeof document !== "undefined") {
+      const combo = document.querySelector<HTMLSelectElement>(".goog-te-combo");
+      if (combo?.value && combo.value !== "ko") return combo.value;
+      const match = document.cookie.match(/(?:^|;\s*)googtrans=\/[^/]+\/([^;]+)/);
+      if (match?.[1] && match[1] !== "ko") return match[1];
+    }
+    return "ko";
   };
 
   const appendTranslatedAiReply = async (msg: SynapseChatMessage) => {
-    const lang = selectedLangCode || "ko";
+    const lang = getEffectiveTargetLang();
     if (lang === "ko") {
       setMessages((prev) => [...prev, msg]);
       return;
@@ -1377,14 +1388,17 @@ export const BioStitchLabView: React.FC = () => {
       translateTextToLanguage(msg.textKo, lang),
       msg.subTextKo ? translateTextToLanguage(msg.subTextKo, lang) : Promise.resolve(undefined),
     ]);
+    const finalMain = translatedMain && translatedMain !== msg.textKo ? translatedMain : msg.textEn;
+    const finalSub =
+      translatedSub && translatedSub !== msg.subTextKo ? translatedSub : msg.subTextEn;
     setMessages((prev) => [
       ...prev,
       {
         ...msg,
-        textKo: translatedMain,
-        textEn: translatedMain,
-        subTextKo: translatedSub,
-        subTextEn: translatedSub,
+        textKo: finalMain,
+        textEn: finalMain,
+        subTextKo: finalSub,
+        subTextEn: finalSub,
       },
     ]);
   };
@@ -1640,7 +1654,12 @@ export const BioStitchLabView: React.FC = () => {
                               : "max-w-[90%] px-3 py-1.5 rounded-2xl rounded-bl-xs text-xs bg-slate-950/90 backdrop-blur-md text-emerald-100 border border-emerald-500/40 shadow-lg break-words"
                           }
                         >
-                          <p className="whitespace-pre-line">{isKo ? msg.textKo : msg.textEn}</p>
+                          <p
+                            translate={msg.sender === "ai" && selectedLangCode !== "ko" ? "no" : undefined}
+                            className="whitespace-pre-line"
+                          >
+                            {isKo ? msg.textKo : msg.textEn}
+                          </p>
                           {(isKo ? msg.subTextKo : msg.subTextEn) && (
                             <p className="text-[11px] text-slate-300 mt-1 border-t border-slate-700/80 pt-1">
                               {isKo ? msg.subTextKo : msg.subTextEn}
@@ -2305,7 +2324,12 @@ export const BioStitchLabView: React.FC = () => {
                   </div>
 
                   {langMode !== "EN" && (
-                    <p className="leading-relaxed font-semibold text-white whitespace-pre-line">{msg.textKo}</p>
+                    <p
+                      translate={selectedLangCode !== "ko" ? "no" : undefined}
+                      className="leading-relaxed font-semibold text-white whitespace-pre-line"
+                    >
+                      {msg.textKo}
+                    </p>
                   )}
                   {langMode !== "KO" && (
                     <p className="leading-relaxed font-medium text-emerald-200">{msg.textEn}</p>
