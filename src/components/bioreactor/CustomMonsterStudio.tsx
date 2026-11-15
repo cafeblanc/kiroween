@@ -89,9 +89,13 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
       setThemeHex(result.themeHex);
       setGeneratedVideoUrl(null);
       setStatusMessage(
-        isKo
-          ? "AI 괴수 이미지가 생성되었습니다. 이제 아래에서 동영상으로 변환하거나 배양기에 투입하세요."
-          : "Custom monster image generated. Convert it to video or start culturing below.",
+        result.source === "procedural"
+          ? isKo
+            ? "외부 AI 응답 지연으로 부위별 변이 합성 이미지를 생성했습니다. 이제 동영상으로 변환하거나 배양기에 투입하세요."
+            : "Rendered procedural multi-part mutation image. Convert to video or launch bioreactor."
+          : isKo
+          ? "입력하신 부위별 사양에 맞춰 새로운 AI 괴수 이미지를 생성했습니다! 이제 아래에서 동영상으로 변환하거나 배양기에 투입하세요."
+          : "Generated a brand-new AI monster image matching your specs! Convert to video or launch bioreactor.",
       );
     } catch (err) {
       setStatusMessage(

@@ -51,6 +51,7 @@ export const API_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "": ["/api/generate-video", "/api/openai/", "/sounds/", "/images/", "/videos/"],
   "api-inference.huggingface.co": ["/models/"],
   "router.huggingface.co": ["/"],
+  "image.pollinations.ai": ["/prompt/"],
   "www.ebi.ac.uk": ["/europepmc/webservices/rest/"],
   "en.wikipedia.org": ["/api/rest_v1/", "/w/api.php"],
   "ko.wikipedia.org": ["/api/rest_v1/", "/w/api.php"],

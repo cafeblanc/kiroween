@@ -1,3 +1,6 @@
+import { assertAllowedApiEndpoint } from "../utils/security";
+import { translateTextToLanguage } from "./scienceStitchService";
+
 export interface MonsterBodyParts {
   head: string;
   hornsOrCrown: string;
@@ -245,12 +248,91 @@ function drawCoverImage(
   ctx.drawImage(img, dx, dy, drawW, drawH);
 }
 
+function hashString(str: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+async function buildEnglishMonsterPrompt(
+  preset: MonsterStudioPreset,
+  description: string,
+): Promise<string> {
+  const translated = await translateTextToLanguage(description, "en", "ko");
+  const compact = translated.replace(/\s+/g, " ").trim().slice(0, 520);
+  return `Photorealistic bio-engineered ${preset.nameEn} monster inside a dark sci-fi laboratory bioreactor chamber, ${compact}, cinematic studio lighting, ultra detailed creature anatomy, no text`;
+}
+
+async function fetchImageBlobAsDataUrl(url: string, init?: RequestInit, timeoutMs = 15000): Promise<string> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(assertAllowedApiEndpoint(url), {
+      ...init,
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    if (!blob.type.startsWith("image/") && blob.size < 2048) {
+      throw new Error("Invalid image payload");
+    }
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("FileReader failed"));
+      reader.readAsDataURL(blob);
+    });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function generateCustomMonsterImage(params: {
   preset: MonsterStudioPreset;
   description: string;
-}): Promise<{ imageUrl: string; themeHex: string }> {
-  const { preset, description } = params;
+  hfToken?: string;
+}): Promise<{ imageUrl: string; themeHex: string; source: "hf" | "pollinations" | "procedural" }> {
+  const { preset, description, hfToken } = params;
   const theme = detectVisualTheme(description, preset.colorHex);
+  const seed = (hashString(description) % 900000) + (Date.now() % 999);
+  const englishPrompt = await buildEnglishMonsterPrompt(preset, description);
+
+  // 1. Optional HuggingFace Inference (FLUX / LTX ecosystem) when HF token is provided
+  if (hfToken?.trim()) {
+    try {
+      const dataUrl = await fetchImageBlobAsDataUrl(
+        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${hfToken.trim()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ inputs: englishPrompt }),
+        },
+        20000,
+      );
+      return { imageUrl: dataUrl, themeHex: theme.primary, source: "hf" };
+    } catch {
+      // Fall through to zero-key AI generation
+    }
+  }
+
+  // 2. Zero-key Real Generative AI Image (Pollinations.ai) driven by exact body-part prompt
+  try {
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      englishPrompt,
+    )}?width=768&height=768&nologo=true&seed=${seed}`;
+    const dataUrl = await fetchImageBlobAsDataUrl(pollinationsUrl, undefined, 16000);
+    return { imageUrl: dataUrl, themeHex: theme.primary, source: "pollinations" };
+  } catch {
+    // Fall through to procedural multi-part mutation canvas
+  }
+
+  // 3. Offline / Fallback Procedural Multi-Part Mutation Canvas (visibly varies per prompt)
   const size = 768;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -262,36 +344,67 @@ export async function generateCustomMonsterImage(params: {
   ctx.fillStyle = "#020617";
   ctx.fillRect(0, 0, size, size);
 
-  // Base creature image with subtle contrast & saturation boost
+  const hueShift = (hashString(description) % 180) - 90;
   ctx.save();
-  ctx.filter = "contrast(1.12) saturate(1.22)";
+  ctx.filter = `contrast(1.16) saturate(1.3) hue-rotate(${hueShift}deg)`;
   drawCoverImage(ctx, baseImg, size, size, 1.04);
   ctx.restore();
 
   // Radial bioluminescent aura tint based on body-part description keywords
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.14, size / 2, size / 2, size * 0.56);
   grad.addColorStop(0, "rgba(0,0,0,0)");
-  grad.addColorStop(0.7, `${theme.primary}33`);
-  grad.addColorStop(1, "rgba(2, 6, 23, 0.88)");
+  grad.addColorStop(0.7, `${theme.primary}44`);
+  grad.addColorStop(1, "rgba(2, 6, 23, 0.9)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
-  // Subtle anatomical part synthesis accents (horns / electro-arcs / embers / spores)
+  // Procedural anatomical accents based on prompt keywords
   ctx.save();
   ctx.globalCompositeOperation = "screen";
+  const lower = description.toLowerCase();
+  // Horns / Crown silhouette
+  if (/(뿔|왕관|전극|볼트|horn|crown|bolt)/.test(lower)) {
+    ctx.strokeStyle = theme.secondary;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.36, size * 0.25);
+    ctx.quadraticCurveTo(size * 0.24, size * 0.08, size * 0.18, size * 0.14);
+    ctx.moveTo(size * 0.64, size * 0.25);
+    ctx.quadraticCurveTo(size * 0.76, size * 0.08, size * 0.82, size * 0.14);
+    ctx.stroke();
+  }
+  // Tentacles / Wings / Tail
+  if (/(촉수|날개|꼬리|tentacle|wing|tail)/.test(lower)) {
+    ctx.strokeStyle = `${theme.primary}cc`;
+    ctx.lineWidth = 5;
+    for (let t = 0; t < 4; t++) {
+      ctx.beginPath();
+      ctx.moveTo(size * 0.5, size * 0.62);
+      ctx.bezierCurveTo(
+        size * (0.2 + t * 0.2),
+        size * 0.45,
+        size * (0.15 + t * 0.24),
+        size * 0.85,
+        size * (0.08 + t * 0.28),
+        size * 0.92,
+      );
+      ctx.stroke();
+    }
+  }
+
   for (let i = 0; i < 42; i++) {
-    const px = ((i * 197) % size);
-    const py = ((i * 313) % size);
+    const px = ((i * 197 + seed) % size);
+    const py = ((i * 313 + seed) % size);
     const r = 2 + (i % 6);
     ctx.beginPath();
     ctx.arc(px, py, r, 0, Math.PI * 2);
-    ctx.fillStyle = i % 2 === 0 ? `${theme.primary}99` : `${theme.secondary}88`;
+    ctx.fillStyle = i % 2 === 0 ? `${theme.primary}aa` : `${theme.secondary}99`;
     ctx.fill();
   }
 
   if (theme.particleMode === "electric") {
     ctx.strokeStyle = "#7dd3fc";
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.5;
     for (let arc = 0; arc < 5; arc++) {
       ctx.beginPath();
       let x = 120 + arc * 130;
@@ -316,35 +429,14 @@ export async function generateCustomMonsterImage(params: {
   ctx.fillStyle = glassGrad;
   ctx.fillRect(0, 0, size, size);
 
-  // Corner biometric scan brackets
   ctx.strokeStyle = `${theme.primary}cc`;
   ctx.lineWidth = 4;
   ctx.strokeRect(10, 10, size - 20, size - 20);
-  const bracket = 34;
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = theme.secondary;
-  // Top-left
-  ctx.beginPath();
-  ctx.moveTo(24, 24 + bracket);
-  ctx.lineTo(24, 24);
-  ctx.lineTo(24 + bracket, 24);
-  // Top-right
-  ctx.moveTo(size - 24 - bracket, 24);
-  ctx.lineTo(size - 24, 24);
-  ctx.lineTo(size - 24, 24 + bracket);
-  // Bottom-left
-  ctx.moveTo(24, size - 24 - bracket);
-  ctx.lineTo(24, size - 24);
-  ctx.lineTo(24 + bracket, size - 24);
-  // Bottom-right
-  ctx.moveTo(size - 24 - bracket, size - 24);
-  ctx.lineTo(size - 24, size - 24);
-  ctx.lineTo(size - 24, size - 24 - bracket);
-  ctx.stroke();
 
   return {
     imageUrl: canvas.toDataURL("image/png"),
     themeHex: theme.primary,
+    source: "procedural",
   };
 }
 
