@@ -7,7 +7,11 @@ import {
 } from "../data/bioExperiments";
 import { COMIC_MONSTERS, ComicMonster, HUMAN_PROMETHEUS_MONSTER } from "../data/comicMonsters";
 import { REAL_STEM_CELL_PHOTOS } from "../data/stemCellPhotos";
-import { scienceStitchService } from "../services/scienceStitchService";
+import {
+  scienceStitchService,
+  detectQuestionIntent,
+  toConciseCore
+} from "../services/scienceStitchService";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { getBattleVideoForPair } from "./bioreactor/arena";
@@ -1390,6 +1394,23 @@ export const BioStitchLabView: React.FC = () => {
     setMessages((prev) => [...prev, userMsg]);
 
     const lower = rawQuery.toLowerCase();
+    const intent = detectQuestionIntent(rawQuery);
+
+    if (intent === "app_usage") {
+      const replyMsg: SynapseChatMessage = {
+        id: (Date.now() + 1).toString() + "-ai",
+        sender: "ai",
+        textKo:
+          "우측 하단에서 7개 실제 줄기세포 실험을 전환하고, 좌측 하단 [전설의 괴수 부활 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
+        textEn:
+          "Switch between 7 real stem-cell cases at the bottom-right, or open the Monster Resurrection Battle at the bottom-left to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
+        pmidBadge: "LAB GUIDE",
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setMessages((prev) => [...prev, replyMsg]);
+      return;
+    }
+
     const matchedCase = experiments.find(
       (c) =>
         lower.includes(c.shortTitle.toLowerCase()) ||
@@ -1410,16 +1431,54 @@ export const BioStitchLabView: React.FC = () => {
           c.id.includes("dishbrain"))
     );
 
-    if (matchedCase) {
-      setActiveExp(matchedCase);
+    const isContextualFollowUp =
+      !matchedCase &&
+      /(이\s*실험|현재\s*실험|이거|여기서|원리|왜|어떻게|유전자|인자|논문|출처|저자|연구소|윤리|위험|한계|실제|진짜|가능)/.test(
+        lower
+      ) &&
+      !/(크리스퍼|crispr|텔로미어|telomere|야마나카|dna|rna|백신|암세포)/.test(lower);
+
+    const targetCase = matchedCase || (isContextualFollowUp ? activeExp : undefined);
+
+    if (targetCase) {
+      if (matchedCase && matchedCase.id !== activeExp.id) {
+        setActiveExp(matchedCase);
+      }
+      const factors = targetCase.stemCellBridge.factors.join(", ");
+      let textKo = "";
+      let textEn = "";
+
+      switch (intent) {
+        case "mechanism":
+          textKo = `[${targetCase.koreanShortTitle} 원리] ${targetCase.koreanHostTissueA}에 ${targetCase.koreanDonorTissueB}를 결합합니다. ${toConciseCore(targetCase.stemCellBridge.koreanFusionMechanism, 160)}`;
+          textEn = `[${targetCase.shortTitle} Mechanism] Combines ${targetCase.hostTissueA} with ${targetCase.donorTissueB}. ${toConciseCore(targetCase.stemCellBridge.fusionMechanism, 160)}`;
+          break;
+        case "genes_cells":
+          textKo = `[핵심 유전자·세포] ${factors} 인자를 사용해 '${targetCase.stemCellBridge.koreanLineage}' 계통으로 분화시킵니다 (생존·활성도 ${targetCase.stemCellBridge.viabilityPercent}%).`;
+          textEn = `[Key Genes & Cells] Uses ${factors} to direct ${targetCase.stemCellBridge.lineage} (${targetCase.stemCellBridge.viabilityPercent}% viability).`;
+          break;
+        case "paper_source":
+          textKo = `[논문 출처] ${targetCase.institution} (${targetCase.leadScientist}) 연구팀이 ${targetCase.journalCitation}에 발표한 실제 연구입니다 (${targetCase.pmidOrDoi}).`;
+          textEn = `[Study Source] Published by ${targetCase.leadScientist} at ${targetCase.institution} in ${targetCase.journalCitation} (${targetCase.pmidOrDoi}).`;
+          break;
+        case "ethics_reality":
+          textKo = `[실제 연구·한계] ${targetCase.journalCitation}에 등재된 실제 실험이며(활성도 ${targetCase.stemCellBridge.viabilityPercent}%), 현재는 질병 모델·장기 재생 등 생명윤리 기준 안에서만 제한적으로 연구됩니다.`;
+          textEn = `[Reality & Ethics] A real study in ${targetCase.journalCitation} (${targetCase.stemCellBridge.viabilityPercent}% viability), strictly bounded by bioethics for disease modeling and organ regeneration.`;
+          break;
+        default:
+          textKo = `[${targetCase.koreanShortTitle}] ${toConciseCore(targetCase.koreanSummary, 170)}`;
+          textEn = `[${targetCase.shortTitle}] ${toConciseCore(targetCase.eerieRealitySummary, 170)}`;
+          break;
+      }
+
       const replyMsg: SynapseChatMessage = {
         id: (Date.now() + 1).toString() + "-ai",
         sender: "ai",
-        textKo: `🧬 [${matchedCase.koreanShortTitle}] ${matchedCase.koreanHeadline}`,
-        textEn: `🧬 [${matchedCase.shortTitle}] ${matchedCase.headline}`,
-        pmidBadge: matchedCase.pmidOrDoi,
+        textKo,
+        textEn,
+        pmidBadge: targetCase.pmidOrDoi,
         timestamp: new Date().toLocaleTimeString(),
-        linkedCase: matchedCase
+        linkedCase: targetCase
       };
       setMessages((prev) => [...prev, replyMsg]);
       return;
