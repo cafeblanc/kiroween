@@ -369,51 +369,6 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pulseBpm: 105
   },
   {
-    id: "case-05-anthrobots",
-    codeName: "CASE #05 · ANTHROBOTS",
-    badgeIcon: "🤖🦠",
-    shortTitle: "Living Human Biobots",
-    koreanShortTitle: "신경을 꿰매는 생체 로봇",
-    headline: "Anthrobots & Xenobots: Self-Assembling Human Stem Biobots That Stitch Neural Wounds",
-    koreanHeadline: "성인 세포가 스스로 조립되어 헤엄치며 찢어진 인간 뇌신경을 꿰매는 생체 로봇",
-    institution: "Tufts University & Harvard Wyss Institute",
-    leadScientist: "Dr. Michael Levin & Dr. Gizem Gumuskaya",
-    journalCitation: "Advanced Science (2023/2025) & PNAS (2020)",
-    pmidOrDoi: "PMID: 38032125 / DOI: 10.1002/advs.202303575",
-    pubMedSearchQuery: "Motile Living Biobots Self-Construct from Adult Human Somatic Progenitor Seed Cells",
-    wikiTitle: "Xenobot",
-    videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/6e/Mitosis_drosophila_larva.ogv",
-    fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
-    microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/d/dd/Xenobot.jpg",
-    secondaryPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/7/73/Xenobot_Multiple_Design_Organism_Pairs.png",
-    hostTissueA: "Lacerated Human 2D Neural Tissue Sheet (Severed Axons)",
-    koreanHostTissueA: "물리적으로 절단되어 신경 다발이 끊어진 인간 신경 조직 시트",
-    stemCellBridge: {
-      factors: ["Adult Somatic Progenitor Plasticity", "Cilia-Outward Polarity Reversal", "Morphogenetic Fields"],
-      lineage: "Self-Assembled Multicellular Ciliated Human Anthrobots",
-      koreanLineage: "섬모(Cilia) 추진력을 가진 자가 조립 다세포 인간 앤스로봇",
-      viabilityPercent: 94,
-      fusionMechanism: "Freed from their normal anatomical constraints, adult progenitor cells invert their cilia outward like thousands of microscopic oars, cluster over severed human neurons, and induce rapid axonal bridging.",
-      koreanFusionMechanism: "기존 신체의 해부학적 제약에서 해방된 성체 전구세포들이 수천 개의 미세 섬모를 바깥으로 뒤집어 노처럼 저으며 이동하고, 끊어진 인간 신경 상처 위에 군집하여 신경 재생 다리를 놓아줍니다."
-    },
-    donorTissueB: "Autonomous Living Biobot Swarm (Zero Genetic Modification)",
-    koreanDonorTissueB: "유전자 조작 없이 스스로 조립된 살아있는 인간 생체 로봇 군집",
-    eerieRealitySummary: "When adult human progenitor cells are liberated from the body and cultured in specific matrices, they refuse to die—instead, they self-assemble into brand-new motile organisms ('Anthrobots') that swim across damaged human neural networks and stitch severed nerves back together.",
-    koreanSummary: "인간의 체세포·전구세포를 기존 신체 구조에서 분리해 특수 배양하자, 세포들이 죽지 않고 스스로 섬모(Cilia)를 바깥으로 뒤집어 노처럼 저으며 헤엄치는 완전히 새로운 다세포 생명체('앤스로봇')로 재조립되었습니다. 더 놀라운 것은 이 생체 로봇들이 칼로 찢어놓은 인간 신경세포 상처 부위로 몰려가 끊어진 신경 다리를 스스로 이어 붙였다는 사실입니다.",
-    narratorScript: [
-      "Case Zero-Five: Living Human Anthrobots and Xenobots.",
-      "Liberated from their default anatomical blueprint, human progenitor cells spontaneously self-assemble into motile microscopic organisms.",
-      "When placed upon severed human neural tissue, these living biobots crawl across the gap and biologically stitch the torn neurons back together."
-    ],
-    koreanNarratorScript: [
-      "다섯 번째 사례는 살아있는 인간 생체 로봇, 앤스로봇입니다.",
-      "인간의 전구세포를 신체에서 분리해 배양하자, 세포들이 스스로 섬모를 바깥으로 뒤집어 헤엄쳐 다니는 새로운 형태의 생명체로 자가 조립되었습니다.",
-      "이 생체 로봇들을 찢어진 인간 뇌신경 위에 올려놓자, 스스로 상처 부위로 이동해 끊어진 신경세포들을 생물학적으로 꿰매어 복구했습니다."
-    ],
-    themeColor: "purple",
-    pulseBpm: 92
-  },
-  {
     id: "case-06-human-pig-chimera",
     codeName: "CASE #06 · INTERSPECIES CHIMERA",
     badgeIcon: "🐷🧬",
@@ -459,51 +414,6 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pulseBpm: 80
   },
   {
-    id: "case-07-synthetic-embryo",
-    codeName: "CASE #07 · SYNTHETIC STEMBRYO",
-    badgeIcon: "🧫⚡",
-    shortTitle: "Sperm-Free Synthetic Embryo",
-    koreanShortTitle: "정자·난자 없는 합성 배아",
-    headline: "Weizmann & Cambridge: Synthetic Embryos Created Purely from Stem Cells with Beating Heart & Brain",
-    koreanHeadline: "정자나 난자 없이 줄기세포만으로 심장이 뛰고 뇌가 접히는 완전 인공 배아를 창조하다 (와이즈만 연구소)",
-    institution: "Weizmann Institute of Science & University of Cambridge",
-    leadScientist: "Dr. Jacob Hanna & Dr. Magdalena Zernicka-Goetz",
-    journalCitation: "Cell (2022) & Nature (2022) — Post-gastrulation synthetic embryos from naive stem cells",
-    pmidOrDoi: "PMID: 35985324 / DOI: 10.1016/j.cell.2022.08.018",
-    pubMedSearchQuery: "Post-gastrulation synthetic embryos generated ex utero from mouse naive iPSCs Hanna",
-    wikiTitle: "Synthetic_embryo",
-    videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
-    fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
-    microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Human_embryonic_stem_cell_colony_phase.jpg",
-    secondaryPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/61/Human_Cerebral_Organoids_%2853728295930%29.jpg",
-    hostTissueA: "Continuous Ex-Utero Rotating Bioreactor Chamber (Atmospheric Oxygenation)",
-    koreanHostTissueA: "모체의 자궁을 대체하는 컴퓨터 제어 회전식 배양기 챔버 (Ex-Utero)",
-    stemCellBridge: {
-      factors: ["OCT4", "SOX2", "GATA4", "CDX2", "Naïve-to-Primed Transition"],
-      lineage: "Self-Assembling Embryonic & Extra-Embryonic Stem Cell Triad",
-      koreanLineage: "배아 줄기세포와 태반·난황 줄기세포 3중 자가 조직화 복합체",
-      viabilityPercent: 93,
-      fusionMechanism: "Naïve stem cells reprogrammed with master lineage drivers talk to each other without maternal signals, spontaneously folding neural tubes and pumping blood chambers within 8.5 days.",
-      koreanFusionMechanism: "순수 만능줄기세포들이 모체의 신호 없이 서로 분자 대화를 나누며 스스로 신경관을 접고, 혈관을 만들고, 쿵쾅쿵쾅 뛰는 심장 원시 심실을 8.5일 만에 자율 형성합니다."
-    },
-    donorTissueB: "Pluripotent Stem-Cell Lineage Triad (ESC + TSC + XEN)",
-    koreanDonorTissueB: "만능줄기세포 유래 배아·태반·난황 3종 세포 융합체",
-    eerieRealitySummary: "Without any sperm, egg, or womb, scientists placed naive stem cells in a revolving artificial incubator. Within days, the cells organized themselves into a living synthetic embryo with a beating heart, distinct brain folds, and circulating red blood cells.",
-    koreanSummary: "정자도 난자도 자궁도 없이, 오직 배양 접시 속 만능줄기세포만을 회전식 인공 인큐베이터에 넣었습니다. 그러자 며칠 만에 세포들이 스스로 위치를 잡으며 앞뒤 축을 만들고, 뇌 주름이 접히며, 붉은 피를 뿜어내는 쿵쾅거리는 심장을 가진 살아있는 인공 배아로 스스로 탄생했습니다.",
-    narratorScript: [
-      "Case Zero-Seven: Synthetic Stembryos from the Weizmann Institute.",
-      "Without sperm, eggs, or a mother's womb, pluripotent stem cells were placed inside a revolving bioreactor.",
-      "The cells communicated and self-assembled into a synthetic embryo featuring a beating heart, neural folds, and circulating blood."
-    ],
-    koreanNarratorScript: [
-      "일곱 번째 사례는 와이즈만 연구소의 인공 합성 배아 스템브리오입니다.",
-      "정자와 난자, 모체의 자궁 없이 오직 만능줄기세포만을 회전 배양기 속에 넣었습니다.",
-      "세포들은 스스로 대화하며 신경관을 접고 뇌를 형성했으며, 스스로 피를 뿜어내는 쿵쾅거리는 심장을 갖춘 인공 생명 배아로 자가 조립되었습니다."
-    ],
-    themeColor: "emerald",
-    pulseBpm: 96
-  },
-  {
     id: "case-08-chimeric-monkey",
     codeName: "CASE #08 · CHIMERIC PRIMATE",
     badgeIcon: "🐒🌟",
@@ -547,51 +457,6 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     ],
     themeColor: "cyan",
     pulseBpm: 120
-  },
-  {
-    id: "case-09-bioprinted-heart",
-    codeName: "CASE #09 · 3D VASCULAR BIOPRINTING",
-    badgeIcon: "🫀🖨️",
-    shortTitle: "3D Printed Cellular Heart",
-    koreanShortTitle: "3D 프린팅 혈관 심장",
-    headline: "Tel Aviv University: 3D Bioprinting a Patient-Specific Vascularized Heart with Stem Cells",
-    koreanHeadline: "환자의 지방세포를 줄기세포로 역분화시켜 혈관망까지 3D 프린팅한 맞춤형 심장 (텔아비브대)",
-    institution: "Tel Aviv University (Sagol Center for Regenerative Medicine)",
-    leadScientist: "Dr. Tal Dvir et al.",
-    journalCitation: "Advanced Science (2019) Vol. 6, Issue 10, 1900344",
-    pmidOrDoi: "PMID: 31011422 / DOI: 10.1002/advs.201900344",
-    pubMedSearchQuery: "3D Printing of Personalized Thick Perfusable and Vascularized Cardiac Patches Dvir",
-    wikiTitle: "Organ_printing",
-    videoUrl: "https://upload.wikimedia.org/wikipedia/commons/1/14/2D-and-3D-Self-Assembling-Nanofiber-Hydrogels-for-Cardiomyocyte-Culture-285678.f1.ogv",
-    fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/04/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s001.ogv",
-    microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/1/12/Blue_Veins_of_the_Heart%E2%80%99s_Shield.jpg",
-    secondaryPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e8/Pipeline_for_multiscale_hyperdimensional_analysis_of_organoids.webp",
-    hostTissueA: "Patient-Specific Omental Decellularized Hydrogel Bio-Ink",
-    koreanHostTissueA: "환자 본인의 대망 조직을 추출해 만든 거부반응 제로 하이드로겔 바이오잉크",
-    stemCellBridge: {
-      factors: ["Personalized hiPSC Reprogramming", "Cardiomyocyte Induction", "Endothelial Patterning"],
-      lineage: "Vascularized Contracting Ventricular & Coronary Architecture",
-      koreanLineage: "관상동맥 미세 혈관망을 갖춘 자가 수축성 3D 심근 구조체",
-      viabilityPercent: 95,
-      fusionMechanism: "High-precision micro-extrusion prints vascular hollow networks layer by layer, where stem-cell cardiomyocytes mature and synchronize contraction across the chambers.",
-      koreanFusionMechanism: "컴퓨터 정밀 노즐이 혈관 파이프와 심실을 한 층씩 출력하면, 줄기세포 유래 심근세포들이 3차원 공간 속에서 서로 결합하여 하나의 심실 전체가 동시에 수축하기 시작합니다."
-    },
-    donorTissueB: "Patient Somatic Biopsy Reprogrammed to Pluripotent Cardiomyocytes",
-    koreanDonorTissueB: "환자 맞춤형 유도만능줄기세포(iPSC) 심장 근육 및 내피세포",
-    eerieRealitySummary: "Using a patient's own fat biopsy converted to pluripotent stem cells and custom extracellular bio-ink, scientists 3D printed an entire vascularized human heart with ventricles, blood vessels, and self-contracting muscle fibers.",
-    koreanSummary: "환자의 지방 조직에서 채취한 세포를 만능줄기세포로 역분화하고, 이를 세포외 기질 바이오잉크와 섞어 3D 프린터로 출력했습니다. 그 결과 주 심실과 미세 혈관망이 완벽하게 설계된 완전한 형태의 살아있는 3차원 심장이 탄생했습니다.",
-    narratorScript: [
-      "Case Zero-Nine: 3D Vascularized Bioprinting from Tel Aviv University.",
-      "Starting from a patient's own fat cells reprogrammed into pluripotent stem cells, a biological ink was synthesized.",
-      "A complete heart with chambers, ventricles, and intricate coronary vessels was printed in three dimensions, contracting with synchronized pulses."
-    ],
-    koreanNarratorScript: [
-      "아홉 번째 사례는 텔아비브 대학교의 3D 바이오프린팅 혈관 심장입니다.",
-      "환자의 세포를 만능줄기세포로 역분화시켜 맞춤형 바이오잉크를 합성했습니다.",
-      "정밀 3D 프린터가 심실과 관상동맥 혈관 파이프를 한 층씩 인쇄해냈으며, 세포들이 연결되어 박동을 시작했습니다."
-    ],
-    themeColor: "rose",
-    pulseBpm: 78
   },
   {
     id: "case-10-axolotl-blastema",
