@@ -146,6 +146,7 @@ export const BioStitchLabView: React.FC = () => {
 
   // Modals
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
+  const [isCustomMonsterModalOpen, setIsCustomMonsterModalOpen] = useState<boolean>(false);
   const [isKiroSpecModalOpen, setIsKiroSpecModalOpen] = useState<boolean>(false);
   const [kiroModalTab, setKiroModalTab] = useState<"requirements" | "tasks" | "hooks" | "code_gen">("requirements");
   const [selectedCodeSpec, setSelectedCodeSpec] = useState<string>("stitcher");
@@ -1577,6 +1578,14 @@ export const BioStitchLabView: React.FC = () => {
             </button>
             <button
               type="button"
+              onClick={() => setIsCustomMonsterModalOpen(true)}
+              className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
+            >
+              <span>🧬</span>
+              <span>{isKo ? "커스텀 괴수 배양기" : "Custom Monster Lab"}</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setIsSoundOn((prev) => !prev)}
               className={`text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded border transition font-bold cursor-pointer shadow ${
                 !isSoundOn
@@ -1925,11 +1934,6 @@ export const BioStitchLabView: React.FC = () => {
                               })}
                             </div>
                           </div>
-
-                          <CustomMonsterStudio
-                            isKo={isKo}
-                            onAwakenCustomMonster={handleSelectAndAwakenMonster}
-                          />
                         </div>
                       )}
 
@@ -2495,6 +2499,46 @@ export const BioStitchLabView: React.FC = () => {
             >
               확인 완료 — 현재 실험실 화면으로 돌아가기
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* INDEPENDENT CUSTOM MONSTER BIOREACTOR STUDIO MODAL */}
+      {isCustomMonsterModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-2 sm:p-4"
+          onClick={() => setIsCustomMonsterModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-5xl max-h-[92vh] bg-slate-900 border-2 border-cyan-500/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-800 bg-slate-950 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🧬</span>
+                <h2 className="text-xs sm:text-sm font-black text-cyan-300">
+                  {isKo ? "커스텀 괴수 배양기 (독립 제작실)" : "Custom Monster Bioreactor Studio"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomMonsterModalOpen(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs px-3 py-1 rounded-lg cursor-pointer transition"
+              >
+                ✕ {isKo ? "닫기" : "Close"}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+              <CustomMonsterStudio
+                isKo={isKo}
+                onAwakenCustomMonster={(customMonster) => {
+                  setIsCustomMonsterModalOpen(false);
+                  setIsStitchModalOpen(true);
+                  setActiveModalTab("chimera_assembler");
+                  handleSelectAndAwakenMonster(customMonster);
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
