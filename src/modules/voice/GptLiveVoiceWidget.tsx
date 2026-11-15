@@ -1,4 +1,4 @@
-// Standalone UI Widget for gpt-live WebRTC Voice Call with Domain-Optimized Intelligence
+﻿// Standalone UI Widget for gpt-live WebRTC Voice Call with Domain-Optimized Intelligence
 // Pure In/Out contract: accepts systemInstruction & tools in, emits onTranscript & onToolCall out.
 
 import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
@@ -27,6 +27,8 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
   const ui = getUIStrings(lang);
   const [localKey, setLocalKey] = useState(() => apiKey || localStorage.getItem('kiroween_openai_api_key') || '');
   const [showKeyModal, setShowKeyModal] = useState(false);
+  // Explicit consent: persist the key only when the user ticks 'remember'. A previously stored key keeps working.
+  const [rememberKey, setRememberKey] = useState(() => !!localStorage.getItem('kiroween_openai_api_key'));
   const [showDeviceModal, setShowDeviceModal] = useState(false);
 
   // Audio Device States
@@ -130,7 +132,11 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
   };
 
   const handleSaveKey = () => {
-    localStorage.setItem('kiroween_openai_api_key', localKey.trim());
+    if (rememberKey) {
+      localStorage.setItem('kiroween_openai_api_key', localKey.trim());
+    } else {
+      localStorage.removeItem('kiroween_openai_api_key');
+    }
     setShowKeyModal(false);
     setError(null);
     startVoice(localKey.trim());
@@ -346,6 +352,11 @@ export const GptLiveVoiceWidget = forwardRef<GptLiveVoiceWidgetHandle, GptLiveVo
               className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
             />
           </div>
+
+          <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+            <input type="checkbox" checked={rememberKey} onChange={e => setRememberKey(e.target.checked)} />
+            <span>이 기기에 기억하기 (remember on this device)</span>
+          </label>
 
           <button
             type="button"

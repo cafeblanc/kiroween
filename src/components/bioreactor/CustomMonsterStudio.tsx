@@ -189,8 +189,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     promptKo: `${longPrompt}\n[전투 능력치: 공격력 ${bioStats.atk}, 방어력 ${bioStats.def}, 속도 ${bioStats.spd}, 재생력 ${bioStats.regen}, 에너지 ${bioStats.energy}]`,
     avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,
     jumpscareImg: generatedImageUrl || selectedPreset.baseImageSrc,
-    videoSrc: generatedVideoUrl || "/videos/dragon_growth.mp4",
-    roarAudio: "/sounds/dragon_roar.mp3",
+    videoSrc: generatedVideoUrl || "/videos/chimera_growth_dragon_24s.mp4",
+    roarAudio: "/sounds/monster_roar_ferocious.wav",
     funFactKo: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): 부위별 맞춤 유전자가 배양기에서 각성했습니다!`,
     funFactEn: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): Custom bio-parts awakened inside the chamber!`,
   });

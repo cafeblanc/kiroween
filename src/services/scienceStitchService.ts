@@ -119,6 +119,34 @@ function isWikiRelevant(topic: string, wiki: WikiContext): boolean {
   return tokens.some((tok) => haystack.includes(tok));
 }
 
+export const DEFAULT_FETCH_TIMEOUT_MS = 8000;
+
+/** fetch that rejects after `ms` (aborts the request and also stops waiting if fetch ignores the signal). */
+export async function fetchWithTimeout(
+  url: string,
+  ms: number = DEFAULT_FETCH_TIMEOUT_MS,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const external = init.signal;
+  if (external) {
+    if (external.aborted) controller.abort();
+    else external.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Request timed out"));
+    }, ms);
+  });
+  try {
+    return await Promise.race([fetch(url, { ...init, signal: controller.signal }), timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 export async function translateTextToLanguage(
   text: string,
   targetLang: string,
@@ -134,7 +162,7 @@ export async function translateTextToLanguage(
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(
           sourceLang,
         )}&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(trimmed)}`;
-        const res = await fetch(assertAllowedApiEndpoint(url));
+        const res = await fetchWithTimeout(assertAllowedApiEndpoint(url));
         if (!res.ok) return line;
         const data = await res.json();
         if (!Array.isArray(data?.[0])) return line;
@@ -153,11 +181,16 @@ export async function translateTextToLanguage(
 
 export const scienceStitchService = {
   async fetchPubMedPapers(query: string, limit: number = 3): Promise<PubMedPaper[]> {
+    return (await this.fetchPubMedPapersOrNull(query, limit)) ?? [];
+  },
+
+  /** Returns null when the request failed or timed out (so callers do not retry a dead endpoint). */
+  async fetchPubMedPapersOrNull(query: string, limit: number = 3): Promise<PubMedPaper[] | null> {
     try {
       const encoded = encodeURIComponent(query);
       const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encoded}&format=json&pageSize=${limit}&resultType=core`;
-      const res = await fetch(assertAllowedApiEndpoint(url));
-      if (!res.ok) return [];
+      const res = await fetchWithTimeout(assertAllowedApiEndpoint(url));
+      if (!res.ok) return null;
       const data = await res.json();
       const list = data?.resultList?.result || [];
       return list.map((item: any) => ({
@@ -173,7 +206,7 @@ export const scienceStitchService = {
           : "Empirical bio-engineering and stem-cell differentiation findings verified in EuropePMC / PubMed."
       }));
     } catch {
-      return [];
+      return null;
     }
   },
 
@@ -183,7 +216,7 @@ export const scienceStitchService = {
       if (!cleanTopic || cleanTopic.length < 2) return null;
       const slug = cleanTopic.replace(/\s+/g, "_");
       const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`;
-      const res = await fetch(assertAllowedApiEndpoint(url));
+      const res = await fetchWithTimeout(assertAllowedApiEndpoint(url));
       if (res.ok) {
         const data = await res.json();
         if (data.type !== "disambiguation" && data.extract) {
@@ -197,7 +230,7 @@ export const scienceStitchService = {
         }
       }
       const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanTopic)}&format=json&origin=*`;
-      const sRes = await fetch(assertAllowedApiEndpoint(searchUrl));
+      const sRes = await fetchWithTimeout(assertAllowedApiEndpoint(searchUrl));
       if (!sRes.ok) return null;
       const sData = await sRes.json();
       const firstTitle = sData?.query?.search?.[0]?.title;
@@ -206,7 +239,7 @@ export const scienceStitchService = {
         return null;
       }
 
-      const sumRes = await fetch(
+      const sumRes = await fetchWithTimeout(
         assertAllowedApiEndpoint(
           `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstTitle.replace(/\s+/g, "_"))}`
         )
@@ -240,11 +273,14 @@ export const scienceStitchService = {
     const pubmedQuery = await buildPubMedQuery(userQuery);
     const [wiki, papers] = await Promise.all([
       this.fetchWikipediaContext(cleanTopic, targetLang === "en" ? "en" : "ko"),
-      this.fetchPubMedPapers(pubmedQuery, 3)
+      this.fetchPubMedPapersOrNull(pubmedQuery, 3)
     ]);
 
+    // Retry with a broader query only when the first request succeeded but found nothing.
     const fallbackPapers =
-      papers.length > 0
+      papers === null
+        ? []
+        : papers.length > 0
         ? papers
         : await this.fetchPubMedPapers(`${pubmedQuery} stem cell`, 3);
 

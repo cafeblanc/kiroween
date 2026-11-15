@@ -440,6 +440,9 @@ export async function generateCustomMonsterImage(params: {
   };
 }
 
+// Last generated blob URL per source image; regenerating from the same image revokes the replaced blob.
+const blobUrlByImage = new Map<string, string>();
+
 export async function generateVideoFromMonsterImage(params: {
   imageUrl: string;
   description: string;
@@ -452,6 +455,7 @@ export async function generateVideoFromMonsterImage(params: {
   }
 
   const { imageUrl, description, accentColor, durationSec = 5, onProgress } = params;
+  const imageKey = imageUrl;
   const theme = detectVisualTheme(description, accentColor);
   const width = 640;
   const height = 640;
@@ -492,7 +496,10 @@ export async function generateVideoFromMonsterImage(params: {
     recorder.onerror = () => reject(new Error("동영상 인코딩 중 오류가 발생했습니다."));
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+      const prevUrl = blobUrlByImage.get(imageKey);
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
       const videoUrl = URL.createObjectURL(blob);
+      blobUrlByImage.set(imageKey, videoUrl);
       onProgress?.(100);
       resolve({
         videoUrl,

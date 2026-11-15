@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { ProductItem, Language } from '../../types';
 import { GptLiveService } from './gptLiveService';
 
@@ -19,6 +19,8 @@ export const GptLiveVoiceModal: React.FC<GptLiveVoiceModalProps> = ({
 }) => {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('kiroween_openai_api_key') || '');
   const [showKeyInput, setShowKeyInput] = useState(false);
+  // Explicit consent: the key is only persisted to localStorage when the user ticks 'remember'. A previously stored key keeps working.
+  const [rememberKey, setRememberKey] = useState(() => !!localStorage.getItem('kiroween_openai_api_key'));
   const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error'>('disconnected');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -116,7 +118,11 @@ export const GptLiveVoiceModal: React.FC<GptLiveVoiceModalProps> = ({
 
     if (apiKey.trim()) {
       setIsSimulated(false);
-      localStorage.setItem('kiroween_openai_api_key', apiKey.trim());
+      if (rememberKey) {
+        localStorage.setItem('kiroween_openai_api_key', apiKey.trim());
+      } else {
+        localStorage.removeItem('kiroween_openai_api_key');
+      }
 
       const instructions = `You are the Kiroween Live Commerce Co-Host AI Agent powered by gpt-live-1.
 You are co-hosting an active live shopping broadcast with the host on screen.
@@ -278,8 +284,12 @@ Rules:
           <div className="p-3 bg-slate-950 border-b border-purple-500/30 flex flex-col gap-2 animate-in slide-in-from-top duration-150">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-purple-300">OpenAI API Key (gpt-live-1 WebRTC 실시간 통화):</label>
-              <span className="text-[10px] text-slate-400">브라우저 로컬스토리지에만 안전하게 보관됩니다</span>
+              <span className="text-[10px] text-slate-400">기본적으로 메모리에만 보관됩니다</span>
             </div>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+              <input type="checkbox" checked={rememberKey} onChange={e => setRememberKey(e.target.checked)} />
+              <span>이 기기에 기억하기 (remember on this device)</span>
+            </label>
             <div className="flex gap-2">
               <input
                 type="password"

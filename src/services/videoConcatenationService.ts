@@ -5,7 +5,8 @@ export const CROSSFADE_SECONDS = 0.15;
 export const EXPECTED_STAGE_COUNT = 6;
 export const EXPECTED_TOTAL_SECONDS = 15.0;
 export const DURATION_EPSILON = 1e-6;
-export const FALLBACK_VIDEO_URL = '/videos/fallback.mp4';
+import { FALLBACK_VIDEO_URL } from '../utils/security';
+export { FALLBACK_VIDEO_URL };
 export const DIRECT_CUT_MESSAGE = 'Converting to direct-cut sequence';
 
 const ALLOWED_PROTOCOLS = new Set(['https:', 'http:', 'blob:']);

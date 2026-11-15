@@ -1,6 +1,7 @@
 import { COMIC_MONSTERS } from "../data/comicMonsters";
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { SlidingWindowRateLimiter } from "../utils/rateLimiter";
+import { pollLumaJob, LUMA_POLL_TIMEOUT_MS } from "./lumaJobClient";
 import type {
   AIVideoGenerator,
   VideoCacheEntry,
@@ -123,6 +124,17 @@ function splitIntoSixStages(prompt: string): string[] {
   );
 }
 
+// Last blob URL created per prompt; replaced blobs are revoked so they do not leak.
+const blobUrlByPrompt = new Map<string, string>();
+
+function createTrackedBlobUrl(prompt: string, blob: Blob): string {
+  const prev = blobUrlByPrompt.get(prompt);
+  if (prev) URL.revokeObjectURL(prev);
+  const next = URL.createObjectURL(blob);
+  blobUrlByPrompt.set(prompt, next);
+  return next;
+}
+
 function pickVideoUrl(data: any): string | null {
   const url = data?.videoUrl ?? data?.assets?.video ?? data?.video?.url;
   return sanitizeVideoUrl(url);
@@ -144,7 +156,10 @@ async function generateSingleStage(
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), AI_VIDEO_TIMEOUT_MS);
+  // Luma jobs are polled for up to LUMA_POLL_TIMEOUT_MS after the create call.
+  const totalTimeout =
+    provider === "luma" ? AI_VIDEO_TIMEOUT_MS + LUMA_POLL_TIMEOUT_MS : AI_VIDEO_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), totalTimeout);
 
   try {
     let url: string | null = null;
@@ -159,9 +174,16 @@ async function generateSingleStage(
 
     if (res.ok) {
       if ((res.headers.get("content-type") || "").includes("video")) {
-        url = URL.createObjectURL(await res.blob());
+        url = createTrackedBlobUrl(prompt, await res.blob());
       } else {
-        url = pickVideoUrl(await res.json());
+        const data = await res.json();
+        if (typeof data?.jobId === "string") {
+          const job = await pollLumaJob(data.jobId, apiKey, { signal: controller.signal });
+          url = job.ok ? job.videoUrl : null;
+          if (!job.ok) console.warn(`${LOG} luma job ended: ${job.error}`);
+        } else {
+          url = pickVideoUrl(data);
+        }
       }
     } else {
       console.warn(`${LOG} proxy responded ${res.status}`);
@@ -178,7 +200,7 @@ async function generateSingleStage(
         body: JSON.stringify({ inputs: prompt }),
         signal: controller.signal,
       });
-      if (hf.ok) url = URL.createObjectURL(await hf.blob());
+      if (hf.ok) url = createTrackedBlobUrl(prompt, await hf.blob());
       else console.warn(`${LOG} HuggingFace responded ${hf.status}`);
     }
 

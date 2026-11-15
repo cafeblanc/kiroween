@@ -1,4 +1,4 @@
-// Headless Hook for gpt-live WebRTC Full-Duplex Voice Engine with Specialized Domain Optimization
+﻿// Headless Hook for gpt-live WebRTC Full-Duplex Voice Engine with Specialized Domain Optimization
 // Pure standalone implementation with zero dependencies on domain business logic.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -41,6 +41,8 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
+  const activeDomainRef = useRef<DomainCategory>('general');
+  const isStartingRef = useRef(false);
 
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -81,6 +83,11 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     optionsRef.current.onError?.(errText);
   }, [updateStatus]);
 
+  const applyActiveDomain = useCallback((domain: DomainCategory) => {
+    activeDomainRef.current = domain;
+    setActiveDomain(domain);
+  }, []);
+
   const setupVisualizer = (stream: MediaStream) => {
     try {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -107,7 +114,8 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     }
   };
 
-  const stopVoice = useCallback(() => {
+  // Releases pc, dc, mic and audio resources WITHOUT touching status (so an error status survives).
+  const cleanup = useCallback(() => {
     if (animFrameIdRef.current) {
       cancelAnimationFrame(animFrameIdRef.current);
       animFrameIdRef.current = null;
@@ -119,11 +127,17 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
     }
 
     if (dcRef.current) {
+      dcRef.current.onopen = null;
+      dcRef.current.onmessage = null;
+      dcRef.current.onclose = null;
       dcRef.current.close();
       dcRef.current = null;
     }
 
     if (pcRef.current) {
+      pcRef.current.onconnectionstatechange = null;
+      pcRef.current.oniceconnectionstatechange = null;
+      pcRef.current.ontrack = null;
       pcRef.current.close();
       pcRef.current = null;
     }
@@ -140,11 +154,18 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
 
     setAudioLevel(0);
     setIsVoiceActive(false);
-    setActiveDomain('general');
+    applyActiveDomain('general');
+  }, [applyActiveDomain]);
+
+  const stopVoice = useCallback(() => {
+    cleanup();
     updateStatus('idle');
-  }, [updateStatus]);
+  }, [cleanup, updateStatus]);
 
   const startVoice = useCallback(async (explicitKey?: string): Promise<boolean> => {
+    // Re-entry guard: ignore a second start while one is in flight (prevents duplicate peer connections)
+    if (isStartingRef.current) return false;
+    isStartingRef.current = true;
     try {
       setError(null);
       updateStatus('connecting');
@@ -220,7 +241,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         console.log('[useGptLiveVoice] WebRTC connectionState changed:', state);
         if (state === 'failed') {
           reportError('WebRTC 실시간 음성 연결이 불안정하여 끊어졌습니다. 네트워크 상태를 확인하시거나 마이크를 다시 켜주세요.');
-          stopVoice();
+          cleanup();
         } else if (state === 'closed') {
           updateStatus('idle');
         }
@@ -231,7 +252,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         console.log('[useGptLiveVoice] WebRTC iceConnectionState changed:', iceState);
         if (iceState === 'failed') {
           reportError('WebRTC ICE 네트워크 터널링에 실패했습니다. 방화벽 환경 또는 네트워크 연결을 점검해주세요.');
-          stopVoice();
+          cleanup();
         }
       };
 
@@ -239,7 +260,7 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
         track.onended = () => {
           console.warn('[useGptLiveVoice] Microphone track ended unexpectedly (device unplugged/disconnected)');
           reportError('마이크 장치가 분리되었거나 사용할 수 없게 되었습니다. 마이크 연결을 확인해주세요.');
-          stopVoice();
+          cleanup();
         };
         pcRef.current.addTrack(track, localStreamRef.current);
       }
@@ -335,23 +356,64 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       if (!sdpResponse.ok && (sdpResponse.status === 400 || sdpResponse.status === 404)) {
         const fallbackModel = primaryModel === 'gpt-realtime' ? 'gpt-4o-realtime-preview' : 'gpt-realtime';
         console.log(`[useGptLiveVoice] Retrying with ${fallbackModel} fallback...`);
-        const fallbackFormData = new FormData();
-        const sdpString = offer.sdp || pcRef.current?.localDescription?.sdp || '';
-        fallbackFormData.append('sdp', sdpString);
-        fallbackFormData.append(
-          'session',
-          JSON.stringify({
-            type: 'realtime',
-            model: fallbackModel
-          })
-        );
-        const retryRes = await fetch(gaCallsUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${activeBearer}`
-          },
-          body: fallbackFormData
-        });
+        // A fresh ephemeral token is bound to its model, so request a new client_secret for the fallback model
+        let fallbackBearer = targetKey;
+        let fallbackEphemeral = false;
+        try {
+          const fallbackSecretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${targetKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              session: {
+                type: 'realtime',
+                model: fallbackModel
+              }
+            })
+          });
+          if (fallbackSecretRes.ok) {
+            const fallbackSecretData = await fallbackSecretRes.json();
+            const fallbackToken = fallbackSecretData.value || fallbackSecretData.client_secret?.value;
+            if (fallbackToken) {
+              fallbackBearer = fallbackToken;
+              fallbackEphemeral = true;
+            }
+          }
+        } catch (fallbackTokenErr) {
+          console.warn('[useGptLiveVoice] Fallback token notice:', fallbackTokenErr);
+        }
+
+        const fallbackSdp = offer.sdp || pcRef.current?.localDescription?.sdp || '';
+        let retryRes: Response;
+        if (fallbackEphemeral) {
+          retryRes = await fetch(gaCallsUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${fallbackBearer}`,
+              'Content-Type': 'application/sdp'
+            },
+            body: fallbackSdp
+          });
+        } else {
+          const fallbackFormData = new FormData();
+          fallbackFormData.append('sdp', fallbackSdp);
+          fallbackFormData.append(
+            'session',
+            JSON.stringify({
+              type: 'realtime',
+              model: fallbackModel
+            })
+          );
+          retryRes = await fetch(gaCallsUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${fallbackBearer}`
+            },
+            body: fallbackFormData
+          });
+        }
         if (retryRes.ok) {
           sdpResponse = retryRes;
         }
@@ -388,10 +450,12 @@ export function useGptLiveVoice(options: UseGptLiveVoiceOptions) {
       console.error('[useGptLiveVoice] Connection error:', err);
       const msg = err?.message || '실시간 음성 연결에 실패했습니다.';
       reportError(msg);
-      stopVoice();
+      cleanup();
       return false;
+    } finally {
+      isStartingRef.current = false;
     }
-  }, [reportError, stopVoice, updateStatus]);
+  }, [reportError, cleanup, updateStatus]);
 
   // DataChannel configuration with Domain-Optimized Tool
   const setupDataChannel = (dc: RTCDataChannel, currentOpts: UseGptLiveVoiceOptions) => {
@@ -496,7 +560,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
               executeVoiceButtonCommand(userText);
 
               const detected = DomainKnowledgeRouter.detectDomain(userText);
-              setActiveDomain(detected.domain);
+              applyActiveDomain(detected.domain);
               if (detected.domain !== 'general') {
                 optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, userText);
               }
@@ -513,7 +577,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
                 lastUserItemId = msg.item.id;
                 const userText = audioContent.transcript.trim();
                 const detected = DomainKnowledgeRouter.detectDomain(userText);
-                setActiveDomain(detected.domain);
+                applyActiveDomain(detected.domain);
                 optionsRef.current.onTranscript?.('user', userText, detected.domain);
               }
             }
@@ -524,7 +588,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             currentResponseEmitted = false;
             pendingAgentText = '';
             // Trigger start of agent voice turn immediately
-            optionsRef.current.onTranscriptStream?.('agent', '', '', activeDomain);
+            optionsRef.current.onTranscriptStream?.('agent', '', '', activeDomainRef.current);
             break;
 
           // Agent Answer Transcription Streaming: emit chunks in real time as the AI speaks
@@ -533,7 +597,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
           case 'response.text.delta':
             if (msg.delta) {
               pendingAgentText += msg.delta;
-              optionsRef.current.onTranscriptStream?.('agent', msg.delta, pendingAgentText, activeDomain);
+              optionsRef.current.onTranscriptStream?.('agent', msg.delta, pendingAgentText, activeDomainRef.current);
             }
             updateStatus('speaking');
             break;
@@ -545,7 +609,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
             const agentAnswer = (msg.transcript || msg.text || pendingAgentText).trim();
             if (agentAnswer && !currentResponseEmitted) {
               currentResponseEmitted = true;
-              optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
+              optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomainRef.current);
             }
             pendingAgentText = '';
             break;
@@ -558,7 +622,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
               const agentAnswer = (part?.transcript || part?.text || pendingAgentText).trim();
               if (agentAnswer) {
                 currentResponseEmitted = true;
-                optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
+                optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomainRef.current);
                 pendingAgentText = '';
               }
             }
@@ -574,7 +638,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
                   const agentAnswer = (part?.transcript || part?.text || pendingAgentText).trim();
                   if (agentAnswer) {
                     currentResponseEmitted = true;
-                    optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomain);
+                    optionsRef.current.onTranscript?.('agent', agentAnswer, activeDomainRef.current);
                     pendingAgentText = '';
                     break;
                   }
@@ -683,7 +747,7 @@ You are equipped with 'domain_optimized_search'. When the user asks domain-speci
     if (!text.trim()) return false;
     const cleanText = text.trim();
     const detected = DomainKnowledgeRouter.detectDomain(cleanText);
-    setActiveDomain(detected.domain);
+    applyActiveDomain(detected.domain);
     if (detected.domain !== 'general') {
       optionsRef.current.onDomainDetected?.(detected.domain, detected.meta, cleanText);
     }

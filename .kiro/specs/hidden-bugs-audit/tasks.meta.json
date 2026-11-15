@@ -1,0 +1,194 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490066
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735495108
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735711341
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490173
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735495226
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735711424
+      }
+    ],
+    "3.1 Batch 1: small isolated fixes (1.1, 1.2, 1.4)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490225
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735714132
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735787150
+      }
+    ],
+    "3.2 Batch 2: viewport and chat resilience (1.3, 1.7, 1.5)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490269
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735789801
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736021888
+      }
+    ],
+    "3.3 Batch 3: Lab Manual and leaks (1.6, 1.10)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490322
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736024572
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736237050
+      }
+    ],
+    "3.4 Batch 4: serverless API (1.8, 1.9)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490367
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736240059
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736366722
+      }
+    ],
+    "3.5 Batch 5: latent Realtime code (1.11, 1.12), last": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490408
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736369696
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736537355
+      }
+    ],
+    "3.6 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490447
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736540361
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736571697
+      }
+    ],
+    "3.7 Verify preservation tests still pass": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490488
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736540724
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736571968
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490529
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736574664
+      },
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736618624
+      }
+    ],
+    "5. Deploy (ONLY after explicit user approval)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794735490584
+      },
+      {
+        "executionId": "53323680-5b3d-4049-bf4b-987c0c978077",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736799515
+      }
+    ],
+    "3. Fix hidden bugs (rollout in 5 batches, small isolated fixes first, latent Realtime code last)": [
+      {
+        "executionId": "00f8c87c-0ea7-445b-a652-a8474a8c82c9",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794736572012
+      }
+    ]
+  }
+}

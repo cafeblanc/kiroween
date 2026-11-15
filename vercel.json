@@ -6,7 +6,7 @@
       "destination": "https://api.openai.com/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!videos/|sounds/|images/|assets/|api/).*)",
       "destination": "/index.html"
     }
   ],

@@ -11,8 +11,11 @@ import {
   scienceStitchService,
   detectQuestionIntent,
   toConciseCore,
-  translateTextToLanguage
+  translateTextToLanguage,
+  fetchWithTimeout,
+  type StitchedResearchDossier
 } from "../services/scienceStitchService";
+import { BioSimCanvas } from "./BioSimCanvas";
 import { CustomMonsterStudio } from "./bioreactor/CustomMonsterStudio";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
@@ -30,6 +33,61 @@ const CURATED_6_MONSTERS: ComicMonster[] = REAL_STEM_CELL_PHOTOS.map(
 );
 
 type LangMode = "KO" | "EN";
+
+const LOCAL_CONFOCAL_FALLBACK = "/images/chimera_microscopy_quad.jpg";
+
+interface LabManualPoint {
+  icon: string;
+  ko: { title: string; body: string };
+  en: { title: string; body: string };
+}
+
+// Concise 6-point Lab Manual (bilingual; the modal picks ko/en by isKo).
+const LAB_MANUAL_POINTS: LabManualPoint[] = [
+  {
+    icon: "🐭",
+    ko: { title: "1. 실제 줄기세포 실험 탐구", body: "실험 목록(아홀로틀 사지 재생·유령 심장·키메라 영장류 등)을 누르면 현미경 뷰와 논문 요약이 즉시 전환됩니다." },
+    en: { title: "1. Explore real stem-cell experiments", body: "Pick an experiment from the list (axolotl limb regeneration, ghost heart, chimeric primate and more) to switch the microscopy view and paper summary." },
+  },
+  {
+    icon: "📡",
+    ko: { title: "2. LIVE BIO-FEED 뷰포트", body: "좌측 상단 LIVE BIO-FEED 영상은 음소거 현미경 영상과 공초점 사진을 겹쳐 보여주며, 화면을 누르면 내레이터가 켜지고 꺼집니다." },
+    en: { title: "2. LIVE BIO-FEED viewport", body: "The muted microscopy video is layered over a confocal photo. Tap the viewport to toggle the narrator." },
+  },
+  {
+    icon: "🌐",
+    ko: { title: "3. 다국어 & 내레이터", body: "우측 상단 언어 선택기로 화면 전체를 번역하고, 내레이터 버튼으로 해당 언어 음성을 듣습니다." },
+    en: { title: "3. Languages & narrator", body: "Use the language selector at the top right to translate the screen, and the Narrator button to hear it spoken." },
+  },
+  {
+    icon: "💬",
+    ko: { title: "4. 논문·백과사전 채팅", body: "하단 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 간결한 답변을 제공합니다." },
+    en: { title: "4. Paper & encyclopedia chat", body: "Ask a question in the input box and the lab searches PubMed and Wikipedia live for a short answer." },
+  },
+  {
+    icon: "⚡",
+    ko: { title: "5. 키메라 조립·부활", body: "키메라 조립 버튼으로 iPSC를 조직 사이에 주입해 괴수를 15초 배양하고 3D 각성과 결투장으로 이어갑니다." },
+    en: { title: "5. Chimera assembly", body: "Open the Chimera Assembler to inject iPSCs between tissues, culture a creature for 15 seconds, then awaken it and send it to the arena." },
+  },
+  {
+    icon: "🧬",
+    ko: { title: "6. 커스텀 괴수 설계", body: "커스텀 괴수 설계 버튼으로 나만의 괴수를 만들 수 있습니다. 가이드를 닫으면 진행 중인 실험 화면 그대로 돌아갑니다." },
+    en: { title: "6. Custom monster design", body: "Design your own creature with Custom Monster Design. Closing this guide returns you to the experiment exactly as you left it." },
+  },
+];
+
+function buildOfflineDossier(query: string): StitchedResearchDossier {
+  return {
+    query,
+    timestamp: new Date().toLocaleTimeString(),
+    wiki: null,
+    papers: [],
+    stemCellSynthesisEn:
+      "The live PubMed / Wikipedia lookup is unavailable right now. Please try again in a moment or ask about the active experiment.",
+    stemCellSynthesisKo:
+      "실시간 PubMed / 위키백과 검색이 지금은 응답하지 않습니다. 잠시 후 다시 시도하거나 현재 실험에 대해 질문해 주세요.",
+  };
+}
 
 interface SynapseChatMessage {
   id: string;
@@ -178,6 +236,9 @@ export const BioStitchLabView: React.FC = () => {
   // Block 1: Video & Confocal Microscopy Photo
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState<boolean>(false);
+  const [photoDead, setPhotoDead] = useState<boolean>(false);
+  const narrationIdRef = useRef<number>(0);
+  const narrationAbortRef = useRef<AbortController | null>(null);
 
   // Block 2: WebAudio Narrator & ECG Pulse
   const [isSoundOn, setIsSoundOn] = useState<boolean>(false);
@@ -1004,13 +1065,38 @@ export const BioStitchLabView: React.FC = () => {
   // Video switch handler
   useEffect(() => {
     setVideoFailed(false);
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {
+    setPhotoDead(false);
+
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+
+    // Browsers without Ogg Theora support cannot play Wikimedia .ogv clips; show photo + canvas instead.
+    if (
+      /\.og[vg](\?|$)/i.test(activeExp.videoUrl) &&
+      typeof video.canPlayType === "function" &&
+      !video.canPlayType('video/ogg; codecs="theora"')
+    ) {
+      setVideoFailed(true);
+      return;
+    }
+
+    const tryPlay = (isRetry: boolean) => {
+      const playPromise = video.play();
+      if (!playPromise || typeof playPromise.catch !== "function") return;
+      playPromise.catch((err: unknown) => {
+        const name = (err as { name?: string } | null)?.name;
+        // AbortError: play() interrupted by a new load/source swap, not a real failure.
+        if (name === "AbortError") return;
+        if (name === "NotAllowedError" && !isRetry) {
+          video.muted = true;
+          tryPlay(true);
+          return;
+        }
         setVideoFailed(true);
       });
-    }
+    };
+    tryPlay(false);
   }, [activeExp.id]);
 
   // Fetch live PubMed & Wiki when dossier tab is opened
@@ -1205,6 +1291,10 @@ export const BioStitchLabView: React.FC = () => {
   const speakText = async (textKo: string, textEn: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
+    narrationAbortRef.current?.abort();
+    const narrationId = ++narrationIdRef.current;
+    const abortController = new AbortController();
+    narrationAbortRef.current = abortController;
 
     const targetCode = selectedLangCode || "ko";
     const bcp47 = getBcp47ForLang(targetCode);
@@ -1215,7 +1305,7 @@ export const BioStitchLabView: React.FC = () => {
         const url = assertAllowedApiEndpoint(
           `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${encodeURIComponent(targetCode)}&dt=t&q=${encodeURIComponent(textEn)}`,
         );
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, 8000, { signal: abortController.signal });
         if (res.ok) {
           const data = await res.json();
           const translated = Array.isArray(data?.[0])
@@ -1227,6 +1317,9 @@ export const BioStitchLabView: React.FC = () => {
         /* fallback to English narration */
       }
     }
+
+    // Discard stale narration (sound muted, experiment/language changed, or unmounted during translate).
+    if (narrationId !== narrationIdRef.current) return;
 
     const softenedText = rawText
       .replace(/([.!?])\s*/g, "$1 ... ")
@@ -1264,10 +1357,16 @@ export const BioStitchLabView: React.FC = () => {
       pulseIntervalRef.current = null;
     }
 
-    if (!isSoundOn) {
+    const stopNarration = () => {
+      narrationIdRef.current++;
+      narrationAbortRef.current?.abort();
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
+    };
+
+    if (!isSoundOn) {
+      stopNarration();
       return;
     }
 
@@ -1283,8 +1382,32 @@ export const BioStitchLabView: React.FC = () => {
 
     return () => {
       if (pulseIntervalRef.current) window.clearInterval(pulseIntervalRef.current);
+      stopNarration();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
   }, [isSoundOn, activeExp.id, selectedLangCode]);
+
+  // Clear every pending arena battle timer on unmount.
+  useEffect(() => {
+    return () => {
+      arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
+      arenaTimersRef.current = [];
+    };
+  }, []);
+
+  // Release the shared AudioContext on unmount.
+  useEffect(() => {
+    return () => {
+      if (audioCtxRef.current) {
+        try {
+          Promise.resolve(audioCtxRef.current.close()).catch(() => {});
+        } catch {
+          /* already closed */
+        }
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   // Active WebAudio Cardiac Loop for Chimera Assembler (Only active during bioreactor growth)
   useEffect(() => {
@@ -1538,8 +1661,14 @@ export const BioStitchLabView: React.FC = () => {
 
     const activeLang = getEffectiveTargetLang();
     setIsQueryingApi(true);
-    const dossier = await scienceStitchService.stitchLiveQuery(rawQuery, activeLang);
-    setIsQueryingApi(false);
+    let dossier: StitchedResearchDossier;
+    try {
+      dossier = await scienceStitchService.stitchLiveQuery(rawQuery, activeLang);
+    } catch {
+      dossier = buildOfflineDossier(rawQuery);
+    } finally {
+      setIsQueryingApi(false);
+    }
 
     const topPaper = dossier.papers[0];
 
@@ -1595,14 +1724,6 @@ export const BioStitchLabView: React.FC = () => {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => setIsHelpOpen(true)}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
-            >
-              <span>❓</span>
-              <span>{isKo ? "사용법(Help)" : "Help"}</span>
-            </button>
-            <button
-              type="button"
               onClick={() => setIsCustomMonsterModalOpen(true)}
               className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
             >
@@ -1647,10 +1768,23 @@ export const BioStitchLabView: React.FC = () => {
           >
             {/* Background High-Res Real Confocal/Experiment Photo */}
             <img
+              key={activeExp.id + "-photo"}
               src={activeExp.microscopyPhotoUrl}
               alt={activeExp.headline}
+              onError={(e) => {
+                const img = e.currentTarget;
+                if (img.dataset.fallback === "1") {
+                  setPhotoDead(true);
+                  return;
+                }
+                img.dataset.fallback = "1";
+                img.src = LOCAL_CONFOCAL_FALLBACK;
+              }}
               className="absolute inset-0 w-full h-full object-cover opacity-60 scale-105 transition-all duration-700 filter contrast-125"
             />
+
+            {/* Canvas bio-simulation: always-visible fallback when no real media can be shown */}
+            {(videoFailed && photoDead) && <BioSimCanvas />}
 
             {/* Live Microscopy Video Layer */}
             {!videoFailed && (
@@ -1675,6 +1809,28 @@ export const BioStitchLabView: React.FC = () => {
                   "radial-gradient(circle at center, transparent 28%, rgba(2, 6, 23, 0.88) 100%), repeating-linear-gradient(0deg, rgba(16, 185, 129, 0.04) 0px, rgba(16, 185, 129, 0.04) 1px, transparent 1px, transparent 3px)"
               }}
             />
+
+            {/* Top-left: LIVE BIO-FEED badge with the Help / Lab Guide button right next to it */}
+            <div
+              className="absolute top-2 left-2 z-20 flex items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span
+                translate="no"
+                className="flex items-center gap-1 bg-black/75 border border-red-500/60 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px]"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                LIVE BIO-FEED
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(true)}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
+              >
+                <span>❓</span>
+                <span>{isKo ? "사용법(Help / Lab Guide)" : "Help / Lab Guide"}</span>
+              </button>
+            </div>
 
             {/* MOBILE FLOATING OVERLAY */}
             <div
@@ -2539,42 +2695,45 @@ export const BioStitchLabView: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">🐭</span>
+                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[0].icon}</span>
                 <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">1. 실제 줄기세포 실험 탐구</p>
-                  <p className="text-slate-300 leading-snug">
-                    우측 하단 <strong>실험 목록(아홀로틀 사지 재생·유령 심장·키메라 영장류 등 7종)</strong>을 누르면 좌측 현미경 뷰와 논문 요약이 즉시 전환됩니다.
-                  </p>
+                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[0].ko.title : LAB_MANUAL_POINTS[0].en.title}</p>
+                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[0].ko.body : LAB_MANUAL_POINTS[0].en.body}</p>
                 </div>
               </div>
-
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">⚡</span>
+                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[1].icon}</span>
                 <div>
-                  <p className="font-bold text-amber-400 mb-0.5">2. 전설의 괴수 배양 & 전투</p>
-                  <p className="text-slate-300 leading-snug">
-                    좌측 하단 <strong>전설의 괴수 배양 & 전투</strong> 버튼을 누르면 전체 화면 배양실이 열리며, 전설·외계·프랑켄슈타인·인간 표본 15초 배양 후 3D 각성과 결투장으로 이어집니다.
-                  </p>
+                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[1].ko.title : LAB_MANUAL_POINTS[1].en.title}</p>
+                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[1].ko.body : LAB_MANUAL_POINTS[1].en.body}</p>
                 </div>
               </div>
-
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">🌐</span>
+                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[2].icon}</span>
                 <div>
-                  <p className="font-bold text-cyan-400 mb-0.5">3. 다국가 언어 &amp; 내레이터</p>
-                  <p className="text-slate-300 leading-snug">
-                    우측 상단 <strong>언어 선택기</strong>로 한국어·English·日本語·中文 등 다국가 언어로 화면 전체를 번역하고, <strong>내레이터</strong> 버튼으로 해당 언어 음성을 듣습니다.
-                  </p>
+                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[2].ko.title : LAB_MANUAL_POINTS[2].en.title}</p>
+                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[2].ko.body : LAB_MANUAL_POINTS[2].en.body}</p>
                 </div>
               </div>
-
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">💬</span>
+                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[3].icon}</span>
                 <div>
-                  <p className="font-bold text-emerald-300 mb-0.5">4. 핵심 질문 논문·백과사전 채팅</p>
-                  <p className="text-slate-300 leading-snug">
-                    하단 입력창에 질문하면 AI 수석 생명공학자가 현재 실험과 핵심 키워드를 분석해 PubMed·백과사전 기반의 간결하고 정확한 답변을 제공합니다.
-                  </p>
+                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[3].ko.title : LAB_MANUAL_POINTS[3].en.title}</p>
+                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[3].ko.body : LAB_MANUAL_POINTS[3].en.body}</p>
+                </div>
+              </div>
+              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
+                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[4].icon}</span>
+                <div>
+                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[4].ko.title : LAB_MANUAL_POINTS[4].en.title}</p>
+                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[4].ko.body : LAB_MANUAL_POINTS[4].en.body}</p>
+                </div>
+              </div>
+              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
+                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[5].icon}</span>
+                <div>
+                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[5].ko.title : LAB_MANUAL_POINTS[5].en.title}</p>
+                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[5].ko.body : LAB_MANUAL_POINTS[5].en.body}</p>
                 </div>
               </div>
             </div>
@@ -2584,7 +2743,7 @@ export const BioStitchLabView: React.FC = () => {
               onClick={() => setIsHelpOpen(false)}
               className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 rounded-xl text-xs sm:text-sm shadow-lg transition cursor-pointer"
             >
-              확인 완료 — 현재 실험실 화면으로 돌아가기
+              {isKo ? "확인 완료 — 현재 실험실 화면으로 돌아가기" : "Got it — back to the active experiment"}
             </button>
           </div>
         </div>

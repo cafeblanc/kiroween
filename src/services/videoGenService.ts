@@ -1,4 +1,5 @@
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
+import { pollLumaJob } from "./lumaJobClient";
 
 export interface VideoGenRequest {
   prompt: string;
@@ -11,6 +12,15 @@ export interface VideoGenResult {
   videoUrl?: string;
   provider: string;
   error?: string;
+}
+
+// Only one generated video is live at a time; revoke the previous blob URL before issuing a new one.
+let lastBlobUrl: string | null = null;
+
+function createTrackedBlobUrl(blob: Blob): string {
+  if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+  lastBlobUrl = URL.createObjectURL(blob);
+  return lastBlobUrl;
 }
 
 /**
@@ -32,11 +42,17 @@ export async function generateMonsterVideo(req: VideoGenRequest): Promise<VideoG
         const blob = await serverRes.blob();
         return {
           success: true,
-          videoUrl: URL.createObjectURL(blob),
+          videoUrl: createTrackedBlobUrl(blob),
           provider: req.provider,
         };
       }
       const data = await serverRes.json();
+      if (typeof data?.jobId === "string") {
+        const job = await pollLumaJob(data.jobId, req.apiKey);
+        return job.ok
+          ? { success: true, videoUrl: job.videoUrl, provider: req.provider }
+          : { success: false, provider: req.provider, error: job.error };
+      }
       const safeUrl = sanitizeVideoUrl(data.videoUrl);
       if (safeUrl) {
         return {
@@ -65,7 +81,7 @@ export async function generateMonsterVideo(req: VideoGenRequest): Promise<VideoG
         const blob = await hfRes.blob();
         return {
           success: true,
-          videoUrl: URL.createObjectURL(blob),
+          videoUrl: createTrackedBlobUrl(blob),
           provider: "huggingface_ltx_video",
         };
       }

@@ -1,4 +1,4 @@
-// gpt-live-1 WebRTC Realtime API (GA endpoint /v1/realtime/calls)
+﻿// gpt-live-1 WebRTC Realtime API (GA endpoint /v1/realtime/calls)
 // Provides: Full-Duplex Simultaneous Listen-and-Speak, Native Server VAD,
 // Instant Barge-in (Interruption), WebRTC Hardware Echo Cancellation,
 // and In-Stream Action Tool Calling.
@@ -81,89 +81,82 @@ export class GptLiveService {
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
 
-      // 6. Authenticate with OpenAI GA Realtime API
-      // Try generating ephemeral client secret first via /v1/realtime/client_secrets or /v1/realtime/sessions
-      let activeBearer = apiKey.trim();
+      // 6. Authenticate and send the SDP offer to /v1/realtime/calls.
+      // Per model attempt: request a NEW ephemeral token via client_secrets
+      // (only {session:{type,model}}). Ephemeral success -> raw SDP (application/sdp).
+      // Master-key fallback -> multipart with plain sdp + minimal session {type, model}.
+      // voice/instructions/tools/transcription are sent via session.update on DataChannel open.
+      const gaCallsUrl = '/api/openai/v1/realtime/calls';
+      const sdpString = offer.sdp || this.pc?.localDescription?.sdp || '';
+      const primaryModel = 'gpt-realtime';
+      const fallbackModel = 'gpt-4o-realtime-preview';
+      const models = [primaryModel, fallbackModel];
+      let sdpResponse: Response | null = null;
 
-      try {
-        // Attempt 1: /v1/realtime/client_secrets (GA endpoint)
-        const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey.trim()}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            session: {
-              type: 'realtime',
-              model: 'gpt-4o-realtime-preview',
-              voice: 'verse'
-            }
-          })
-        });
+      for (const model of models) {
+        let activeBearer = apiKey.trim();
+        let usedEphemeral = false;
 
-        if (secretRes.ok) {
-          const secretData = await secretRes.json();
-          const token = secretData.value || secretData.client_secret?.value;
-          if (token) {
-            activeBearer = token;
-            console.log('[gpt-live-1 GA] Ephemeral client_secret obtained successfully');
-          }
-        } else if (secretRes.status === 401) {
-          throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): API 키가 올바른지 확인해주세요.');
-        } else if (secretRes.status === 403) {
-          throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 접근 권한이 없거나 제한된 Project 키입니다. platform.openai.com에서 Realtime 권한이 부여된 키인지 확인하세요.');
-        } else if (secretRes.status === 429) {
-          throw new Error('OpenAI 크레딧 부족 또는 요청 제한 (429 Rate Limit/Quota Exceeded): OpenAI 유료 크레딧 잔액을 확인해주세요.');
-        } else {
-          // Attempt 2 fallback: /v1/realtime/sessions
-          const sessionRes = await fetch('/api/openai/v1/realtime/sessions', {
+        try {
+          const secretRes = await fetch('/api/openai/v1/realtime/client_secrets', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${apiKey.trim()}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              model: 'gpt-4o-realtime-preview',
-              voice: 'verse'
-            })
+            body: JSON.stringify({ session: { type: 'realtime', model } })
           });
-          if (sessionRes.ok) {
-            const sessionData = await sessionRes.json();
-            const token = sessionData.client_secret?.value || sessionData.value;
-            if (token) activeBearer = token;
+
+          if (secretRes.ok) {
+            const secretData = await secretRes.json();
+            const token = secretData.value || secretData.client_secret?.value;
+            if (token) {
+              activeBearer = token;
+              usedEphemeral = true;
+            }
+          } else if (secretRes.status === 401) {
+            throw new Error('OpenAI API 키 인증 실패 (401 Unauthorized): API 키가 올바른지 확인해주세요.');
+          } else if (secretRes.status === 403) {
+            throw new Error('OpenAI 권한 거부 (403 Permission denied): 현재 API 키에 Realtime API 접근 권한이 없거나 제한된 Project 키입니다. platform.openai.com에서 Realtime 권한이 부여된 키인지 확인하세요.');
+          } else if (secretRes.status === 429) {
+            throw new Error('OpenAI 크레딧 부족 또는 요청 제한 (429 Rate Limit/Quota Exceeded): OpenAI 유료 크레딧 잔액을 확인해주세요.');
           }
+        } catch (tokenErr: any) {
+          if (tokenErr.message?.includes('401') || tokenErr.message?.includes('403') || tokenErr.message?.includes('429')) {
+            throw tokenErr;
+          }
+          console.warn('[gpt-live-1 GA] Client secret creation notice, proceeding to direct call:', tokenErr);
         }
-      } catch (tokenErr: any) {
-        if (tokenErr.message?.includes('401') || tokenErr.message?.includes('403') || tokenErr.message?.includes('429')) {
-          throw tokenErr;
+
+        if (usedEphemeral) {
+          sdpResponse = await fetch(gaCallsUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${activeBearer}`,
+              'Content-Type': 'application/sdp'
+            },
+            body: sdpString
+          });
+        } else {
+          // Direct master key call: multipart with plain sdp text and minimal session only
+          const formData = new FormData();
+          formData.append('sdp', sdpString);
+          formData.append('session', JSON.stringify({ type: 'realtime', model }));
+          sdpResponse = await fetch(gaCallsUrl, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${activeBearer}` },
+            body: formData
+          });
         }
-        console.warn('[gpt-live-1 GA] Client secret creation notice, proceeding to direct call:', tokenErr);
+
+        if (sdpResponse.ok) break;
+        // Only model-related errors trigger the gpt-realtime <-> gpt-4o-realtime-preview fallback
+        if (sdpResponse.status !== 400 && sdpResponse.status !== 404) break;
       }
 
-      // 7. Send Multipart FormData SDP Offer to Official OpenAI GA Realtime Calls Endpoint (/v1/realtime/calls)
-      const gaCallsUrl = '/api/openai/v1/realtime/calls';
-      const formData = new FormData();
-      const sdpString = offer.sdp || this.pc?.localDescription?.sdp || '';
-      formData.append('sdp', sdpString);
-      formData.append(
-        'session',
-        JSON.stringify({
-          type: 'realtime',
-          model: 'gpt-4o-realtime-preview',
-          instructions: instructions,
-          voice: 'verse'
-        })
-      );
-
-      const sdpResponse = await fetch(gaCallsUrl, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${activeBearer}`
-        }
-      });
-
+      if (!sdpResponse) {
+        throw new Error('OpenAI Realtime 연결 요청을 보내지 못했습니다.');
+      }
       if (!sdpResponse.ok) {
         const errorText = await sdpResponse.text();
         console.error('[gpt-live-1 GA Calls failed]:', sdpResponse.status, errorText);
