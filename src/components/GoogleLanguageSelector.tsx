@@ -60,9 +60,19 @@ function setGoogTransCookie(langCode: string) {
 
 function triggerGoogleTranslate(langCode: string, attempt = 0) {
   if (typeof document === "undefined") return;
+  if (langCode === "ko") {
+    // Google Translate 배너의 원문 복원 링크가 있으면 클릭하고, 콤보박스도 ko로 복원한다.
+    const restoreLink = document.querySelector<HTMLIFrameElement>(
+      ".goog-te-banner-frame"
+    )?.contentDocument?.querySelector<HTMLAnchorElement>(".goog-close-link");
+    if (restoreLink) {
+      restoreLink.click();
+      return;
+    }
+  }
   const combo = document.querySelector<HTMLSelectElement>(".goog-te-combo");
   if (!combo) {
-    if (attempt < 15) {
+    if (attempt < 20) {
       window.setTimeout(() => triggerGoogleTranslate(langCode, attempt + 1), 250);
     }
     return;
@@ -119,7 +129,11 @@ export const GoogleLanguageSelector: React.FC<GoogleLanguageSelectorProps> = ({ 
 
   return (
     <div className="flex items-center gap-1" translate="no">
-      <div id="google_translate_element" className="hidden" aria-hidden="true" />
+      <div
+        id="google_translate_element"
+        className="fixed -left-[9999px] top-0 opacity-0 pointer-events-none"
+        aria-hidden="true"
+      />
       <label htmlFor="google-lang-select" className="sr-only">
         Language
       </label>

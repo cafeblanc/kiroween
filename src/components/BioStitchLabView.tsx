@@ -117,13 +117,13 @@ export const BioStitchLabView: React.FC = () => {
     return window.localStorage.getItem("prometheus_lang") || "ko";
   });
   const [langMode, setLangMode] = useState<LangMode>(() =>
-    selectedLangCode === "ko" ? "KO" : "EN",
+    selectedLangCode === "en" ? "EN" : "KO",
   );
   const isKo = langMode === "KO";
 
   const handleGlobalLanguageChange = (langCode: string) => {
     setSelectedLangCode(langCode);
-    setLangMode(langCode === "ko" ? "KO" : "EN");
+    setLangMode(langCode === "en" ? "EN" : "KO");
     if (typeof window !== "undefined") {
       window.localStorage.setItem("prometheus_lang", langCode);
       document.documentElement.lang = langCode;
@@ -1457,14 +1457,13 @@ export const BioStitchLabView: React.FC = () => {
       <header className="border-b border-emerald-500/30 px-2.5 sm:px-4 py-2 flex justify-between items-center bg-slate-900/95 backdrop-blur shadow-lg w-full shrink-0 z-30">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
-          <h1 className="text-xs sm:text-sm font-black tracking-wide text-emerald-300 truncate shrink-0">
+          <h1
+            translate="no"
+            className="text-xs sm:text-sm font-black tracking-wide text-emerald-300 truncate shrink-0"
+          >
             PROMETHEUS-iPSC
           </h1>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="bg-emerald-600 text-slate-950 text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded flex items-center gap-1 uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping"></span>
-              <span>BIO-FEED</span>
-            </span>
             <button
               type="button"
               onClick={() => setIsHelpOpen(true)}
@@ -1484,11 +1483,11 @@ export const BioStitchLabView: React.FC = () => {
             >
               {isSoundOn
                 ? isKo
-                  ? "🔊 내레이터 켜짐"
-                  : "🔊 Narrator ON"
+                  ? "🔊 내레이터"
+                  : "🔊 Narrator"
                 : isKo
-                ? "🔇 내레이터 소리 켜기"
-                : "🔇 Tap for Voice"}
+                ? "🔇 내레이터"
+                : "🔇 Narrator"}
             </button>
           </div>
         </div>
@@ -2343,9 +2342,9 @@ export const BioStitchLabView: React.FC = () => {
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
                 <span className="text-lg shrink-0">🐭</span>
                 <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">1. 6대 실제 줄기세포 실험 탐구</p>
+                  <p className="font-bold text-emerald-400 mb-0.5">1. 실제 줄기세포 실험 탐구</p>
                   <p className="text-slate-300 leading-snug">
-                    하단 <strong>6개 실험 칩(쥐 뇌 92% 인간화, 유령 심장 등)</strong>을 누르면 실제 현미경 영상·사진과 논문으로 즉시 전환됩니다.
+                    우측 하단 <strong>실험 목록(아홀로틀 사지 재생·유령 심장·키메라 영장류 등 7종)</strong>을 누르면 좌측 현미경 뷰와 논문 요약이 즉시 전환됩니다.
                   </p>
                 </div>
               </div>
@@ -2355,7 +2354,7 @@ export const BioStitchLabView: React.FC = () => {
                 <div>
                   <p className="font-bold text-amber-400 mb-0.5">2. 전설의 괴수 부활 전투</p>
                   <p className="text-slate-300 leading-snug">
-                    <strong>전설의 괴수 부활 전투</strong> 버튼에서 표본을 배양해 3D 각성시키고 괴수 결투장에서 대결을 펼칩니다.
+                    좌측 하단 <strong>전설의 괴수 부활 전투</strong> 버튼을 누르면 전체 화면 배양실이 열리며, 전설·외계·프랑켄슈타인·인간 표본 15초 배양 후 3D 각성과 결투장으로 이어집니다.
                   </p>
                 </div>
               </div>
@@ -2363,9 +2362,9 @@ export const BioStitchLabView: React.FC = () => {
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
                 <span className="text-lg shrink-0">🌐</span>
                 <div>
-                  <p className="font-bold text-cyan-400 mb-0.5">3. 한·영 실시간 번역 & 음성 해설</p>
+                  <p className="font-bold text-cyan-400 mb-0.5">3. 다국가 언어 &amp; 내레이터</p>
                   <p className="text-slate-300 leading-snug">
-                    상단 <strong>🇰🇷 한국어 / 🇺🇸 ENG</strong> 버튼으로 전체 언어와 박사님의 음성 내레이션을 즉시 전환합니다.
+                    우측 상단 <strong>언어 선택기</strong>로 한국어·English·日本語·中文 등 다국가 언어로 화면 전체를 번역하고, <strong>내레이터</strong> 버튼으로 해당 언어 음성을 듣습니다.
                   </p>
                 </div>
               </div>
@@ -2373,29 +2372,9 @@ export const BioStitchLabView: React.FC = () => {
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
                 <span className="text-lg shrink-0">💬</span>
                 <div>
-                  <p className="font-bold text-emerald-300 mb-0.5">4. 실시간 논문 검색 & 3초 채팅</p>
+                  <p className="font-bold text-emerald-300 mb-0.5">4. 핵심 질문 논문·백과사전 채팅</p>
                   <p className="text-slate-300 leading-snug">
-                    질문 입력 시 PubMed·백과사전을 실시간 검색하며, 모바일에선 <strong>3초 후 위로 사라진 뒤 재노출되지 않습니다.</strong>
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">📸</span>
-                <div>
-                  <p className="font-bold text-rose-400 mb-0.5">5. 실제 학술지 실험 사진 전환</p>
-                  <p className="text-slate-300 leading-snug">
-                    우측 상단 <strong>실제 실험 사진 보기</strong> 버튼으로 현미경 동영상과 고해상도 실험 증거 사진을 교차 확인합니다.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">📐</span>
-                <div>
-                  <p className="font-bold text-purple-400 mb-0.5">6. Kiro Spec-Driven 설계도</p>
-                  <p className="text-slate-300 leading-snug">
-                    상단 <strong>.kiro Plan</strong> 버튼에서 Kiro IDE의 Steering·Requirements·Design·Hooks 명세를 확인합니다.
+                    하단 입력창에 질문하면 AI 수석 생명공학자가 현재 실험과 핵심 키워드를 분석해 PubMed·백과사전 기반의 간결하고 정확한 답변을 제공합니다.
                   </p>
                 </div>
               </div>
