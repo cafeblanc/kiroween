@@ -2243,16 +2243,6 @@ export const BioStitchLabView: React.FC = () => {
                       <span className="text-[10px] text-amber-300 font-mono truncate">
                         iPSC: {msg.linkedCase.stemCellBridge.factors.join(", ")}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveExp(msg.linkedCase!);
-                          setIsStitchModalOpen(true);
-                        }}
-                        className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer shrink-0"
-                      >
-                        ⚡ {isKo ? "키메라 조립실 열기" : "Open Bio-Assembler"}
-                      </button>
                     </div>
                   )}
                 </div>
