@@ -1607,30 +1607,6 @@ export const BioStitchLabView: React.FC = () => {
               />
             </div>
 
-            {/* Real Photographic Evidence Thumbnail Card (Bottom-Right on Desktop) */}
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPhotoOverlay((prev) => !prev);
-              }}
-              className="hidden md:flex absolute bottom-3 right-3 z-20 bg-slate-950/90 backdrop-blur-md border border-emerald-500/50 rounded-xl p-2 items-center gap-2.5 max-w-[340px] shadow-2xl hover:border-emerald-400 transition cursor-pointer"
-            >
-              <img
-                src={activeExp.microscopyPhotoUrl}
-                alt="Confocal Microscopy"
-                className="w-14 h-14 rounded-lg object-cover border border-emerald-400/40 shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
-                  {isKo ? "실제 학술지 실험 사진 (클릭 시 확대)" : "VERIFIED LAB PHOTO (CLICK)"}
-                </span>
-                <p className="text-[11px] font-bold text-white truncate mt-0.5">{activeExp.journalCitation}</p>
-                <p className="text-[10px] text-slate-300 line-clamp-2 leading-tight mt-0.5">
-                  {isKo ? activeExp.stemCellBridge.koreanLineage : activeExp.stemCellBridge.lineage}
-                </p>
-              </div>
-            </div>
-
             {/* MOBILE FLOATING OVERLAY */}
             <div
               className="md:hidden absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent px-2.5 pb-2 pt-6 pointer-events-none gap-1.5"
