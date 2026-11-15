@@ -21,6 +21,14 @@ import { GROWTH_STAGES } from "./bioreactor/growthStages";
 import { GoogleLanguageSelector, getBcp47ForLang } from "./GoogleLanguageSelector";
 import { assertAllowedApiEndpoint } from "../utils/security";
 
+const CURATED_6_MONSTERS: ComicMonster[] = REAL_STEM_CELL_PHOTOS.map(
+  (photo) =>
+    COMIC_MONSTERS.find((m) => m.id === photo.targetMonsterId) ||
+    (photo.targetMonsterId === HUMAN_PROMETHEUS_MONSTER.id
+      ? HUMAN_PROMETHEUS_MONSTER
+      : COMIC_MONSTERS[0]),
+);
+
 type LangMode = "KO" | "EN";
 
 interface SynapseChatMessage {
@@ -156,12 +164,10 @@ export const BioStitchLabView: React.FC = () => {
   const [arenaDamagePopup, setArenaDamagePopup] = useState<{ target: 1 | 2; text: string } | null>(null);
   const [aiBattleVideoUrl, setAiBattleVideoUrl] = useState<string | null>(null);
   const [activeClashVideoUrl, setActiveClashVideoUrl] = useState<string | null>(null);
-  const [isGeneratingAiBattle, setIsGeneratingAiBattle] = useState<boolean>(false);
   const [ai3DBurstVideoUrl, setAi3DBurstVideoUrl] = useState<string | null>(null);
   const [isGeneratingAi3D, setIsGeneratingAi3D] = useState<boolean>(false);
   const [ai3DStatus, setAi3DStatus] = useState<string>("");
   const [hfTokenInput, setHfTokenInput] = useState<string>("");
-  const [aiGenStatus, setAiGenStatus] = useState<string>("");
   const arenaTimersRef = useRef<number[]>([]);
   const f1VideoRef = useRef<HTMLVideoElement | null>(null);
   const f2VideoRef = useRef<HTMLVideoElement | null>(null);
@@ -441,35 +447,6 @@ export const BioStitchLabView: React.FC = () => {
       setActiveClashVideoUrl(null);
       setIsArenaBattling(false);
     }, 5400));
-  };
-
-  // 무료/오픈소스 AI 동영상 생성 API (HuggingFace LTX-Video / Luma / 서버 프록시) 실제 호출
-  const handleGenerateAiBattleVideo = async () => {
-    setIsGeneratingAiBattle(true);
-    setAiBattleVideoUrl(null);
-    setAiGenStatus(isKo ? "⏳ AI 서버에 격돌 동영상 생성 요청 중..." : "⏳ Generating live AI combat video...");
-
-    const prompt = `Epic cinematic 3D monster battle: ${arenaFighter1.promptEn} violently clashing and roaring against ${arenaFighter2.promptEn} inside a shattered sci-fi laboratory arena, sparks, shockwave, dynamic camera movement, photorealistic movie CGI.`;
-
-    const res = await generateMonsterVideo({
-      prompt,
-      provider: "huggingface_wan2",
-      apiKey: hfTokenInput.trim() || undefined,
-    });
-
-    if (res.success && res.videoUrl) {
-      setAiBattleVideoUrl(res.videoUrl);
-      setAiGenStatus(isKo ? "✅ AI 격돌 동영상 생성 완료!" : "✅ AI Combat Video Ready!");
-      playChimeraRoar(arenaFighter1.roarAudio);
-    } else {
-      setAiGenStatus(
-        isKo
-          ? "⚠️ API 키(무료 HF 토큰) 미설정 — 실시간 물리 듀얼 격돌 모드로 자동 실행합니다."
-          : "⚠️ No HF Token — running Real-Time Dual Video Clash mode."
-      );
-      handleStartArenaBattle();
-    }
-    setIsGeneratingAiBattle(false);
   };
 
   // 3D 각성 괴수 실사 동영상 API 생성 (고정된 프레임 내부에서 살아 움직이며 포효하는 괴수 AI 비디오 생성)
@@ -1779,15 +1756,30 @@ export const BioStitchLabView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setActiveModalTab("monster_arena")}
+                        disabled={isArenaBattling}
+                        onClick={() => {
+                          if (activeModalTab !== "monster_arena") {
+                            setActiveModalTab("monster_arena");
+                          } else {
+                            handleStartArenaBattle();
+                          }
+                        }}
                         className={`px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer transition flex items-center gap-1 whitespace-nowrap ${
                           activeModalTab === "monster_arena"
-                            ? "bg-rose-600 text-white shadow shadow-rose-600/30"
+                            ? "bg-rose-600 hover:bg-rose-500 text-white shadow shadow-rose-600/30"
                             : "bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800"
                         }`}
                       >
                         <span>⚔️</span>
-                        <span>{isKo ? "괴수 결투장" : "Clash Arena"}</span>
+                        <span>
+                          {isArenaBattling
+                            ? isKo
+                              ? "격돌 중..."
+                              : "Battling..."
+                            : isKo
+                            ? "실시간 결투"
+                            : "Real-time Duel"}
+                        </span>
                       </button>
                     </div>
 
@@ -2017,12 +2009,12 @@ export const BioStitchLabView: React.FC = () => {
                         <select
                           value={arenaFighter1.id}
                           onChange={(e) => {
-                            const found = COMIC_MONSTERS.find((m) => m.id === e.target.value);
+                            const found = CURATED_6_MONSTERS.find((m) => m.id === e.target.value);
                             if (found) { setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); }
                           }}
-                          className="bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[160px]"
+                          className="bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
-                          {COMIC_MONSTERS.map((m) => (
+                          {CURATED_6_MONSTERS.map((m) => (
                             <option key={m.id} value={m.id}>🔵 {m.nameKo}</option>
                           ))}
                         </select>
@@ -2030,41 +2022,21 @@ export const BioStitchLabView: React.FC = () => {
                         <select
                           value={arenaFighter2.id}
                           onChange={(e) => {
-                            const found = COMIC_MONSTERS.find((m) => m.id === e.target.value);
+                            const found = CURATED_6_MONSTERS.find((m) => m.id === e.target.value);
                             if (found) { setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); }
                           }}
-                          className="bg-slate-950 border border-rose-500/60 text-rose-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[160px]"
+                          className="bg-slate-950 border border-rose-500/60 text-rose-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
-                          {COMIC_MONSTERS.map((m) => (
+                          {CURATED_6_MONSTERS.map((m) => (
                             <option key={m.id} value={m.id}>🔴 {m.nameKo}</option>
                           ))}
                         </select>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <input
-                          type="password"
-                          value={hfTokenInput}
-                          onChange={(e) => setHfTokenInput(e.target.value)}
-                          placeholder={isKo ? "HF 무료 토큰(선택)" : "HF Token (opt)"}
-                          className="w-28 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400"
-                        />
-                        <button
-                          type="button"
-                          disabled={isArenaBattling || isGeneratingAiBattle}
-                          onClick={handleStartArenaBattle}
-                          className="btn-bio btn-bio-danger"
-                        >
-                          {isArenaBattling ? "⚔️ 격돌 중..." : "⚔️ 실시간 결투!"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isArenaBattling || isGeneratingAiBattle}
-                          onClick={handleGenerateAiBattleVideo}
-                          className="btn-bio btn-bio-cyber"
-                        >
-                          {isGeneratingAiBattle ? "⏳ 생성 중..." : "🎬 AI 영상 생성"}
-                        </button>
+                        <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">
+                          {isKo ? "상단 [실시간 결투] 버튼으로 대결 시작" : "Click [Real-time Duel] above to start"}
+                        </span>
                       </div>
                     </div>
 
@@ -2242,12 +2214,6 @@ export const BioStitchLabView: React.FC = () => {
                             </div>
                           )}
 
-                          {/* Optional AI Status Toast */}
-                          {aiGenStatus && (
-                            <div className="absolute bottom-3 left-3 z-30 bg-black/80 text-cyan-300 text-xs font-mono px-3 py-1 rounded-lg border border-cyan-500/40">
-                              {aiGenStatus}
-                            </div>
-                          )}
                         </>
                       )}
                     </div>
