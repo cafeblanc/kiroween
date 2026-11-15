@@ -146,7 +146,6 @@ export const BioStitchLabView: React.FC = () => {
   // Block 1: Video & Confocal Microscopy Photo
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState<boolean>(false);
-  const [showPhotoOverlay, setShowPhotoOverlay] = useState<boolean>(false);
 
   // Block 2: WebAudio Narrator & ECG Pulse
   const [isSoundOn, setIsSoundOn] = useState<boolean>(false);
@@ -1482,13 +1481,13 @@ export const BioStitchLabView: React.FC = () => {
           >
             {/* Background High-Res Real Confocal/Experiment Photo */}
             <img
-              src={showPhotoOverlay ? activeExp.secondaryPhotoUrl : activeExp.microscopyPhotoUrl}
+              src={activeExp.microscopyPhotoUrl}
               alt={activeExp.headline}
               className="absolute inset-0 w-full h-full object-cover opacity-60 scale-105 transition-all duration-700 filter contrast-125"
             />
 
             {/* Live Microscopy Video Layer */}
-            {!videoFailed && !showPhotoOverlay && (
+            {!videoFailed && (
               <video
                 ref={videoRef}
                 key={activeExp.id + "-" + activeExp.videoUrl}
@@ -1531,31 +1530,10 @@ export const BioStitchLabView: React.FC = () => {
                     <span>{isKo ? "사용법(Help)" : "Help"}</span>
                   </button>
                 </div>
-
-                <span className="bg-black/85 backdrop-blur-md text-cyan-300 text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md border border-cyan-500/40 font-mono font-bold shadow truncate max-w-full">
-                  {isKo ? "SF 상상 생명공학 시뮬레이션" : "SF Bio-Simulation Studio"}
-                </span>
-              </div>
-
-              {/* Active Case Floating Scientific Banner */}
-              <div className="bg-slate-950/90 backdrop-blur-md border-l-4 border-emerald-400 px-2.5 py-1.5 rounded-r-lg shadow-xl">
-                <p className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
-                  {activeExp.codeName} · SF BIO-STITCH LAB
-                </p>
-                {langMode !== "EN" && (
-                  <p className="text-xs sm:text-sm font-extrabold text-white leading-snug mt-0.5">
-                    {activeExp.koreanHeadline}
-                  </p>
-                )}
-                {langMode !== "KO" && (
-                  <p className="text-[11px] sm:text-xs font-bold text-emerald-200 leading-snug mt-0.5">
-                    {activeExp.headline}
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Top-Right: Sound Narrator Toggle + Stem-Cell Viability + Photo/Video Switcher */}
+            {/* Top-Right: Sound Narrator Toggle */}
             <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-20 flex flex-col items-end gap-1.5">
               <button
                 type="button"
@@ -1577,34 +1555,6 @@ export const BioStitchLabView: React.FC = () => {
                   ? "🔇 내레이터 소리 켜기"
                   : "🔇 Tap for Voice"}
               </button>
-
-              <span className="text-[10px] sm:text-[11px] font-mono font-bold px-2.5 py-1 rounded-md border bg-black/85 text-emerald-300 border-emerald-500/40 shadow">
-                🧬 {isKo ? "줄기세포 활성도" : "Viability"}: {activeExp.stemCellBridge.viabilityPercent}% ({activeExp.pulseBpm} BPM)
-              </span>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowPhotoOverlay((prev) => !prev);
-                }}
-                className="bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 text-[10px] px-2 py-1 rounded-md font-semibold cursor-pointer shadow"
-              >
-                {showPhotoOverlay
-                  ? isKo
-                    ? "🎬 현미경 동영상 보기"
-                    : "🎬 Microscopy Video"
-                  : isKo
-                  ? "📸 실제 실험 사진 보기"
-                  : "📸 Confocal Photo"}
-              </button>
-
-              <canvas
-                ref={canvasRef}
-                width={110}
-                height={26}
-                className="bg-black/80 border border-emerald-500/30 rounded px-1"
-              />
             </div>
 
             {/* MOBILE FLOATING OVERLAY */}
