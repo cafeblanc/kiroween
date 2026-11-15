@@ -305,3 +305,14 @@
 .animate-vatTwitchingIdle {
   animation: vatTwitchingIdle 2.4s infinite ease-in-out;
 }
+
+/* Hide Google Translate top banner so 100dvh layout never shifts */
+iframe.goog-te-banner-frame,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.skiptranslate > iframe {
+  display: none !important;
+}
+
+body {
+  top: 0px !important;
+}

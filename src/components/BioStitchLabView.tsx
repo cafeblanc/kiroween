@@ -12,6 +12,7 @@ import { generateMonsterVideo } from "../services/videoGenService";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { getBattleVideoForPair } from "./bioreactor/arena";
 import { GROWTH_STAGES } from "./bioreactor/growthStages";
+import { GoogleLanguageSelector } from "./GoogleLanguageSelector";
 
 type LangMode = "KO" | "EN";
 
@@ -110,8 +111,23 @@ function createOrganicHeartbeatBuffer(ctx: AudioContext): AudioBuffer {
 export const BioStitchLabView: React.FC = () => {
   const [experiments] = useState<BioExperimentCase[]>(VERIFIED_BIO_EXPERIMENTS);
   const [activeExp, setActiveExp] = useState<BioExperimentCase>(VERIFIED_BIO_EXPERIMENTS[0]);
-  const [langMode, setLangMode] = useState<LangMode>("KO");
+  const [selectedLangCode, setSelectedLangCode] = useState<string>(() => {
+    if (typeof window === "undefined") return "ko";
+    return window.localStorage.getItem("prometheus_lang") || "ko";
+  });
+  const [langMode, setLangMode] = useState<LangMode>(() =>
+    selectedLangCode === "ko" ? "KO" : "EN",
+  );
   const isKo = langMode === "KO";
+
+  const handleGlobalLanguageChange = (langCode: string) => {
+    setSelectedLangCode(langCode);
+    setLangMode(langCode === "ko" ? "KO" : "EN");
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("prometheus_lang", langCode);
+      document.documentElement.lang = langCode;
+    }
+  };
 
   // Modals
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
@@ -1462,27 +1478,7 @@ export const BioStitchLabView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Language Mode Switcher */}
-          <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg p-0.5 text-[10px] sm:text-[11px] font-bold">
-            <button
-              type="button"
-              onClick={() => setLangMode("KO")}
-              className={`px-2 py-0.5 rounded-md cursor-pointer transition ${
-                langMode === "KO" ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              🇰🇷 한국어
-            </button>
-            <button
-              type="button"
-              onClick={() => setLangMode("EN")}
-              className={`px-2 py-0.5 rounded-md cursor-pointer transition ${
-                langMode === "EN" ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              🇺🇸 ENG
-            </button>
-          </div>
+          <GoogleLanguageSelector value={selectedLangCode} onChange={handleGlobalLanguageChange} />
         </div>
       </header>
 
