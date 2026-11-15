@@ -163,6 +163,8 @@ export const BioStitchLabView: React.FC = () => {
   const [arenaHp2, setArenaHp2] = useState<number>(100);
   const [arenaPhase, setArenaPhase] = useState<"idle" | "f1_strike" | "f2_strike" | "clash" | "ko">("idle");
   const [arenaDamagePopup, setArenaDamagePopup] = useState<{ target: 1 | 2; text: string } | null>(null);
+  const [arenaCombatLog, setArenaCombatLog] = useState<string[]>([]);
+  const [customArenaRoster, setCustomArenaRoster] = useState<ComicMonster[]>([]);
   const [aiBattleVideoUrl, setAiBattleVideoUrl] = useState<string | null>(null);
   const [activeClashVideoUrl, setActiveClashVideoUrl] = useState<string | null>(null);
   const [ai3DBurstVideoUrl, setAi3DBurstVideoUrl] = useState<string | null>(null);
@@ -346,6 +348,9 @@ export const BioStitchLabView: React.FC = () => {
     setArenaHp2(100);
     setArenaPhase("idle");
     setArenaDamagePopup(null);
+    setArenaCombatLog([
+      `⚡ ${arenaFighter1.nameKo} VS ${arenaFighter2.nameKo} — 결투 개시!`,
+    ]);
 
     // 성체 전투 구간으로 두 비디오 점프
     if (f1VideoRef.current && f1VideoRef.current.duration) {
@@ -384,6 +389,10 @@ export const BioStitchLabView: React.FC = () => {
         target: firstAttacker === 1 ? 2 : 1,
         text: r1.isCrit ? `💥 -${r1.dmg * 12}! 치명타 선공!` : `-${r1.dmg * 10}! 선제 타격`,
       });
+      setArenaCombatLog((prev) => [
+        ...prev.slice(-3),
+        `[R1] ${firstAttacker === 1 ? arenaFighter1.nameKo : arenaFighter2.nameKo}의 ${r1.isCrit ? "치명타 선공!" : "기습 타격"} (-${r1.dmg * 10} DMG)`,
+      ]);
       playCardiacThump(180);
       playChimeraRoar(firstAttacker === 1 ? arenaFighter1.roarAudio : arenaFighter2.roarAudio);
     }, 350));
@@ -403,6 +412,10 @@ export const BioStitchLabView: React.FC = () => {
         target: secondAttacker === 1 ? 2 : 1,
         text: r2.isCrit ? `⚡ -${r2.dmg * 12}! 극대 반격!` : `-${r2.dmg * 10}! 반격`,
       });
+      setArenaCombatLog((prev) => [
+        ...prev.slice(-3),
+        `[R2] ${secondAttacker === 1 ? arenaFighter1.nameKo : arenaFighter2.nameKo}의 ${r2.isCrit ? "극대 반격!" : "돌진 반격"} (-${r2.dmg * 10} DMG)`,
+      ]);
       playCardiacThump(200);
       playChimeraRoar(secondAttacker === 1 ? arenaFighter1.roarAudio : arenaFighter2.roarAudio);
     }, 1500));
@@ -424,6 +437,10 @@ export const BioStitchLabView: React.FC = () => {
         target: clashEdge,
         text: `💥 정면 대충돌! (-${Math.max(r3a.dmg, r3b.dmg) * 10})`,
       });
+      setArenaCombatLog((prev) => [
+        ...prev.slice(-3),
+        `[R3] 양측 정면 대충돌! 충격파 발생 (-${Math.max(r3a.dmg, r3b.dmg) * 10} DMG)`,
+      ]);
       playCardiacThump(240);
     }, 2750));
 
@@ -438,11 +455,19 @@ export const BioStitchLabView: React.FC = () => {
         setArenaHp2(0);
         setArenaDamagePopup({ target: 2, text: "💀 K.O. 필살 일격!" });
         setArenaWinner(arenaFighter1);
+        setArenaCombatLog((prev) => [
+          ...prev.slice(-3),
+          `🏆 [K.O.] ${arenaFighter1.nameKo} 최종 승리!`,
+        ]);
         playChimeraRoar(arenaFighter1.roarAudio);
       } else {
         setArenaHp1(0);
         setArenaDamagePopup({ target: 1, text: "💀 K.O. 필살 일격!" });
         setArenaWinner(arenaFighter2);
+        setArenaCombatLog((prev) => [
+          ...prev.slice(-3),
+          `🏆 [K.O.] ${arenaFighter2.nameKo} 최종 승리!`,
+        ]);
         playChimeraRoar(arenaFighter2.roarAudio);
       }
       setActiveClashVideoUrl(null);
@@ -2050,12 +2075,13 @@ export const BioStitchLabView: React.FC = () => {
                         <select
                           value={arenaFighter1.id}
                           onChange={(e) => {
-                            const found = CURATED_6_MONSTERS.find((m) => m.id === e.target.value);
-                            if (found) { setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); }
+                            const roster = [...customArenaRoster, ...CURATED_6_MONSTERS];
+                            const found = roster.find((m) => m.id === e.target.value);
+                            if (found) { setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
                           }}
                           className="bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
-                          {CURATED_6_MONSTERS.map((m) => (
+                          {[...customArenaRoster, ...CURATED_6_MONSTERS].map((m) => (
                             <option key={m.id} value={m.id}>🔵 {m.nameKo}</option>
                           ))}
                         </select>
@@ -2063,12 +2089,13 @@ export const BioStitchLabView: React.FC = () => {
                         <select
                           value={arenaFighter2.id}
                           onChange={(e) => {
-                            const found = CURATED_6_MONSTERS.find((m) => m.id === e.target.value);
-                            if (found) { setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); }
+                            const roster = [...customArenaRoster, ...CURATED_6_MONSTERS];
+                            const found = roster.find((m) => m.id === e.target.value);
+                            if (found) { setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
                           }}
                           className="bg-slate-950 border border-rose-500/60 text-rose-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
-                          {CURATED_6_MONSTERS.map((m) => (
+                          {[...customArenaRoster, ...CURATED_6_MONSTERS].map((m) => (
                             <option key={m.id} value={m.id}>🔴 {m.nameKo}</option>
                           ))}
                         </select>
@@ -2179,6 +2206,11 @@ export const BioStitchLabView: React.FC = () => {
                                   : "w-1/2"
                               }`}
                             >
+                              <img
+                                src={arenaFighter1.jumpscareImg || arenaFighter1.avatarImg}
+                                alt={arenaFighter1.nameKo}
+                                className="absolute inset-0 w-full h-full object-cover scale-[1.08]"
+                              />
                               <video
                                 ref={f1VideoRef}
                                 key={arenaFighter1.id + "-f1"}
@@ -2189,9 +2221,21 @@ export const BioStitchLabView: React.FC = () => {
                                 playsInline
                                 onLoadedMetadata={(e) => {
                                   const v = e.currentTarget;
-                                  if (v.duration) v.currentTime = v.duration * 0.65;
+                                  if (v.duration && !arenaFighter1.id.startsWith("custom_")) {
+                                    v.currentTime = v.duration * 0.68;
+                                  }
                                 }}
-                                className="w-full h-full object-cover scale-[1.18]"
+                                onTimeUpdate={(e) => {
+                                  const v = e.currentTarget;
+                                  if (
+                                    v.duration &&
+                                    !arenaFighter1.id.startsWith("custom_") &&
+                                    v.currentTime < v.duration * 0.65
+                                  ) {
+                                    v.currentTime = v.duration * 0.68;
+                                  }
+                                }}
+                                className="relative w-full h-full object-cover scale-[1.12] mix-blend-screen opacity-65"
                               />
                               <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-black/80 to-transparent pointer-events-none" />
                               {arenaDamagePopup?.target === 1 && (
@@ -2217,6 +2261,11 @@ export const BioStitchLabView: React.FC = () => {
                                   : "w-1/2"
                               }`}
                             >
+                              <img
+                                src={arenaFighter2.jumpscareImg || arenaFighter2.avatarImg}
+                                alt={arenaFighter2.nameKo}
+                                className="absolute inset-0 w-full h-full object-cover scale-[1.08] scale-x-[-1]"
+                              />
                               <video
                                 ref={f2VideoRef}
                                 key={arenaFighter2.id + "-f2"}
@@ -2227,9 +2276,21 @@ export const BioStitchLabView: React.FC = () => {
                                 playsInline
                                 onLoadedMetadata={(e) => {
                                   const v = e.currentTarget;
-                                  if (v.duration) v.currentTime = v.duration * 0.65;
+                                  if (v.duration && !arenaFighter2.id.startsWith("custom_")) {
+                                    v.currentTime = v.duration * 0.68;
+                                  }
                                 }}
-                                className="w-full h-full object-cover scale-[1.18] scale-x-[-1]"
+                                onTimeUpdate={(e) => {
+                                  const v = e.currentTarget;
+                                  if (
+                                    v.duration &&
+                                    !arenaFighter2.id.startsWith("custom_") &&
+                                    v.currentTime < v.duration * 0.65
+                                  ) {
+                                    v.currentTime = v.duration * 0.68;
+                                  }
+                                }}
+                                className="relative w-full h-full object-cover scale-[1.12] scale-x-[-1] mix-blend-screen opacity-65"
                               />
                               <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-black/80 to-transparent pointer-events-none" />
                               {arenaDamagePopup?.target === 2 && (
@@ -2255,6 +2316,32 @@ export const BioStitchLabView: React.FC = () => {
                             </div>
                           )}
 
+                          {/* Center Clash Shockwave & Live Combat Log HUD */}
+                          {arenaPhase === "clash" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                              <div className="w-40 h-40 rounded-full border-4 border-amber-400 animate-ping opacity-80" />
+                            </div>
+                          )}
+
+                          {arenaWinner && (
+                            <div className="absolute top-20 inset-x-4 z-30 flex justify-center pointer-events-none">
+                              <div className="bg-black/85 border-2 border-amber-400 px-5 py-2 rounded-2xl shadow-2xl text-center">
+                                <span className="text-sm sm:text-lg font-black text-amber-300">
+                                  🏆 {arenaWinner.icon} {arenaWinner.nameKo} {isKo ? "승리!" : "VICTORY!"}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {arenaCombatLog.length > 0 && (
+                            <div className="absolute bottom-3 inset-x-3 z-30 bg-black/80 backdrop-blur border border-slate-700/80 rounded-xl px-3 py-2 flex flex-col gap-0.5 pointer-events-none">
+                              {arenaCombatLog.map((line, i) => (
+                                <p key={i} className="text-[11px] font-mono text-amber-200 leading-tight">
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -2532,10 +2619,25 @@ export const BioStitchLabView: React.FC = () => {
               <CustomMonsterStudio
                 isKo={isKo}
                 onAwakenCustomMonster={(customMonster) => {
+                  setCustomArenaRoster((prev) => [customMonster, ...prev.slice(0, 5)]);
                   setIsCustomMonsterModalOpen(false);
                   setIsStitchModalOpen(true);
                   setActiveModalTab("chimera_assembler");
                   handleSelectAndAwakenMonster(customMonster);
+                }}
+                onSendToArena={(customMonster) => {
+                  setCustomArenaRoster((prev) => [customMonster, ...prev.slice(0, 5)]);
+                  setArenaFighter1(customMonster);
+                  setAiBattleVideoUrl(null);
+                  setActiveClashVideoUrl(null);
+                  setArenaWinner(null);
+                  setArenaPhase("idle");
+                  setArenaHp1(100);
+                  setArenaHp2(100);
+                  setArenaCombatLog([]);
+                  setIsCustomMonsterModalOpen(false);
+                  setIsStitchModalOpen(true);
+                  setActiveModalTab("monster_arena");
                 }}
               />
             </div>

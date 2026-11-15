@@ -123,6 +123,58 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
   },
 ];
 
+export interface MonsterBioStats {
+  atk: number;
+  def: number;
+  spd: number;
+  regen: number;
+  energy: number;
+  elementLabelKo: string;
+  elementLabelEn: string;
+}
+
+export function computeMonsterBioStats(description: string): MonsterBioStats {
+  const d = description.toLowerCase();
+  let atk = 68;
+  let def = 65;
+  let spd = 64;
+  let regen = 62;
+  let energy = 70;
+
+  if (/(송곳니|발톱|칼날|창날|이중\s*턱|독침|강철|방사|포식)/.test(d)) atk += 22;
+  if (/(갑옷|비늘|외골격|흑요석|흉곽|껍질|장갑|두꺼운)/.test(d)) def += 24;
+  if (/(날개|역관절|유영|지느러미|민첩|추진|도약|채찍)/.test(d)) spd += 25;
+  if (/(재생|줄기세포|블라스테마|봉합|심장|회복|불사|미토콘드리아)/.test(d)) regen += 26;
+  if (/(화염|용암|마그마|전기|스파크|볼트|생체\s*발광|산성|형광|우주)/.test(d)) energy += 24;
+
+  const clamp = (n: number) => Math.min(99, Math.max(40, n));
+  let elementLabelKo = "생체 키메라형";
+  let elementLabelEn = "Bio-Chimera";
+  if (/(화염|용암|마그마|불꽃)/.test(d)) {
+    elementLabelKo = "초고온 마그마·화염형";
+    elementLabelEn = "Pyroclastic Magma";
+  } else if (/(전기|번개|스파크|볼트)/.test(d)) {
+    elementLabelKo = "고전압 바이오·전격형";
+    elementLabelEn = "High-Volt Bio-Electric";
+  } else if (/(심해|촉수|크라켄|흡반)/.test(d)) {
+    elementLabelKo = "심해 수압·생체발광형";
+    elementLabelEn = "Abyssal Bioluminescent";
+  } else if (/(산성|키틴|제노|외계)/.test(d)) {
+    elementLabelKo = "초강산 키틴 포식형";
+    elementLabelEn = "Acidic Chitin Apex";
+  }
+
+  return {
+    atk: clamp(atk),
+    def: clamp(def),
+    spd: clamp(spd),
+    regen: clamp(regen),
+    energy: clamp(energy),
+    elementLabelKo,
+    elementLabelEn,
+  };
+}
+
 export function composeDescriptionFromParts(
   preset: MonsterStudioPreset,
   parts: MonsterBodyParts,
@@ -255,10 +307,40 @@ export async function generateCustomMonsterImage(params: {
   }
   ctx.restore();
 
-  // Clean HUD frame border (no cluttered text over the creature)
-  ctx.strokeStyle = `${theme.primary}aa`;
+  // Volumetric containment glass sheen & targeting calipers
+  const glassGrad = ctx.createLinearGradient(0, 0, size, size);
+  glassGrad.addColorStop(0, "rgba(255,255,255,0.12)");
+  glassGrad.addColorStop(0.25, "rgba(255,255,255,0.02)");
+  glassGrad.addColorStop(0.75, "rgba(0,0,0,0)");
+  glassGrad.addColorStop(1, `${theme.secondary}26`);
+  ctx.fillStyle = glassGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Corner biometric scan brackets
+  ctx.strokeStyle = `${theme.primary}cc`;
   ctx.lineWidth = 4;
   ctx.strokeRect(10, 10, size - 20, size - 20);
+  const bracket = 34;
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = theme.secondary;
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(24, 24 + bracket);
+  ctx.lineTo(24, 24);
+  ctx.lineTo(24 + bracket, 24);
+  // Top-right
+  ctx.moveTo(size - 24 - bracket, 24);
+  ctx.lineTo(size - 24, 24);
+  ctx.lineTo(size - 24, 24 + bracket);
+  // Bottom-left
+  ctx.moveTo(24, size - 24 - bracket);
+  ctx.lineTo(24, size - 24);
+  ctx.lineTo(24 + bracket, size - 24);
+  // Bottom-right
+  ctx.moveTo(size - 24 - bracket, size - 24);
+  ctx.lineTo(size - 24, size - 24);
+  ctx.lineTo(size - 24, size - 24 - bracket);
+  ctx.stroke();
 
   return {
     imageUrl: canvas.toDataURL("image/png"),
@@ -337,10 +419,11 @@ export async function generateVideoFromMonsterImage(params: {
       onProgress?.(Math.round(progress * 98));
 
       const t = elapsed / 1000;
-      // Breathing pulse + cinematic slow zoom/pan
-      const breath = 1.04 + Math.sin(t * 2.6) * 0.035 + progress * 0.05;
-      const driftX = Math.sin(t * 1.1) * 10;
-      const driftY = Math.cos(t * 0.9) * 8;
+      // Heartbeat-synced breathing pulse + cinematic camera micro-shake
+      const beatWave = Math.pow(Math.max(0, Math.sin(t * 4.2)), 6);
+      const breath = 1.05 + Math.sin(t * 2.4) * 0.03 + beatWave * 0.04 + progress * 0.06;
+      const driftX = Math.sin(t * 1.1) * 11 + (beatWave > 0.7 ? (Math.sin(t * 55) * 4) : 0);
+      const driftY = Math.cos(t * 0.9) * 9 + (beatWave > 0.7 ? (Math.cos(t * 48) * 4) : 0);
 
       ctx.fillStyle = "#020617";
       ctx.fillRect(0, 0, width, height);

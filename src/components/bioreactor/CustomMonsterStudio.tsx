@@ -4,6 +4,7 @@ import {
   MonsterBodyParts,
   MonsterStudioPreset,
   composeDescriptionFromParts,
+  computeMonsterBioStats,
   generateCustomMonsterImage,
   generateVideoFromMonsterImage,
 } from "../../services/customMonsterMediaService";
@@ -12,11 +13,26 @@ import type { ComicMonster } from "../../data/comicMonsters";
 interface CustomMonsterStudioProps {
   isKo: boolean;
   onAwakenCustomMonster: (monster: ComicMonster) => void;
+  onSendToArena?: (monster: ComicMonster) => void;
 }
+
+const MUTATION_CHIPS: Array<{
+  labelKo: string;
+  field: keyof MonsterBodyParts;
+  appendKo: string;
+}> = [
+  { labelKo: "🔥 용암 비늘 흉곽", field: "torso", appendKo: "용암이 흐르는 흑요석 비늘 갑옷" },
+  { labelKo: "⚡ 고전압 전극 볼트", field: "hornsOrCrown", appendKo: "고전압 전기 스파크가 튀는 금속 전극 볼트" },
+  { labelKo: "🐙 8촉수 흡반 팔", field: "arms", appendKo: "강철 갈고리 흡반이 달린 8개의 심해 촉수" },
+  { labelKo: "🦂 전갈 산성 독침 꼬리", field: "tail", appendKo: "초강산 독침이 달린 절지 전갈 꼬리" },
+  { labelKo: "👑 생체발광 왕관 뿔", field: "hornsOrCrown", appendKo: "시안빛으로 맥동하는 생체발광 왕관 뿔" },
+  { labelKo: "🦾 티타늄 포식자 발톱", field: "arms", appendKo: "면도날 같은 티타늄 생체 발톱" },
+];
 
 export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   isKo,
   onAwakenCustomMonster,
+  onSendToArena,
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<MonsterStudioPreset>(
     MONSTER_STUDIO_PRESETS[0],
@@ -141,27 +157,40 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     }
   };
 
+  const buildCustomMonsterObject = (): ComicMonster => ({
+    id: `custom_${selectedPreset.id}_${Date.now()}`,
+    nameEn: customName || `${selectedPreset.nameEn} Custom`,
+    nameKo: customName || `${selectedPreset.nameKo} 커스텀`,
+    taglineKo: bioStats.elementLabelKo,
+    taglineEn: bioStats.elementLabelEn,
+    icon: selectedPreset.icon,
+    bpm: 138,
+    colorHex: themeHex,
+    badge: "CUSTOM AI",
+    promptEn: longPrompt,
+    promptKo: longPrompt,
+    avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,
+    jumpscareImg: generatedImageUrl || selectedPreset.baseImageSrc,
+    videoSrc: generatedVideoUrl || "/videos/dragon_growth.mp4",
+    roarAudio: "/sounds/dragon_roar.mp3",
+    funFactKo: `${customName}: 부위별 맞춤 유전자가 배양기에서 각성했습니다!`,
+    funFactEn: `${customName}: Custom bio-parts awakened inside the chamber!`,
+  });
+
   const handleStartCustomBioreactor = () => {
-    const customMonster: ComicMonster = {
-      id: `custom_${selectedPreset.id}_${Date.now()}`,
-      nameEn: customName || `${selectedPreset.nameEn} Custom`,
-      nameKo: customName || `${selectedPreset.nameKo} 커스텀`,
-      taglineKo: "부위별 맞춤 유전자 배양체",
-      taglineEn: "Custom Multi-Part Bio-Chimera",
-      icon: selectedPreset.icon,
-      bpm: 138,
-      colorHex: themeHex,
-      badge: "CUSTOM AI",
-      promptEn: longPrompt,
-      promptKo: longPrompt,
-      avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,
-      jumpscareImg: generatedImageUrl || selectedPreset.baseImageSrc,
-      videoSrc: generatedVideoUrl || "/videos/dragon_growth.mp4",
-      roarAudio: "/sounds/dragon_roar.mp3",
-      funFactKo: `${customName}: 부위별 맞춤 유전자가 배양기에서 각성했습니다!`,
-      funFactEn: `${customName}: Custom bio-parts awakened inside the chamber!`,
-    };
-    onAwakenCustomMonster(customMonster);
+    onAwakenCustomMonster(buildCustomMonsterObject());
+  };
+
+  const handleSendCustomToArena = () => {
+    onSendToArena?.(buildCustomMonsterObject());
+  };
+
+  const bioStats = computeMonsterBioStats(longPrompt);
+
+  const applyMutationChip = (field: keyof MonsterBodyParts, appendKo: string) => {
+    const current = parts[field];
+    const nextVal = current.includes(appendKo) ? current : `${current} + ${appendKo}`;
+    handlePartChange(field, nextVal);
   };
 
   const partFields: Array<{ key: keyof MonsterBodyParts; labelKo: string; labelEn: string }> = [
@@ -246,6 +275,49 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
             />
           </div>
         ))}
+      </div>
+
+      {/* 2.5 One-Click Bio-Mutation Chips + Live Bio-Stats HUD */}
+      <div className="flex flex-col gap-2 bg-slate-950/90 border border-slate-800 rounded-xl p-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-[10px] font-black text-amber-300">
+            ⚡ {isKo ? "원클릭 부위 변이 조합 (클릭 시 부위 묘사 즉시 추가)" : "Quick Bio-Mutations"}
+          </span>
+          <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
+            {isKo ? bioStats.elementLabelKo : bioStats.elementLabelEn}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {MUTATION_CHIPS.map((chip) => (
+            <button
+              key={chip.labelKo}
+              type="button"
+              onClick={() => applyMutationChip(chip.field, chip.appendKo)}
+              className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-900 hover:bg-cyan-950 text-slate-200 border border-slate-700 hover:border-cyan-400 cursor-pointer transition"
+            >
+              + {chip.labelKo}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-5 gap-2 pt-1">
+          {[
+            { label: "ATK", val: bioStats.atk, bar: "bg-rose-500" },
+            { label: "DEF", val: bioStats.def, bar: "bg-amber-400" },
+            { label: "SPD", val: bioStats.spd, bar: "bg-cyan-400" },
+            { label: "REGEN", val: bioStats.regen, bar: "bg-emerald-400" },
+            { label: "ENERGY", val: bioStats.energy, bar: "bg-purple-400" },
+          ].map((stat) => (
+            <div key={stat.label} className="flex flex-col gap-0.5">
+              <div className="flex justify-between text-[9px] font-mono text-slate-300 font-bold">
+                <span>{stat.label}</span>
+                <span>{stat.val}</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div className={`h-full ${stat.bar} transition-all duration-300`} style={{ width: `${stat.val}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 3. Long Multi-Line Monster Description Chat / Prompt Box */}
@@ -382,19 +454,36 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         </div>
       )}
 
-      {/* 6. Direct Launch into 15s Bioreactor */}
-      <button
-        type="button"
-        onClick={handleStartCustomBioreactor}
-        className="w-full bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:via-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs sm:text-sm py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-2"
-      >
-        <span>⚡</span>
-        <span>
-          {isKo
-            ? `[${customName}] 15초 괴수 배양기 즉시 가동`
-            : `Launch 15s Bioreactor with ${customName}`}
-        </span>
-      </button>
+      {/* 6. Direct Launch into 15s Bioreactor or Battle Arena */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={handleStartCustomBioreactor}
+          className="w-full bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:via-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs sm:text-sm py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-2"
+        >
+          <span>⚡</span>
+          <span>
+            {isKo
+              ? `[${customName}] 15초 배양기 가동`
+              : `Launch 15s Bioreactor`}
+          </span>
+        </button>
+
+        {onSendToArena && (
+          <button
+            type="button"
+            onClick={handleSendCustomToArena}
+            className="w-full bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-2"
+          >
+            <span>⚔️</span>
+            <span>
+              {isKo
+                ? `[${customName}] 결투장 바로 출격`
+                : `Send to Real-time Duel`}
+            </span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };
