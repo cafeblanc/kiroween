@@ -187,7 +187,7 @@ export function composeDescriptionFromParts(
     `• 머리: ${parts.head}`,
     `• 뿔·왕관·전극: ${parts.hornsOrCrown}`,
     `• 몸통: ${parts.torso}`,
-    `• 팔·촉수: ${parts.arms}`,
+    `• 팔·촉수·날개: ${parts.arms}`,
     `• 다리·하체: ${parts.legs}`,
     `• 꼬리·후면: ${parts.tail}`,
     `• 피부·오라: ${parts.auraAndSkin}`,

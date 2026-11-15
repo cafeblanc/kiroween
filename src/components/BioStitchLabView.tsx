@@ -1607,7 +1607,7 @@ export const BioStitchLabView: React.FC = () => {
               className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
             >
               <span>🧬</span>
-              <span>{isKo ? "커스텀 괴수 배양기" : "Custom Monster Lab"}</span>
+              <span>{isKo ? "커스텀 괴수 설계" : "Custom Monster Design"}</span>
             </button>
             <button
               type="button"

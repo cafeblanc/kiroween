@@ -201,7 +201,7 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     { key: "head", labelKo: "머리 (Head)", labelEn: "Head" },
     { key: "hornsOrCrown", labelKo: "뿔·왕관·전극", labelEn: "Horns / Crown" },
     { key: "torso", labelKo: "몸통 (Torso)", labelEn: "Torso" },
-    { key: "arms", labelKo: "팔·촉수 (Arms)", labelEn: "Arms / Tentacles" },
+    { key: "arms", labelKo: "팔,촉수,날개 (Arms)", labelEn: "Arms / Tentacles / Wings" },
     { key: "legs", labelKo: "다리·하체 (Legs)", labelEn: "Legs" },
     { key: "tail", labelKo: "꼬리·후면 (Tail)", labelEn: "Tail / Back" },
     { key: "auraAndSkin", labelKo: "피부·특수 오라", labelEn: "Skin & Aura" },
