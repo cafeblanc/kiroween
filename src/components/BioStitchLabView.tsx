@@ -12,7 +12,8 @@ import { generateMonsterVideo } from "../services/videoGenService";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { getBattleVideoForPair } from "./bioreactor/arena";
 import { GROWTH_STAGES } from "./bioreactor/growthStages";
-import { GoogleLanguageSelector } from "./GoogleLanguageSelector";
+import { GoogleLanguageSelector, getBcp47ForLang } from "./GoogleLanguageSelector";
+import { assertAllowedApiEndpoint } from "../utils/security";
 
 type LangMode = "KO" | "EN";
 
@@ -1191,43 +1192,58 @@ export const BioStitchLabView: React.FC = () => {
     } catch {}
   };
 
-  // Bilingual Speech Synthesis (Korean / English synced to langMode)
-  // High-Quality Warm & Flexible Neural Narrator Voice Synthesizer
-  const speakText = (textKo: string, textEn: string) => {
+  // Multi-Country Speech Synthesis (synced to selectedLangCode)
+  const speakText = async (textKo: string, textEn: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
-    const useKoreanVoice = langMode === "KO";
-    const rawText = useKoreanVoice ? textKo : textEn;
-    
-    // Clean and soften sentence transitions for natural cadence
+
+    const targetCode = selectedLangCode || "ko";
+    const bcp47 = getBcp47ForLang(targetCode);
+    let rawText = targetCode === "ko" ? textKo : textEn;
+
+    if (targetCode !== "ko" && targetCode !== "en") {
+      try {
+        const url = assertAllowedApiEndpoint(
+          `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${encodeURIComponent(targetCode)}&dt=t&q=${encodeURIComponent(textEn)}`,
+        );
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const translated = Array.isArray(data?.[0])
+            ? data[0].map((seg: unknown[]) => (typeof seg?.[0] === "string" ? seg[0] : "")).join("")
+            : "";
+          if (translated.trim()) rawText = translated;
+        }
+      } catch {
+        /* fallback to English narration */
+      }
+    }
+
     const softenedText = rawText
       .replace(/([.!?])\s*/g, "$1 ... ")
       .replace(/([,])\s*/g, "$1 , ");
 
     const utter = new SpeechSynthesisUtterance(softenedText);
-    utter.lang = useKoreanVoice ? "ko-KR" : "en-US";
-    utter.rate = useKoreanVoice ? 0.91 : 0.93; // slightly slower for flexible human breathing
-    utter.pitch = 1.02; // natural, warm human pitch
+    utter.lang = bcp47;
+    utter.rate = targetCode === "ko" ? 0.91 : 0.93;
+    utter.pitch = 1.02;
 
-    // Dynamic High-Quality Neural/Natural Voice Selector
     const allVoices = window.speechSynthesis.getVoices();
     if (allVoices && allVoices.length > 0) {
-      if (useKoreanVoice) {
-        // Find best Korean natural/neural/online voice
-        const bestKo =
-          allVoices.find((v) => v.lang.includes("ko") && (v.name.includes("Natural") || v.name.includes("Online") || v.name.includes("SunHi"))) ||
-          allVoices.find((v) => v.lang.includes("ko") && v.name.includes("Google")) ||
-          allVoices.find((v) => v.lang.includes("ko") && (v.name.includes("Heami") || v.name.includes("Yuna"))) ||
-          allVoices.find((v) => v.lang.includes("ko"));
-        if (bestKo) utter.voice = bestKo;
-      } else {
-        // Find best English natural/neural voice
-        const bestEn =
-          allVoices.find((v) => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Online") || v.name.includes("Jenny"))) ||
-          allVoices.find((v) => v.lang.startsWith("en") && v.name.includes("Google")) ||
-          allVoices.find((v) => v.lang.startsWith("en"));
-        if (bestEn) utter.voice = bestEn;
-      }
+      const langPrefix = bcp47.split("-")[0].toLowerCase();
+      const exactMatch =
+        allVoices.find(
+          (v) =>
+            v.lang.toLowerCase() === bcp47.toLowerCase() &&
+            (v.name.includes("Natural") || v.name.includes("Online") || v.name.includes("Google")),
+        ) ||
+        allVoices.find(
+          (v) =>
+            v.lang.toLowerCase().startsWith(langPrefix) &&
+            (v.name.includes("Natural") || v.name.includes("Online") || v.name.includes("Google")),
+        ) ||
+        allVoices.find((v) => v.lang.toLowerCase().startsWith(langPrefix));
+      if (exactMatch) utter.voice = exactMatch;
     }
 
     window.speechSynthesis.speak(utter);
@@ -1246,7 +1262,7 @@ export const BioStitchLabView: React.FC = () => {
       return;
     }
 
-    speakText(
+    void speakText(
       activeExp.koreanNarratorScript.join(" "),
       activeExp.narratorScript.join(" ")
     );
@@ -1259,7 +1275,7 @@ export const BioStitchLabView: React.FC = () => {
     return () => {
       if (pulseIntervalRef.current) window.clearInterval(pulseIntervalRef.current);
     };
-  }, [isSoundOn, activeExp.id, langMode]);
+  }, [isSoundOn, activeExp.id, selectedLangCode]);
 
   // Active WebAudio Cardiac Loop for Chimera Assembler (Only active during bioreactor growth)
   useEffect(() => {

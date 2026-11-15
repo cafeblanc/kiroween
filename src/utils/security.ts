@@ -55,6 +55,7 @@ export const API_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
   "en.wikipedia.org": ["/api/rest_v1/", "/w/api.php"],
   "ko.wikipedia.org": ["/api/rest_v1/", "/w/api.php"],
   "api.openai.com": ["/v1/realtime/"],
+  "translate.googleapis.com": ["/translate_a/"],
 };
 
 /** True when the endpoint is https and its host+path appear in the allowlist (or is same-origin allowlisted path). */
