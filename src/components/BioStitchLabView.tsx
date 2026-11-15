@@ -5,7 +5,7 @@ import {
   CHIMERA_PART_OPTIONS,
   ChimeraPartOption
 } from "../data/bioExperiments";
-import { COMIC_MONSTERS, ComicMonster } from "../data/comicMonsters";
+import { COMIC_MONSTERS, ComicMonster, HUMAN_PROMETHEUS_MONSTER } from "../data/comicMonsters";
 import { REAL_STEM_CELL_PHOTOS } from "../data/stemCellPhotos";
 import { scienceStitchService } from "../services/scienceStitchService";
 import { generateMonsterVideo } from "../services/videoGenService";
@@ -1816,24 +1816,28 @@ export const BioStitchLabView: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <span className="text-xl">📷</span>
                                 <h3 className="text-xs sm:text-sm font-black text-amber-300">
-                                  {isKo ? "1. 실제 생체 줄기세포 현미경 사진관 (8 Real Confocal Specimen Photos)" : "1. 8 Real Stem-Cell Confocal Photos"}
+                                  {isKo ? "키메라 배양실 (전설 2 · 외계 2 · 프랑켄슈타인 1 · 인간 1)" : "Chimera Bioreactor Lab (6 Specimens)"}
                                 </h3>
                               </div>
                               <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold">
-                                8 REAL STEM-CELL PHOTOS
+                                6 SPECIMENS
                               </span>
                             </div>
 
                             <p className="text-[11px] text-slate-300 leading-relaxed">
                               {isKo
-                                ? "실제 체외 배양기 및 공초점 레이저 형광 현미경으로 촬영된 8가지 핵심 줄기세포 조직 사진입니다. 원하는 생체 조직 사진을 클릭하면 즉시 해당 유전자가 결합된 괴수의 15초 배양기 성장 타임랩스가 가동됩니다."
-                                : "Authentic confocal laser fluorescence & in-vitro bioreactor microscopy photographs. Click any photo to initiate 15-second virtual time-lapse growth of the corresponding chimera!"}
+                                ? "전설의 괴수 2종, 외계 상상의 괴수 2종, 프랑켄슈타인 1종, 인간 1종 총 6가지 표본입니다. 원하는 표본을 클릭하면 해당 괴수의 배양기 타임랩스가 즉시 시작됩니다."
+                                : "6 curated specimens (2 Mythic, 2 Alien, 1 Frankenstein, 1 Human). Click any specimen to start its 15-second bioreactor time-lapse!"}
                             </p>
 
-                            {/* 8 Real Stem-Cell Confocal Photos Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                            {/* 6 Specimens Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                               {REAL_STEM_CELL_PHOTOS.map((photo) => {
-                                const targetMonster = COMIC_MONSTERS.find((m) => m.id === photo.targetMonsterId) || COMIC_MONSTERS[0];
+                                const targetMonster =
+                                  COMIC_MONSTERS.find((m) => m.id === photo.targetMonsterId) ||
+                                  (photo.targetMonsterId === HUMAN_PROMETHEUS_MONSTER.id
+                                    ? HUMAN_PROMETHEUS_MONSTER
+                                    : COMIC_MONSTERS[0]);
                                 const isSelected = selectedComicMonster.id === targetMonster.id;
                                 return (
                                   <div

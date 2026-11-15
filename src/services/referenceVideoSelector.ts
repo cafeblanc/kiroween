@@ -26,12 +26,11 @@ export const FALLBACK_MESSAGE = "Reference video unavailable, using generic grow
 /** Reference videos (existing files under public/videos) keyed by monster id. */
 const BATTLE_XENO = "/videos/battles/battle_xeno_vs_frankenstein.mp4";
 const BATTLE_CERBERUS = "/videos/battles/battle_cerberus_vs_hydra.mp4";
-const BATTLE_DRAGON = "/videos/battles/battle_dragon_vs_kraken.mp4";
 
 export const REFERENCE_VIDEOS: Readonly<Record<string, string>> = {
-  myth_dragon: BATTLE_DRAGON,
-  myth_kraken: BATTLE_DRAGON,
-  myth_leviathan: BATTLE_DRAGON,
+  myth_dragon: "/videos/chimera_growth_dragon_24s.mp4",
+  myth_kraken: "/videos/chimera_growth_kraken_24s.mp4",
+  myth_leviathan: "/videos/chimera_growth_deepsea_abyss_30s.mp4",
   myth_chimera: BATTLE_CERBERUS,
   myth_hydra: BATTLE_CERBERUS,
   myth_cerberus: BATTLE_CERBERUS,
@@ -40,7 +39,8 @@ export const REFERENCE_VIDEOS: Readonly<Record<string, string>> = {
   myth_frankenstein: BATTLE_XENO,
   alien_xenomorph: BATTLE_XENO,
   alien_arachno: BATTLE_XENO,
-  alien_void_slug: BATTLE_XENO,
+  alien_void_slug: "/videos/chimera_growth_deepsea_abyss_30s.mp4",
+  human_prometheus: "/videos/chimera_awakening_cyber.mp4",
 };
 
 /** Splits a reference video into 6 consecutive 2.5s clips covering 0-15s. */
