@@ -201,7 +201,7 @@ export const BioStitchLabView: React.FC = () => {
     {
       id: "init-1",
       sender: "ai",
-      textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 6대 실제 실험을 내레이터와 함께 살펴보거나, [🧬 신화적 키메라 조립 & 부활] 버튼을 눌러 새로운 생명체를 조립해 보세요!",
+      textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 실제 실험을 내레이터와 함께 살펴보거나, [🧬 전설의 괴수 부활 전투] 버튼을 눌러 새로운 생명체를 배양·대결해 보세요!",
       textEn: "🧬 PROMETHEUS-iPSC Lab Online. Explore the 6 real-world stem-cell experiments with the narrator, or open [🧬 Mythic Chimera Assembler] to stitch and resurrect a custom creature!",
       subTextKo: "질문을 입력하면 실시간으로 PubMed 논문과 백과사전을 검색해 답변합니다.",
       subTextEn: "Type any question to query live PubMed papers and Wikipedia archives.",
@@ -2283,8 +2283,8 @@ export const BioStitchLabView: React.FC = () => {
                       ? "조립 실험실 닫기"
                       : "Close Lab"
                     : isKo
-                    ? "신화적 키메라 조립 & 부활 실험"
-                    : "Mythic Chimera Bio-Assembler"}
+                    ? "전설의 괴수 부활 전투"
+                    : "Mythic Beast Revival & Battle"}
                 </span>
               </button>
             </div>
@@ -2454,9 +2454,9 @@ export const BioStitchLabView: React.FC = () => {
               <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
                 <span className="text-lg shrink-0">⚡</span>
                 <div>
-                  <p className="font-bold text-amber-400 mb-0.5">2. 신화적 키메라 조립 & 부활</p>
+                  <p className="font-bold text-amber-400 mb-0.5">2. 전설의 괴수 부활 전투</p>
                   <p className="text-slate-300 leading-snug">
-                    <strong>신화적 키메라 조립 & 부활</strong> 버튼에서 두뇌·심장·몸통·사지를 조합해 배양기 변이 애니메이션과 반전 생명체를 깨웁니다.
+                    <strong>전설의 괴수 부활 전투</strong> 버튼에서 표본을 배양해 3D 각성시키고 괴수 결투장에서 대결을 펼칩니다.
                   </p>
                 </div>
               </div>
