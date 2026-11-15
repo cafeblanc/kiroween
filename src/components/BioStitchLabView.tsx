@@ -1485,24 +1485,24 @@ export const BioStitchLabView: React.FC = () => {
 
       switch (intent) {
         case "mechanism":
-          textKo = `[${targetCase.koreanShortTitle} 원리] ${targetCase.koreanHostTissueA}에 ${targetCase.koreanDonorTissueB}를 결합합니다. ${toConciseCore(targetCase.stemCellBridge.koreanFusionMechanism, 160)}`;
-          textEn = `[${targetCase.shortTitle} Mechanism] Combines ${targetCase.hostTissueA} with ${targetCase.donorTissueB}. ${toConciseCore(targetCase.stemCellBridge.fusionMechanism, 160)}`;
+          textKo = `[${targetCase.koreanShortTitle} 작동 원리]\n• 핵심 결합: ${targetCase.koreanHostTissueA}에 ${targetCase.koreanDonorTissueB}를 정밀 접합합니다.\n• 기전 설명: ${toConciseCore(targetCase.stemCellBridge.koreanFusionMechanism, 280)}\n• 연구 의의: ${toConciseCore(targetCase.koreanSummary, 220)} (${targetCase.institution}, ${targetCase.pmidOrDoi})`;
+          textEn = `[${targetCase.shortTitle} Mechanism]\n• Core Fusion: Combines ${targetCase.hostTissueA} with ${targetCase.donorTissueB}.\n• Process: ${toConciseCore(targetCase.stemCellBridge.fusionMechanism, 280)}\n• Significance: ${toConciseCore(targetCase.eerieRealitySummary, 220)} (${targetCase.institution}, ${targetCase.pmidOrDoi})`;
           break;
         case "genes_cells":
-          textKo = `[핵심 유전자·세포] ${factors} 인자를 사용해 '${targetCase.stemCellBridge.koreanLineage}' 계통으로 분화시킵니다 (생존·활성도 ${targetCase.stemCellBridge.viabilityPercent}%).`;
-          textEn = `[Key Genes & Cells] Uses ${factors} to direct ${targetCase.stemCellBridge.lineage} (${targetCase.stemCellBridge.viabilityPercent}% viability).`;
+          textKo = `[핵심 유전자·줄기세포 구성]\n• 주요 인자: ${factors}\n• 분화 계통: ${targetCase.stemCellBridge.koreanLineage} (세포 생존·활성도 ${targetCase.stemCellBridge.viabilityPercent}%)\n• 작용 방식: ${toConciseCore(targetCase.stemCellBridge.koreanFusionMechanism, 240)}\n• 연구 요약: ${toConciseCore(targetCase.koreanSummary, 180)}`;
+          textEn = `[Key Genes & Stem-Cell Lineage]\n• Key Factors: ${factors}\n• Target Lineage: ${targetCase.stemCellBridge.lineage} (${targetCase.stemCellBridge.viabilityPercent}% viability)\n• Mechanism: ${toConciseCore(targetCase.stemCellBridge.fusionMechanism, 240)}\n• Summary: ${toConciseCore(targetCase.eerieRealitySummary, 180)}`;
           break;
         case "paper_source":
-          textKo = `[논문 출처] ${targetCase.institution} (${targetCase.leadScientist}) 연구팀이 ${targetCase.journalCitation}에 발표한 실제 연구입니다 (${targetCase.pmidOrDoi}).`;
-          textEn = `[Study Source] Published by ${targetCase.leadScientist} at ${targetCase.institution} in ${targetCase.journalCitation} (${targetCase.pmidOrDoi}).`;
+          textKo = `[학술 논문 및 연구 출처]\n• 연구 기관 및 책임자: ${targetCase.institution} — ${targetCase.leadScientist}\n• 게재 학술지: ${targetCase.journalCitation} (${targetCase.pmidOrDoi})\n• 실험 내용: ${toConciseCore(targetCase.koreanSummary, 260)}\n• 사용 세포 계통: ${targetCase.stemCellBridge.koreanLineage} (${factors})`;
+          textEn = `[Study & Journal Citation]\n• Institution & Lead: ${targetCase.institution} — ${targetCase.leadScientist}\n• Journal: ${targetCase.journalCitation} (${targetCase.pmidOrDoi})\n• Findings: ${toConciseCore(targetCase.eerieRealitySummary, 260)}\n• Lineage: ${targetCase.stemCellBridge.lineage} (${factors})`;
           break;
         case "ethics_reality":
-          textKo = `[실제 연구·한계] ${targetCase.journalCitation}에 등재된 실제 실험이며(활성도 ${targetCase.stemCellBridge.viabilityPercent}%), 현재는 질병 모델·장기 재생 등 생명윤리 기준 안에서만 제한적으로 연구됩니다.`;
-          textEn = `[Reality & Ethics] A real study in ${targetCase.journalCitation} (${targetCase.stemCellBridge.viabilityPercent}% viability), strictly bounded by bioethics for disease modeling and organ regeneration.`;
+          textKo = `[실제 연구 여부 및 생명윤리 한계]\n• 검증 출처: ${targetCase.institution} (${targetCase.leadScientist})가 ${targetCase.journalCitation}에 발표한 실제 연구입니다 (${targetCase.pmidOrDoi}).\n• 달성 수준: ${targetCase.stemCellBridge.koreanLineage} 기준 활성도 ${targetCase.stemCellBridge.viabilityPercent}%를 기록했습니다.\n• 윤리·과학적 경계: ${toConciseCore(targetCase.koreanSummary, 220)} 현재는 장기 재생·난치병 모델링 목적의 엄격한 생명윤리 규범 내에서만 허용됩니다.`;
+          textEn = `[Scientific Reality & Bioethics]\n• Verified Study: Real peer-reviewed research by ${targetCase.leadScientist} (${targetCase.institution}) in ${targetCase.journalCitation} (${targetCase.pmidOrDoi}).\n• Viability: Achieved ${targetCase.stemCellBridge.viabilityPercent}% in ${targetCase.stemCellBridge.lineage}.\n• Ethical Boundary: ${toConciseCore(targetCase.eerieRealitySummary, 220)} Strictly regulated for disease modeling and regenerative medicine.`;
           break;
         default:
-          textKo = `[${targetCase.koreanShortTitle}] ${toConciseCore(targetCase.koreanSummary, 170)}`;
-          textEn = `[${targetCase.shortTitle}] ${toConciseCore(targetCase.eerieRealitySummary, 170)}`;
+          textKo = `[${targetCase.koreanShortTitle} 상세 해설]\n• 연구 배경: ${toConciseCore(targetCase.koreanSummary, 260)}\n• 줄기세포 접합: ${targetCase.koreanHostTissueA} ↔ ${targetCase.koreanDonorTissueB} (${factors})\n• 작동 기전: ${toConciseCore(targetCase.stemCellBridge.koreanFusionMechanism, 220)}\n• 출처: ${targetCase.institution} · ${targetCase.pmidOrDoi}`;
+          textEn = `[${targetCase.shortTitle} Overview]\n• Summary: ${toConciseCore(targetCase.eerieRealitySummary, 260)}\n• Stem-Cell Bridge: ${targetCase.hostTissueA} ↔ ${targetCase.donorTissueB} (${factors})\n• Mechanism: ${toConciseCore(targetCase.stemCellBridge.fusionMechanism, 220)}\n• Source: ${targetCase.institution} · ${targetCase.pmidOrDoi}`;
           break;
       }
 
@@ -1663,7 +1663,7 @@ export const BioStitchLabView: React.FC = () => {
                               : "max-w-[90%] px-3 py-1.5 rounded-2xl rounded-bl-xs text-xs bg-slate-950/90 backdrop-blur-md text-emerald-100 border border-emerald-500/40 shadow-lg break-words"
                           }
                         >
-                          <p>{isKo ? msg.textKo : msg.textEn}</p>
+                          <p className="whitespace-pre-line">{isKo ? msg.textKo : msg.textEn}</p>
                           {(isKo ? msg.subTextKo : msg.subTextEn) && (
                             <p className="text-[11px] text-slate-300 mt-1 border-t border-slate-700/80 pt-1">
                               {isKo ? msg.subTextKo : msg.subTextEn}
@@ -2339,7 +2339,7 @@ export const BioStitchLabView: React.FC = () => {
                   </div>
 
                   {langMode !== "EN" && (
-                    <p className="leading-relaxed font-semibold text-white">{msg.textKo}</p>
+                    <p className="leading-relaxed font-semibold text-white whitespace-pre-line">{msg.textKo}</p>
                   )}
                   {langMode !== "KO" && (
                     <p className="leading-relaxed font-medium text-emerald-200">{msg.textEn}</p>

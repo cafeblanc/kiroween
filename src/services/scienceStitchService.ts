@@ -98,15 +98,21 @@ function buildPubMedQuery(rawQuery: string): string {
   return asciiOnly || "stem cell";
 }
 
-export function toConciseCore(text: string, maxChars: number = 170): string {
+export function toConciseCore(text: string, maxChars: number = 460): string {
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean) return "";
-  const firstTwo = clean.match(/^[^.!?]+[.!?](\s+[^.!?]+[.!?])?/);
-  const candidate = firstTwo ? firstTwo[0].trim() : clean;
-  if (candidate.length <= maxChars) return candidate;
-  const firstOne = clean.match(/^[^.!?]+[.!?]/);
-  if (firstOne && firstOne[0].length <= maxChars) return firstOne[0].trim();
-  return candidate.slice(0, maxChars - 1).trimEnd() + "…";
+  if (clean.length <= maxChars) return clean;
+  const sentences = clean.match(/[^.!?]+[.!?]+/g);
+  if (sentences && sentences.length > 0) {
+    let acc = "";
+    for (const s of sentences) {
+      const next = acc ? `${acc} ${s.trim()}` : s.trim();
+      if (next.length > maxChars) break;
+      acc = next;
+    }
+    if (acc) return acc;
+  }
+  return clean.slice(0, maxChars - 1).trimEnd() + "…";
 }
 
 function isWikiRelevant(topic: string, wiki: WikiContext): boolean {
@@ -160,7 +166,7 @@ export const scienceStitchService = {
         pmid: item.pmid,
         doi: item.doi,
         abstractText: item.abstractText
-          ? item.abstractText.replace(/<[^>]+>/g, "").slice(0, 320) + "..."
+          ? item.abstractText.replace(/<[^>]+>/g, "").slice(0, 560) + "..."
           : "Empirical bio-engineering and stem-cell differentiation findings verified in EuropePMC / PubMed."
       }));
     } catch {
@@ -231,20 +237,26 @@ export const scienceStitchService = {
         : await this.fetchPubMedPapers(`${pubmedQuery} stem cell`, 3);
 
     const topPaper = fallbackPapers[0];
-    const wikiSummary = wiki?.extract ? toConciseCore(wiki.extract, 170) : "";
-    const paperCore = topPaper?.abstractText ? toConciseCore(topPaper.abstractText, 170) : "";
+    const wikiSummary = wiki?.extract ? toConciseCore(wiki.extract, 420) : "";
+    const paperCore = topPaper?.abstractText ? toConciseCore(topPaper.abstractText, 380) : "";
 
-    const stemCellSynthesisKo = wikiSummary
-      ? `[${wiki?.title}] ${wikiSummary}`
-      : topPaper
-      ? `[${topPaper.title}] ${paperCore}`
-      : `"${cleanTopic}"에 대한 정확한 답을 찾지 못했습니다. 현재 실험(원리·유전자·논문·윤리)이나 생물학 핵심 단어로 다시 질문해 주세요.`;
+    const stemCellSynthesisKo =
+      wikiSummary && paperCore
+        ? `[${wiki?.title}] ${wikiSummary}\n\n📄 관련 학술 연구(${topPaper.journalTitle}, ${topPaper.pubYear}): ${paperCore}`
+        : wikiSummary
+        ? `[${wiki?.title}] ${wikiSummary}`
+        : topPaper
+        ? `[${topPaper.title}] ${paperCore}`
+        : `"${cleanTopic}"에 대한 정확한 답을 찾지 못했습니다. 현재 실험(원리·유전자·논문·윤리)이나 생물학 핵심 단어로 다시 질문해 주세요.`;
 
-    const stemCellSynthesisEn = wikiSummary
-      ? `[${wiki?.title}] ${wikiSummary}`
-      : topPaper
-      ? `[${topPaper.title}] ${paperCore}`
-      : `Could not find a direct match for "${cleanTopic}". Ask about the active experiment's mechanism, genes, paper, or ethics.`;
+    const stemCellSynthesisEn =
+      wikiSummary && paperCore
+        ? `[${wiki?.title}] ${wikiSummary}\n\n📄 Related Study (${topPaper.journalTitle}, ${topPaper.pubYear}): ${paperCore}`
+        : wikiSummary
+        ? `[${wiki?.title}] ${wikiSummary}`
+        : topPaper
+        ? `[${topPaper.title}] ${paperCore}`
+        : `Could not find a direct match for "${cleanTopic}". Ask about the active experiment's mechanism, genes, paper, or ethics.`;
 
     return {
       query: userQuery,
