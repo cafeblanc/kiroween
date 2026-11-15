@@ -42,6 +42,14 @@ const KO_TO_EN_BIO_TERMS: ReadonlyArray<[RegExp, string]> = [
   [/유전자|게놈/g, "gene genome"],
   [/크리스퍼|유전자\s*가위/g, "CRISPR gene editing"],
   [/프랑켄슈타인/g, "Frankenstein"],
+  [/수명|기대\s*수명/g, "human lifespan longevity"],
+  [/노화|항노화|회춘/g, "aging cellular reprogramming"],
+  [/장수/g, "longevity"],
+  [/텔로미어/g, "telomere"],
+  [/암|종양/g, "cancer"],
+  [/치매|알츠하이머/g, "alzheimer"],
+  [/면역/g, "immunity"],
+  [/인간/g, "human"],
   [/세포/g, "cell"],
 ];
 
@@ -54,7 +62,7 @@ export type QuestionIntent =
   | "definition";
 
 const KO_INTERROGATIVE_PATTERNS =
-  /(이란\s*무엇인가요|란\s*무엇인가요|이란\s*뭐야|란\s*뭐야|가\s*뭐야|이\s*뭐야|무엇인가요|무엇입니까|어떻게\s*되나요|어떻게\s*하나요|어떻게\s*작동|왜\s*그런가요|왜\s*다시|알려\s*주세요|알려주세요|알려줘|설명해\s*주세요|설명해줘|말해줘|인가요|입니까|하나요|되나요|있나요|없나요|가능한가요|가능할까|할\s*수\s*있나요|원리가\s*뭐|원리는|차이는|장점은|단점은|이유는|뭐야|무엇|어떻게|왜|에\s*대해|대해서)/g;
+  /(이란\s*무엇인가요|란\s*무엇인가요|이란\s*뭐야|란\s*뭐야|가\s*뭐야|이\s*뭐야|무엇인가요|무엇입니까|어떻게\s*되나요|어떻게\s*하나요|어떻게\s*작동|왜\s*그런가요|왜\s*다시|알려\s*주세요|알려주세요|알려줘|설명해\s*주세요|설명해줘|말해줘|늘어날까요|늘어날까|줄어들까|얼마나|인가요|입니까|하나요|되나요|있나요|없나요|가능한가요|가능할까|될까요|될까|할\s*수\s*있나요|원리가\s*뭐|원리는|차이는|장점은|단점은|이유는|뭐야|무엇|어떻게|왜|에\s*대해|대해서)/g;
 
 export function detectQuestionIntent(query: string): QuestionIntent {
   const q = query.toLowerCase();
@@ -128,17 +136,18 @@ function isWikiRelevant(topic: string, wiki: WikiContext): boolean {
 export async function translateTextToLanguage(
   text: string,
   targetLang: string,
+  sourceLang: string = "ko",
 ): Promise<string> {
-  if (!text || !targetLang || targetLang === "ko") return text;
+  if (!text || !targetLang || targetLang === sourceLang) return text;
   try {
     const lines = text.split("\n");
     const translatedLines = await Promise.all(
       lines.map(async (line) => {
         const trimmed = line.trim();
         if (!trimmed) return "";
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=${encodeURIComponent(
-          targetLang,
-        )}&dt=t&q=${encodeURIComponent(trimmed)}`;
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(
+          sourceLang,
+        )}&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(trimmed)}`;
         const res = await fetch(assertAllowedApiEndpoint(url));
         if (!res.ok) return line;
         const data = await res.json();
@@ -231,11 +240,20 @@ export const scienceStitchService = {
     }
   },
 
-  async stitchLiveQuery(userQuery: string, preferKorean: boolean = true): Promise<StitchedResearchDossier> {
+  async stitchLiveQuery(
+    userQuery: string,
+    preferKoreanOrLang: boolean | string = true,
+  ): Promise<StitchedResearchDossier> {
+    const targetLang =
+      typeof preferKoreanOrLang === "string"
+        ? preferKoreanOrLang
+        : preferKoreanOrLang
+        ? "ko"
+        : "en";
     const cleanTopic = extractWikiTopic(userQuery);
     const pubmedQuery = buildPubMedQuery(userQuery);
     const [wiki, papers] = await Promise.all([
-      this.fetchWikipediaContext(cleanTopic, preferKorean ? "ko" : "en"),
+      this.fetchWikipediaContext(cleanTopic, targetLang === "en" ? "en" : "ko"),
       this.fetchPubMedPapers(pubmedQuery, 3)
     ]);
 
@@ -245,25 +263,46 @@ export const scienceStitchService = {
         : await this.fetchPubMedPapers(`${pubmedQuery} stem cell`, 3);
 
     const topPaper = fallbackPapers[0];
-    const wikiSummary = wiki?.extract ? toConciseCore(wiki.extract, 420) : "";
-    const paperCore = topPaper?.abstractText ? toConciseCore(topPaper.abstractText, 380) : "";
+    const rawWikiSummary = wiki?.extract ? toConciseCore(wiki.extract, 420) : "";
+    const rawPaperCore = topPaper?.abstractText ? toConciseCore(topPaper.abstractText, 380) : "";
 
-    const stemCellSynthesisKo =
-      wikiSummary && paperCore
-        ? `[${wiki?.title}] ${wikiSummary}\n\n📄 관련 학술 연구(${topPaper.journalTitle}, ${topPaper.pubYear}): ${paperCore}`
-        : wikiSummary
-        ? `[${wiki?.title}] ${wikiSummary}`
+    // PubMed 논문 제목/초록은 항상 영어이므로, 한국어나 기타 언어가 설정되어 있으면 해당 언어로 번역
+    const [translatedPaperTitle, translatedPaperCore, translatedWikiTitle, translatedWikiSummary] =
+      await Promise.all([
+        topPaper && targetLang !== "en"
+          ? translateTextToLanguage(topPaper.title, targetLang, "en")
+          : Promise.resolve(topPaper?.title || ""),
+        rawPaperCore && targetLang !== "en"
+          ? translateTextToLanguage(rawPaperCore, targetLang, "en")
+          : Promise.resolve(rawPaperCore),
+        wiki && targetLang !== "ko" && targetLang !== "en"
+          ? translateTextToLanguage(wiki.title, targetLang, "auto")
+          : Promise.resolve(wiki?.title || ""),
+        rawWikiSummary && targetLang !== "ko" && targetLang !== "en"
+          ? translateTextToLanguage(rawWikiSummary, targetLang, "auto")
+          : Promise.resolve(rawWikiSummary),
+      ]);
+
+    const localizedSummary =
+      translatedWikiSummary && translatedPaperCore
+        ? `[${translatedWikiTitle || wiki?.title}] ${translatedWikiSummary}\n\n📄 ${
+            targetLang === "ko" ? "관련 학술 연구" : "Related Study"
+          } (${topPaper.journalTitle}, ${topPaper.pubYear}): ${translatedPaperCore}`
+        : translatedWikiSummary
+        ? `[${translatedWikiTitle || wiki?.title}] ${translatedWikiSummary}`
         : topPaper
-        ? `[${topPaper.title}] ${paperCore}`
-        : `"${cleanTopic}"에 대한 정확한 답을 찾지 못했습니다. 현재 실험(원리·유전자·논문·윤리)이나 생물학 핵심 단어로 다시 질문해 주세요.`;
+        ? `[${translatedPaperTitle || topPaper.title}] ${translatedPaperCore}`
+        : targetLang === "ko"
+        ? `"${cleanTopic}"에 대한 정확한 답을 찾지 못했습니다. 현재 실험(원리·유전자·논문·윤리)이나 생물학 핵심 단어로 다시 질문해 주세요.`
+        : `Could not find a direct match for "${cleanTopic}". Ask about the active experiment's mechanism, genes, paper, or ethics.`;
 
     const stemCellSynthesisEn =
-      wikiSummary && paperCore
-        ? `[${wiki?.title}] ${wikiSummary}\n\n📄 Related Study (${topPaper.journalTitle}, ${topPaper.pubYear}): ${paperCore}`
-        : wikiSummary
-        ? `[${wiki?.title}] ${wikiSummary}`
+      rawWikiSummary && rawPaperCore
+        ? `[${wiki?.title}] ${rawWikiSummary}\n\n📄 Related Study (${topPaper.journalTitle}, ${topPaper.pubYear}): ${rawPaperCore}`
+        : rawWikiSummary
+        ? `[${wiki?.title}] ${rawWikiSummary}`
         : topPaper
-        ? `[${topPaper.title}] ${paperCore}`
+        ? `[${topPaper.title}] ${rawPaperCore}`
         : `Could not find a direct match for "${cleanTopic}". Ask about the active experiment's mechanism, genes, paper, or ethics.`;
 
     return {
@@ -272,7 +311,7 @@ export const scienceStitchService = {
       wiki,
       papers: fallbackPapers,
       stemCellSynthesisEn,
-      stemCellSynthesisKo
+      stemCellSynthesisKo: localizedSummary,
     };
   }
 };

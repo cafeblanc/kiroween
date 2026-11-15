@@ -1510,8 +1510,9 @@ export const BioStitchLabView: React.FC = () => {
       return;
     }
 
+    const activeLang = getEffectiveTargetLang();
     setIsQueryingApi(true);
-    const dossier = await scienceStitchService.stitchLiveQuery(rawQuery, selectedLangCode !== "en");
+    const dossier = await scienceStitchService.stitchLiveQuery(rawQuery, activeLang);
     setIsQueryingApi(false);
 
     const topPaper = dossier.papers[0];
@@ -1532,6 +1533,23 @@ export const BioStitchLabView: React.FC = () => {
       pmidBadge: topPaper?.pmid ? `PMID: ${topPaper.pmid}` : dossier.wiki ? "Wikipedia Live" : "Search",
       timestamp: new Date().toLocaleTimeString()
     };
+
+    if (activeLang !== "ko" && activeLang !== "en") {
+      // dossier.stemCellSynthesisKo is already localized to activeLang; only translate subTextKo if present
+      const translatedSub = aiReply.subTextKo
+        ? await translateTextToLanguage(aiReply.subTextKo, activeLang, "ko")
+        : undefined;
+      setMessages((prev) => [
+        ...prev,
+        {
+          ...aiReply,
+          textEn: aiReply.textKo,
+          subTextKo: translatedSub,
+          subTextEn: translatedSub,
+        },
+      ]);
+      return;
+    }
 
     await appendTranslatedAiReply(aiReply);
   };
