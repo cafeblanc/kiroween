@@ -58,6 +58,19 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   const [isGeneratingVideo, setIsGeneratingVideo] = useState<boolean>(false);
   const [videoProgress, setVideoProgress] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statOverrides, setStatOverrides] = useState<
+    Partial<Record<"atk" | "def" | "spd" | "regen" | "energy", number>>
+  >({});
+
+  const computedStats = computeMonsterBioStats(longPrompt);
+  const bioStats = {
+    ...computedStats,
+    atk: statOverrides.atk ?? computedStats.atk,
+    def: statOverrides.def ?? computedStats.def,
+    spd: statOverrides.spd ?? computedStats.spd,
+    regen: statOverrides.regen ?? computedStats.regen,
+    energy: statOverrides.energy ?? computedStats.energy,
+  };
 
   const handleSelectPreset = (preset: MonsterStudioPreset) => {
     setSelectedPreset(preset);
@@ -65,6 +78,7 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     setParts(preset.defaultParts);
     setLongPrompt(composeDescriptionFromParts(preset, preset.defaultParts));
     setThemeHex(preset.colorHex);
+    setStatOverrides({});
     setGeneratedImageUrl(null);
     setGeneratedVideoUrl(null);
     setStatusMessage(null);
@@ -168,17 +182,17 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     taglineKo: bioStats.elementLabelKo,
     taglineEn: bioStats.elementLabelEn,
     icon: selectedPreset.icon,
-    bpm: 138,
+    bpm: Math.round(95 + (bioStats.spd + bioStats.energy) * 0.4),
     colorHex: themeHex,
     badge: "CUSTOM AI",
-    promptEn: longPrompt,
-    promptKo: longPrompt,
+    promptEn: `${longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
+    promptKo: `${longPrompt}\n[전투 능력치: 공격력 ${bioStats.atk}, 방어력 ${bioStats.def}, 속도 ${bioStats.spd}, 재생력 ${bioStats.regen}, 에너지 ${bioStats.energy}]`,
     avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,
     jumpscareImg: generatedImageUrl || selectedPreset.baseImageSrc,
     videoSrc: generatedVideoUrl || "/videos/dragon_growth.mp4",
     roarAudio: "/sounds/dragon_roar.mp3",
-    funFactKo: `${customName}: 부위별 맞춤 유전자가 배양기에서 각성했습니다!`,
-    funFactEn: `${customName}: Custom bio-parts awakened inside the chamber!`,
+    funFactKo: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): 부위별 맞춤 유전자가 배양기에서 각성했습니다!`,
+    funFactEn: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): Custom bio-parts awakened inside the chamber!`,
   });
 
   const handleStartCustomBioreactor = () => {
@@ -188,8 +202,6 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   const handleSendCustomToArena = () => {
     onSendToArena?.(buildCustomMonsterObject());
   };
-
-  const bioStats = computeMonsterBioStats(longPrompt);
 
   const applyMutationChip = (field: keyof MonsterBodyParts, appendKo: string) => {
     const current = parts[field];
@@ -303,24 +315,55 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-2 pt-1">
-          {[
-            { label: "ATK", val: bioStats.atk, bar: "bg-rose-500" },
-            { label: "DEF", val: bioStats.def, bar: "bg-amber-400" },
-            { label: "SPD", val: bioStats.spd, bar: "bg-cyan-400" },
-            { label: "REGEN", val: bioStats.regen, bar: "bg-emerald-400" },
-            { label: "ENERGY", val: bioStats.energy, bar: "bg-purple-400" },
-          ].map((stat) => (
-            <div key={stat.label} className="flex flex-col gap-0.5">
-              <div className="flex justify-between text-[9px] font-mono text-slate-300 font-bold">
-                <span>{stat.label}</span>
-                <span>{stat.val}</span>
+        <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[11px] font-black text-emerald-300">
+              🧬{" "}
+              {isKo
+                ? "괴수 전투 능력치 조절 (슬라이더를 움직여 능력치 직접 설정)"
+                : "Monster Combat Stats Tuner (Drag sliders to adjust)"}
+            </span>
+            {Object.keys(statOverrides).length > 0 && (
+              <button
+                type="button"
+                onClick={() => setStatOverrides({})}
+                className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-600 cursor-pointer"
+              >
+                {isKo ? "↺ 자동 분석값으로 복원" : "↺ Reset to Auto"}
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+            {(
+              [
+                { key: "atk", labelKo: "공격력 (ATK)", labelEn: "ATK", val: bioStats.atk, accent: "accent-rose-500", text: "text-rose-300" },
+                { key: "def", labelKo: "방어력 (DEF)", labelEn: "DEF", val: bioStats.def, accent: "accent-amber-400", text: "text-amber-300" },
+                { key: "spd", labelKo: "속도 (SPD)", labelEn: "SPD", val: bioStats.spd, accent: "accent-cyan-400", text: "text-cyan-300" },
+                { key: "regen", labelKo: "재생력 (REGEN)", labelEn: "REGEN", val: bioStats.regen, accent: "accent-emerald-400", text: "text-emerald-300" },
+                { key: "energy", labelKo: "에너지 (ENERGY)", labelEn: "ENERGY", val: bioStats.energy, accent: "accent-purple-400", text: "text-purple-300" },
+              ] as const
+            ).map((stat) => (
+              <div key={stat.key} className="bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col gap-1">
+                <div className="flex justify-between items-center text-[10px] font-mono font-bold">
+                  <span className={stat.text}>{isKo ? stat.labelKo : stat.labelEn}</span>
+                  <span className="text-white">{stat.val}</span>
+                </div>
+                <input
+                  type="range"
+                  min={20}
+                  max={99}
+                  value={stat.val}
+                  onChange={(e) =>
+                    setStatOverrides((prev) => ({
+                      ...prev,
+                      [stat.key]: Number(e.target.value),
+                    }))
+                  }
+                  className={`w-full h-1.5 cursor-pointer ${stat.accent}`}
+                />
               </div>
-              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                <div className={`h-full ${stat.bar} transition-all duration-300`} style={{ width: `${stat.val}%` }} />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
