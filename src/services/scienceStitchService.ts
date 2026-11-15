@@ -1,4 +1,5 @@
 import { assertAllowedApiEndpoint } from "../utils/security";
+import { keywordDbService } from "./keywordDbService";
 
 export interface PubMedPaper {
   id: string;
@@ -26,32 +27,6 @@ export interface StitchedResearchDossier {
   stemCellSynthesisEn: string;
   stemCellSynthesisKo: string;
 }
-
-const KO_TO_EN_BIO_TERMS: ReadonlyArray<[RegExp, string]> = [
-  [/만능\s*줄기세포|유도\s*만능\s*줄기세포|ipsc/gi, "induced pluripotent stem cell"],
-  [/줄기세포/g, "stem cell"],
-  [/뇌\s*오가노이드/g, "brain organoid"],
-  [/오가노이드/g, "organoid"],
-  [/유령\s*심장/g, "decellularized bioartificial heart"],
-  [/심장/g, "heart"],
-  [/키메라/g, "chimera"],
-  [/배아/g, "embryo"],
-  [/아홀로틀|도롱뇽/g, "axolotl regeneration"],
-  [/사지\s*재생|재생/g, "limb regeneration"],
-  [/신경|뇌/g, "neural brain"],
-  [/유전자|게놈/g, "gene genome"],
-  [/크리스퍼|유전자\s*가위/g, "CRISPR gene editing"],
-  [/프랑켄슈타인/g, "Frankenstein"],
-  [/수명|기대\s*수명/g, "human lifespan longevity"],
-  [/노화|항노화|회춘/g, "aging cellular reprogramming"],
-  [/장수/g, "longevity"],
-  [/텔로미어/g, "telomere"],
-  [/암|종양/g, "cancer"],
-  [/치매|알츠하이머/g, "alzheimer"],
-  [/면역/g, "immunity"],
-  [/인간/g, "human"],
-  [/세포/g, "cell"],
-];
 
 export type QuestionIntent =
   | "app_usage"
@@ -94,15 +69,26 @@ function extractWikiTopic(rawQuery: string): string {
   return cleaned || rawQuery.trim();
 }
 
-function buildPubMedQuery(rawQuery: string): string {
-  let q = extractWikiTopic(rawQuery);
-  for (const [pattern, en] of KO_TO_EN_BIO_TERMS) {
-    if (pattern.test(q)) {
-      q = q.replace(pattern, ` ${en} `);
-    }
+async function buildPubMedQuery(rawQuery: string): Promise<string> {
+  const clean = extractWikiTopic(rawQuery);
+  const fromDb = keywordDbService.resolveEnglishQuery(clean);
+  if (fromDb) return fromDb;
+
+  // DB에 없는 새로운 키워드이면 Google Translate로 영문 학술 키워드를 동적 추출
+  const hasHangul = /[\uAC00-\uD7A3\u3131-\u318E]/.test(clean);
+  if (hasHangul) {
+    const translated = await translateTextToLanguage(clean, "en", "ko");
+    const ascii = translated
+      .replace(/[\uAC00-\uD7A3\u3131-\u318E]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (ascii) return ascii;
   }
-  // Remove remaining Hangul characters so EuropePMC searches clean English scientific terms
-  const asciiOnly = q.replace(/[\uAC00-\uD7A3\u3131-\u318E]/g, " ").replace(/\s+/g, " ").trim();
+
+  const asciiOnly = clean
+    .replace(/[\uAC00-\uD7A3\u3131-\u318E]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return asciiOnly || "stem cell";
 }
 
@@ -251,7 +237,7 @@ export const scienceStitchService = {
         ? "ko"
         : "en";
     const cleanTopic = extractWikiTopic(userQuery);
-    const pubmedQuery = buildPubMedQuery(userQuery);
+    const pubmedQuery = await buildPubMedQuery(userQuery);
     const [wiki, papers] = await Promise.all([
       this.fetchWikipediaContext(cleanTopic, targetLang === "en" ? "en" : "ko"),
       this.fetchPubMedPapers(pubmedQuery, 3)
@@ -265,6 +251,19 @@ export const scienceStitchService = {
     const topPaper = fallbackPapers[0];
     const rawWikiSummary = wiki?.extract ? toConciseCore(wiki.extract, 420) : "";
     const rawPaperCore = topPaper?.abstractText ? toConciseCore(topPaper.abstractText, 380) : "";
+
+    // 새로운 키워드나 기존 키워드를 DB에 저장·갱신하여 다음 질문에 미리 대비
+    if (cleanTopic.length >= 2) {
+      keywordDbService.upsertKeyword({
+        keywordKo: cleanTopic,
+        queryEn: pubmedQuery,
+        wikiTitle: wiki?.title,
+        wikiExtract: rawWikiSummary || undefined,
+        topPaperTitle: topPaper?.title,
+        topPaperSummary: rawPaperCore || undefined,
+        pmid: topPaper?.pmid,
+      });
+    }
 
     // PubMed 논문 제목/초록은 항상 영어이므로, 한국어나 기타 언어가 설정되어 있으면 해당 언어로 번역
     const [translatedPaperTitle, translatedPaperCore, translatedWikiTitle, translatedWikiSummary] =
