@@ -343,6 +343,15 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     const monster = buildCustomMonsterObject({ imageUrl: image, videoUrl: video.videoUrl });
     persistToVault(monster, image, video.videoUrl);
     onSendToArena?.(monster, video.ltxError);
+    // This monster is finished. The next design must be a NEW monster even if it reuses the same preset, name and parts;
+    // otherwise it would get the same id, overwrite this one and both arena halves would show the same creature.
+    buildIdRef.current = null;
+    // Start the next design from step 1 (⚡ image). Keeping this monster's image/video would let ⚔️ send the next design
+    // out with the first monster's look. The URLs are not revoked: the arena monster still uses them.
+    setGeneratedImageUrl(null);
+    setGeneratedVideoUrl(null);
+    setImagePromptEn(undefined);
+    setVideoSource(null);
   };
   const currentId = buildIdRef.current?.id ?? "";
   const opponents = opponentsFor(opponentRoster, currentId);

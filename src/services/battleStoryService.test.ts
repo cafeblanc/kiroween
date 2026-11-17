@@ -5,7 +5,13 @@ import {
   actForPhase,
   cleanStoryName,
   composeBattleStory,
+  instrumentalParticle,
+  objectParticle,
+  partPhrase,
+  subjectParticle,
   toStoryFighter,
+  topicParticle,
+  withParticle,
   type StoryFighter,
 } from './battleStoryService';
 import { createSeededRng, resolveBattle, type BattleResult } from '../utils/arenaBattle';
@@ -93,12 +99,49 @@ describe('composeBattleStory (examples)', () => {
     }
     expect(ko).not.toContain('추가 촉수'); // only the first "+" segment is used
     for (const s of all) {
-      expect(s.storyKo.act2_clash).toContain('입을 벌려 화염포');
+      expect(s.storyKo.act2_clash).toContain('입에서 화염포');
       expect(s.storyEn.act2_clash).toContain('flame cannons');
       expect(s.storyKo.act2_clash).toContain('꼬리');
       expect(s.storyEn.act2_clash).toContain('tail');
       expect(s.storyKo.act3_finish).toContain('화염포');
     }
+  });
+
+  it('turns long designed parts into short phrases, never cut mid-word', () => {
+    expect(partPhrase('날카로운 송곳니와 용암처럼 빛나는 황금빛 파충류 눈을 가진 용의 머리', '머리', 'head')).toBe('용의 머리');
+    expect(partPhrase('초고온 케라틴 비늘 갑옷으로 덮인 거대한 흉곽과 맥동하는 용암 심장', '몸통', 'torso')).toBe('거대한 흉곽');
+    expect(partPhrase('뿔 달린 용 머리', '머리', 'head')).toBe('뿔 달린 용 머리');
+    expect(partPhrase('강철을 찢는 거대한 발톱과 박쥐 날개막이 연결된 앞다리', '팔', 'arms')).toBe('날개막이 연결된 앞다리');
+    expect(partPhrase('지면을 부수는 두꺼운 파충류 뒷다리와 쇠사슬 같은 힘줄', '다리', 'legs')).toBe('두꺼운 파충류 뒷다리');
+    expect(partPhrase('끝에 창날 모양의 화염 가시가 달린 길고 묵직한 비늘 꼬리', '꼬리', 'tail')).toBe('묵직한 비늘 꼬리');
+    expect(partPhrase('맥동하는 용암 심장', '몸통', 'torso')).toBe('용암 심장 몸통');
+    expect(partPhrase('', '꼬리', 'tail')).toBe('꼬리');
+    expect(partPhrase('전갈 독침 꼬리 + 추가 촉수', '꼬리', 'tail')).toBe('전갈 독침 꼬리');
+  });
+
+  it('picks the Korean particle from the final syllable', () => {
+    expect(objectParticle('꼬리')).toBe('를');
+    expect(objectParticle('흉곽')).toBe('을');
+    expect(objectParticle('Dragon')).toBe('를');
+    expect(subjectParticle('드래곤')).toBe('이');
+    expect(subjectParticle('레비아탄 커스텀')).toBe('이');
+    expect(subjectParticle('키메라')).toBe('가');
+    expect(instrumentalParticle('뒷다리')).toBe('로');
+    expect(instrumentalParticle('꼬리')).toBe('로');
+    expect(instrumentalParticle('발톱')).toBe('으로');
+    expect(instrumentalParticle('비늘')).toBe('로');
+    expect(withParticle('드래곤')).toBe('과');
+    expect(topicParticle('키메라')).toBe('는');
+  });
+
+  it('writes no "(를)" / "(가)" style placeholders in the Korean story', () => {
+    fc.assert(
+      fc.property(fighterArb, fighterArb, fc.integer(), (a, b, seed) => {
+        const { s } = story(a, b, seed);
+        expect(s.textKo).not.toMatch(/\((을|를|이|가|은|는|과|와|으로|로)\)/);
+        expect(s.textKo).not.toContain('…');
+      }),
+    );
   });
 
   it('falls back to generic part names when a monster has no designed parts', () => {

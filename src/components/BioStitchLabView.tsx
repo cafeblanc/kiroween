@@ -71,6 +71,8 @@ const LOCAL_CONFOCAL_FALLBACK = "/images/chimera_microscopy_quad.jpg";
 
 // Synapse chat overlay: messages stay on the video this long after the last one, then slide up and vanish.
 const SYNAPSE_CHAT_ABSORB_MS = 3000;
+/** The chimera lab tab (6 curated sample specimens) is hidden for now at the user's request; the code is kept. */
+const SHOW_CHIMERA_LAB = false;
 const SYNAPSE_CHAT_EXIT_ANIM_MS = 550;
 
 interface LabManualPoint {
@@ -247,7 +249,10 @@ export const BioStitchLabView: React.FC = () => {
   const [selectedCodeSpec, setSelectedCodeSpec] = useState<string>("stitcher");
   const [isCodeCopied, setIsCodeCopied] = useState<boolean>(false);
   const [isStitchModalOpen, setIsStitchModalOpen] = useState<boolean>(false);
-  const [activeModalTab, setActiveModalTab] = useState<"chimera_assembler" | "monster_arena">("chimera_assembler");
+  // 키메라 배양실(샘플 6종)은 당분간 숨김: 결투장이 기본 탭 (코드는 유지, SHOW_CHIMERA_LAB로 다시 켤 수 있음)
+  const [activeModalTab, setActiveModalTab] = useState<"chimera_assembler" | "monster_arena">(
+    SHOW_CHIMERA_LAB ? "chimera_assembler" : "monster_arena",
+  );
   // 괴수 설계실 → 배양기: 이미지가 백그라운드에서 완성되면 3D로 튀어나오는 연출 (포효와 함께)
   const [revealMonster, setRevealMonster] = useState<ComicMonster | null>(null);
   // 괴수 설계실 → 결투장 출격: 동영상이 완성될 때까지 이미지 + 점점 커지는 포효
@@ -2416,6 +2421,7 @@ export const BioStitchLabView: React.FC = () => {
                   {/* 1-LINE SLIM HEADER BAR (글씨는 맨 윗줄 1줄만! 나머지 전체는 영상으로 꽉 채움) */}
                   <div className="flex items-center justify-between gap-1.5 border-b border-slate-800 px-3 py-1.5 shrink-0 overflow-x-auto no-scrollbar bg-slate-950/95">
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {SHOW_CHIMERA_LAB && (
                       <button
                         type="button"
                         onClick={() => setActiveModalTab("chimera_assembler")}
@@ -2428,6 +2434,7 @@ export const BioStitchLabView: React.FC = () => {
                         <span>⚡</span>
                         <span>{isKo ? "키메라 배양실" : "Bio-Assembler"}</span>
                       </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setActiveModalTab("monster_arena")}
@@ -2797,7 +2804,7 @@ export const BioStitchLabView: React.FC = () => {
                             playsInline
                             controls={battlePhase === "playing"}
                             onEnded={() => setBattlePhase("outcome")}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-cover"
                           />
                           {battlePhase === "playing" && (
                             <button

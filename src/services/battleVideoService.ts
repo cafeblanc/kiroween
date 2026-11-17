@@ -59,11 +59,58 @@ function cleanName(nameEn: string, fallback: string): string {
   return toPromptText(nameEn.replace(/^\d+\s*[.)]\s*/, ""), 60) || fallback;
 }
 
-/** Appearance of one fighter for the prompt: its English design text, or a generic line from the name. */
+/**
+ * The studio's English image prompt wraps the design in fixed boilerplate ("Photorealistic bio-engineered X monster
+ * inside a dark sci-fi laboratory bioreactor chamber, ... cinematic studio lighting, ultra detailed creature anatomy,
+ * no text"). Keeping it made both fighters' descriptions nearly identical, so the model blended them into one creature.
+ * Only the design part in the middle is kept.
+ */
+export function designFromImagePrompt(promptEn: string | undefined): string {
+  return (promptEn ?? "")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^\s*photorealistic bio-engineered .*? monster inside a dark sci-fi laboratory bioreactor chamber,?\s*/i, "")
+    .replace(/,?\s*(cinematic studio lighting|ultra detailed creature anatomy|no text)\b.*$/is, "")
+    // Stat cues ("ferocious battle-scarred predator, ATK 98, ...") describe numbers, not the creature's look.
+    .replace(/,?\s*[^,]*,\s*ATK \d+\b.*$/is, "")
+    .replace(/,?\s*ATK \d+\b.*$/is, "")
+    .trim();
+}
+
+/** Plain colour word for a #rrggbb theme colour, so the two fighters get clearly different visual identifiers. */
+export function colorWord(hex: string | undefined): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex ?? "");
+  if (!m) return "";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  // Low saturation (e.g. slate #64748b) reads as grey, not as a hue.
+  if (max - min < 0.12 || (max - min) / max < 0.3) return max > 0.7 ? "pale silver" : max < 0.25 ? "black" : "grey";
+  let h = 0;
+  if (max === r) h = ((g - b) / (max - min)) % 6;
+  else if (max === g) h = (b - r) / (max - min) + 2;
+  else h = (r - g) / (max - min) + 4;
+  const deg = (h * 60 + 360) % 360;
+  if (deg < 15 || deg >= 345) return "crimson red";
+  if (deg < 40) return "fiery orange";
+  if (deg < 65) return "golden yellow";
+  if (deg < 170) return "toxic green";
+  if (deg < 200) return "glowing cyan";
+  if (deg < 255) return "deep blue";
+  if (deg < 300) return "violet purple";
+  return "magenta pink";
+}
+
+/** Appearance of one fighter for the prompt: colour + its own design text, or a generic line from the name. */
 export function describeBattleFighter(f: BattleVideoFighter, fallbackName: string): string {
   const name = cleanName(f.nameEn, fallbackName);
-  const design = toPromptText(f.promptEn, MAX_FIGHTER_CHARS);
-  return design ? `${name}, ${design}` : `${name}, a hulking bio-engineered monster`;
+  const color = colorWord(f.colorHex);
+  const design = toPromptText(designFromImagePrompt(f.promptEn), MAX_FIGHTER_CHARS);
+  const body = design || "a hulking bio-engineered monster";
+  return `${name}, a ${color ? `${color} ` : ""}creature: ${body}`;
 }
 
 /**
@@ -105,18 +152,26 @@ function composeParts(
   exchange: string,
   finish: string,
 ): string {
+  const c1 = colorWord(f1.colorHex);
+  const c2 = colorWord(f2.colorHex);
+  // Short visual tags reused in every sentence so the model keeps the two creatures apart ("the crimson red left creature").
+  const tag1 = `the ${c1 && c1 !== c2 ? `${c1} ` : ""}left creature`;
+  const tag2 = `the ${c2 && c2 !== c1 ? `${c2} ` : ""}right creature`;
+  // One continuous take (no cuts): the LTX guide recommends it for image-to-video, and cuts let the model re-draw
+  // both fighters from text, which turned two different designs into the same creature.
   const parts = [
-    "A wide shot opens on a dark sci-fi bio-lab arena lit by cold cyan and red rim light.",
-    `On the left stands ${describeBattleFighter(f1, "the left monster")}.`,
-    `On the right stands ${describeBattleFighter(f2, "the right monster")}.`,
-    `The two monsters charge and collide: ${n1} swings its clawed arms and slashes ${n2}'s torso while its legs stomp the cracking floor,`,
-    `and ${n2} whips its spiked tail like a scythe, smashing it into ${n1}'s head; their bodies twist and grapple.`,
-    "The view cuts to a low-angle medium shot: both monsters rear their heads, open their jaws wide and fire roaring flame cannons from their mouths at each other,",
-    `while bright laser beams cross in mid-air; ${n1} unleashes ${atk1} and ${n2} answers with ${atk2},`,
+    "One continuous cinematic take, no cuts, starting exactly from the first frame: a dark sci-fi bio-lab arena lit by cold cyan and red rim light.",
+    "Two completely different creatures face each other.",
+    `On the left: ${describeBattleFighter(f1, "the left monster")}.`,
+    `On the right: ${describeBattleFighter(f2, "the right monster")}.`,
+    "Each creature keeps its own colours, body shape, head, horns, limbs and tail for the whole clip; they never merge, swap places or turn into each other.",
+    `They charge and collide: ${tag1} (${n1}) swings its clawed arms and slashes the torso of ${tag2} while its legs stomp the cracking floor,`,
+    `and ${tag2} (${n2}) whips its spiked tail like a scythe, smashing it into the head of ${tag1}; their bodies twist and grapple.`,
+    "The camera swoops low as both rear their heads, open their jaws wide and fire roaring flame cannons from their mouths at each other,",
+    `while bright laser beams cross in mid-air; ${tag1} unleashes ${atk1} and ${tag2} answers with ${atk2},`,
     "exploding into sparks, shockwaves, smoke and flying debris.",
     exchange ? `The exchange unfolds like this: ${exchange}.` : "",
-    `A hard cut to a close-up of the finish: ${finish || `the winner coils its tail around the loser and slams it down`}.`,
-    "The same two monsters stay recognizable across every cut.",
+    `The camera pushes in for the finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
     "Fast handheld action camera with motion blur, photorealistic creatures, Unreal Engine 5 quality, no text, no subtitles, no logos.",
   ].filter(Boolean);
   return parts.join(" ").replace(/\s+/g, " ").trim();
@@ -129,6 +184,35 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error("image load failed"));
     img.src = src;
   });
+}
+
+/** Share of the image height cut from the bottom of each monster image (removes the pollinations.ai watermark). */
+export const FIRST_FRAME_CROP_BOTTOM = 0.1;
+/** Half-width of the blended dark band between the two monsters in the first frame. */
+export const FIRST_FRAME_SEAM_PX = 70;
+
+/**
+ * Source rectangle that makes an image cover a box (crop, no letterbox), after cutting `cropBottom` (0..0.5) of its
+ * height from the bottom. Pure, for tests.
+ */
+export function coverSourceRect(
+  imgW: number,
+  imgH: number,
+  boxW: number,
+  boxH: number,
+  cropBottom = 0,
+): { sx: number; sy: number; sw: number; sh: number } {
+  const w = Math.max(1, imgW);
+  const usableH = Math.max(1, imgH * (1 - Math.min(0.5, Math.max(0, cropBottom))));
+  const boxAspect = Math.max(1, boxW) / Math.max(1, boxH);
+  if (w / usableH > boxAspect) {
+    // Image is wider than the box: keep full usable height, crop the sides around the centre.
+    const sw = usableH * boxAspect;
+    return { sx: (w - sw) / 2, sy: 0, sw, sh: usableH };
+  }
+  // Image is taller: keep full width, crop from the top part (heads sit near the top of creature shots).
+  const sh = w / boxAspect;
+  return { sx: 0, sy: Math.max(0, (usableH - sh) * 0.25), sw: w, sh };
 }
 
 /** Fits an image inside a box (contain) and returns the drawn rect. Pure, for tests. */
@@ -161,17 +245,34 @@ export async function composeBattleFirstFrame(img1: string, img2: string): Promi
     canvas.height = H;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    const bg = ctx.createRadialGradient(W / 2, H * 0.6, 40, W / 2, H / 2, W * 0.7);
-    bg.addColorStop(0, "#1e293b");
-    bg.addColorStop(1, "#020617");
-    ctx.fillStyle = bg;
+    ctx.fillStyle = "#020617";
     ctx.fillRect(0, 0, W, H);
-    const pad = 24;
+    // One scene, not two framed photos: each monster fills its half edge to edge (cover), with the image's bottom strip
+    // cropped off (pollinations.ai stamps its watermark there). The video model then animates a single arena instead of
+    // re-drawing the creatures from text.
     const half = W / 2;
     for (const [img, x0] of [[a, 0], [b, half]] as const) {
-      const r = containRect(img.naturalWidth || img.width, img.naturalHeight || img.height, x0 + pad, pad, half - pad * 2, H - pad * 2);
-      ctx.drawImage(img, r.x, r.y, r.w, r.h);
+      const s = coverSourceRect(img.naturalWidth || img.width, img.naturalHeight || img.height, half, H, FIRST_FRAME_CROP_BOTTOM);
+      ctx.drawImage(img, s.sx, s.sy, s.sw, s.sh, x0, 0, half, H);
     }
+    // Blend the seam: a dark band in the middle fades both halves into the same smoky arena.
+    const seam = ctx.createLinearGradient(half - FIRST_FRAME_SEAM_PX, 0, half + FIRST_FRAME_SEAM_PX, 0);
+    seam.addColorStop(0, "rgba(2,6,23,0)");
+    seam.addColorStop(0.5, "rgba(2,6,23,0.85)");
+    seam.addColorStop(1, "rgba(2,6,23,0)");
+    ctx.fillStyle = seam;
+    ctx.fillRect(half - FIRST_FRAME_SEAM_PX, 0, FIRST_FRAME_SEAM_PX * 2, H);
+    // Shared lighting: a vignette and a darker floor so both halves read as the same place.
+    const vignette = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.35, W / 2, H * 0.55, W * 0.75);
+    vignette.addColorStop(0, "rgba(2,6,23,0)");
+    vignette.addColorStop(1, "rgba(2,6,23,0.7)");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, W, H);
+    const floor = ctx.createLinearGradient(0, H * 0.78, 0, H);
+    floor.addColorStop(0, "rgba(2,6,23,0)");
+    floor.addColorStop(1, "rgba(2,6,23,0.75)");
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, H * 0.78, W, H * 0.22);
     return canvas.toDataURL("image/jpeg", 0.85);
   } catch {
     return null;

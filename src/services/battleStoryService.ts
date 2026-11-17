@@ -67,8 +67,26 @@ export function cleanStoryName(raw: string | undefined, fallback: string): strin
   return (s || fallback).slice(0, 40);
 }
 
+/** Max length of the short design tag in act 1 (cut at a word boundary, never mid-word). */
+const PARTS_TAG_MAX_CHARS = 40;
+
+/**
+ * Short design tag for act 1: drops "[베이스 종족: …]" / "[Combat Stats …]" tags, bullets, "머리:" style labels and the
+ * English studio boilerplate, then keeps whole words up to PARTS_TAG_MAX_CHARS.
+ */
 function cleanParts(raw: string | undefined): string {
-  return (raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const text = (raw ?? '')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/^\s*photorealistic bio-engineered .*? monster inside a dark sci-fi laboratory bioreactor chamber,?\s*/i, '')
+    .replace(/,?\s*(cinematic studio lighting|ultra detailed creature anatomy|no text)\b.*$/is, '')
+    .replace(/[•·]/g, ' ')
+    .replace(/(^|\s)[^\s:]{1,12}:\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= PARTS_TAG_MAX_CHARS) return text;
+  const cut = text.slice(0, PARTS_TAG_MAX_CHARS);
+  const space = cut.lastIndexOf(' ');
+  return (space > 10 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, '');
 }
 
 type StatKey = keyof CombatStats;
@@ -101,19 +119,111 @@ interface Side {
   partsKo: string;
   partsEn: string;
   top: StatKey;
+  /** True when the studio body parts are known (then act 1 shows the short head/tail phrases). */
+  hasParts: boolean;
   /** Short Korean noun phrase per part ("용암 비늘 꼬리"), or the generic noun when the part was not designed. */
   part: Record<'head' | 'arms' | 'legs' | 'tail' | 'torso', string>;
 }
 
 const GENERIC_PART_KO = { head: '머리', arms: '팔', legs: '다리', tail: '꼬리', torso: '몸통' } as const;
 
-/** First segment of a studio part text ("A + B" -> "A"), bounded so a sentence stays readable. */
-function partPhrase(raw: string | undefined, generic: string): string {
-  const first = (raw ?? '').split('+')[0].replace(/\s+/g, ' ').trim();
-  if (!first) return generic;
-  const short = first.length > 22 ? `${first.slice(0, 22).trim()}…` : first;
-  return `${short} ${generic}`;
+/** Words that already name the body part (so "꼬리" is not appended twice). */
+const PART_NOUNS_KO: Record<keyof typeof GENERIC_PART_KO, RegExp> = {
+  head: /(머리|대가리|두개골|얼굴|주둥이|턱)$/,
+  arms: /(팔|앞다리|발톱|촉수|날개|집게|손)$/,
+  legs: /(다리|뒷다리|하체|발)$/,
+  tail: /(꼬리|독침|채찍)$/,
+  torso: /(몸통|흉곽|가슴|등껍질|갑옷|껍질|몸)$/,
+};
+
+/** Words kept in front of the part noun: short, punchy phrases ("두꺼운 파충류 뒷다리"). */
+export const PART_PHRASE_MODIFIERS = 2;
+
+const TRAILING_PARTICLE = /(으로|과|와|을|를|이|가|은|는|의|로|에|도)$/;
+
+function stripParticle(word: string): string {
+  const w = word.replace(/[,.;:!?…]+$/, '');
+  const s = w.replace(TRAILING_PARTICLE, '');
+  return s.length >= 1 ? s : w;
 }
+
+/** Adnominal verb form ("가진", "달린", "연결된", "부수는"): dangling when its object was cut off. */
+function isAdnominal(word: string): boolean {
+  if (/는$/.test(word)) return true;
+  const code = word.slice(-1).charCodeAt(0);
+  return code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 === 4; // final ㄴ
+}
+
+/**
+ * Short noun phrase for a designed part, never cut mid-word: the last word that names the part (particle removed)
+ * plus up to PART_PHRASE_MODIFIERS words in front of it; a leading verb whose object was cut off is dropped.
+ * "날카로운 송곳니와 … 눈을 가진 용의 머리" -> "용의 머리"; "끝에 창날 모양의 … 길고 묵직한 비늘 꼬리" -> "묵직한 비늘 꼬리".
+ * When no word names the part, the last two words plus the generic noun are used ("맥동하는 용암 심장" -> "용암 심장 몸통").
+ */
+export function partPhrase(raw: string | undefined, generic: string, key?: keyof typeof GENERIC_PART_KO): string {
+  const first = (raw ?? '').split('+')[0].replace(/[[\]•():]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!first) return generic;
+  const words = first.split(' ').filter(Boolean);
+  const nounRe = key ? PART_NOUNS_KO[key] : null;
+  let at = -1;
+  if (nounRe) for (let i = words.length - 1; i >= 0; i--) if (nounRe.test(stripParticle(words[i]))) { at = i; break; }
+  if (at < 0) {
+    const lastTwo = words.slice(-2).map((w, i, a) => (i === a.length - 1 ? stripParticle(w) : w));
+    return `${lastTwo.join(' ')} ${generic}`.trim();
+  }
+  let start = Math.max(0, at - PART_PHRASE_MODIFIERS);
+  let kept = words.slice(start, at);
+  if (kept.length > 0 && start > 0 && isAdnominal(kept[0])) {
+    const before = words[start - 1];
+    if (/(으로|로|을|를|이|가|에|과|와|의)$/.test(before)) {
+      // "눈을 | 가진 용의 머리", "갑옷으로 | 덮인 거대한 흉곽": the verb's object was cut off, so drop the verb.
+      kept = kept.slice(1);
+    } else if (before.length <= 2 && !/(고|게|며|서|히|럼)$/.test(before)) {
+      // "뿔 | 달린 용 머리": a bare one-word noun belongs to the verb, so keep it.
+      start -= 1;
+      kept = words.slice(start, at);
+    }
+  }
+  return [...kept, stripParticle(words[at])].join(' ');
+}
+
+/** Korean object particle that matches the final syllable: 을 after a final consonant, 를 otherwise. */
+export function objectParticle(word: string): '을' | '를' {
+  const ch = word.trim().slice(-1);
+  const code = ch.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return '를';
+  return (code - 0xac00) % 28 === 0 ? '를' : '을';
+}
+
+/** Subject particle: 이 after a final consonant, 가 otherwise. */
+export function subjectParticle(word: string): '이' | '가' {
+  return objectParticle(word) === '을' ? '이' : '가';
+}
+
+/** Instrumental particle: 로 after a vowel or ㄹ, 으로 after other final consonants. */
+export function instrumentalParticle(word: string): '로' | '으로' {
+  const ch = word.trim().slice(-1);
+  const code = ch.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return '로';
+  const jong = (code - 0xac00) % 28;
+  return jong === 0 || jong === 8 ? '로' : '으로';
+}
+
+/** Topic particle: 은 after a final consonant, 는 otherwise. */
+export function topicParticle(word: string): '은' | '는' {
+  return objectParticle(word) === '을' ? '은' : '는';
+}
+
+/** Conjunctive particle: 과 after a final consonant, 와 otherwise. */
+export function withParticle(word: string): '과' | '와' {
+  return objectParticle(word) === '을' ? '과' : '와';
+}
+
+const eul = (w: string) => `${w}${objectParticle(w)}`;
+const iga = (w: string) => `${w}${subjectParticle(w)}`;
+const ro = (w: string) => `${w}${instrumentalParticle(w)}`;
+const eun = (w: string) => `${w}${topicParticle(w)}`;
+const gwa = (w: string) => `${w}${withParticle(w)}`;
 
 function toSide(f: StoryFighter, fallbackNo: 1 | 2): Side {
   const bp = f.bodyParts ?? {};
@@ -123,12 +233,13 @@ function toSide(f: StoryFighter, fallbackNo: 1 | 2): Side {
     partsKo: cleanParts(f.partsKo),
     partsEn: cleanParts(f.partsEn),
     top: dominantStat(resolveCombatStats(f.customStats)),
+    hasParts: Boolean(bp.head || bp.tail),
     part: {
-      head: partPhrase(bp.head, GENERIC_PART_KO.head),
-      arms: partPhrase(bp.arms, GENERIC_PART_KO.arms),
-      legs: partPhrase(bp.legs, GENERIC_PART_KO.legs),
-      tail: partPhrase(bp.tail, GENERIC_PART_KO.tail),
-      torso: partPhrase(bp.torso, GENERIC_PART_KO.torso),
+      head: partPhrase(bp.head, GENERIC_PART_KO.head, 'head'),
+      arms: partPhrase(bp.arms, GENERIC_PART_KO.arms, 'arms'),
+      legs: partPhrase(bp.legs, GENERIC_PART_KO.legs, 'legs'),
+      tail: partPhrase(bp.tail, GENERIC_PART_KO.tail, 'tail'),
+      torso: partPhrase(bp.torso, GENERIC_PART_KO.torso, 'torso'),
     },
   };
 }
@@ -153,11 +264,11 @@ function strikeLine(
   if (l === 'ko') {
     const head = kind === 'first' ? '⚡ 선공' : '↩️ 반격';
     if (kind === 'first') {
-      if (ev?.evaded) return `${head}: ${A}이(가) ${att.part.arms}을(를) 휘두르지만 ${D}이(가) ${def.part.legs}로 박차 올라 간발의 차로 회피한다!`;
-      return `${head}: ${A}이(가) ${att.part.arms}을(를) 휘둘러 ${D}의 ${def.part.torso}을(를) 찢어발긴다${skill}`;
+      if (ev?.evaded) return `${head}: ${iga(A)} ${eul(att.part.arms)} 휘두르지만 ${iga(D)} ${ro(def.part.legs)} 박차 올라 피한다!`;
+      return `${head}: ${iga(A)} ${eul(att.part.arms)} 휘둘러 ${D}의 ${eul(def.part.torso)} 찢는다${skill}`;
     }
-    if (ev?.evaded) return `${head}: ${A}이(가) ${att.part.tail}을(를) 채찍처럼 휘두르지만 ${D}이(가) 몸을 비틀어 회피한다!`;
-    return `${head}: ${A}이(가) ${att.part.tail}을(를) 채찍처럼 휘둘러 ${D}의 ${def.part.head}을(를) 내리친다${skill}`;
+    if (ev?.evaded) return `${head}: ${iga(A)} ${eul(att.part.tail)} 휘두르지만 ${iga(D)} 몸을 비틀어 피한다!`;
+    return `${head}: ${iga(A)} ${eul(att.part.tail)} 채찍처럼 휘둘러 ${D}의 ${eul(def.part.head)} 내리친다${skill}`;
   }
   const head = kind === 'first' ? '⚡ First strike' : '↩️ Counter';
   if (kind === 'first') {
@@ -172,7 +283,7 @@ function strikeLine(
 function clashLine(l: Lang, ev: BattleEvent | undefined, s1: Side, s2: Side): string {
   const skill = ev?.skill ? ` — ${ev.skill}!` : '!';
   if (l === 'ko') {
-    return `💥 정면 대충돌: ${s1.ko}와(과) ${s2.ko}이(가) 동시에 입을 벌려 화염포를 쏘고, 교차하는 레이저 사이로 충격파가 터진다${skill}`;
+    return `💥 정면 충돌: ${gwa(s1.ko)} ${iga(s2.ko)} 동시에 입에서 화염포를 쏘고, 레이저가 엇갈리며 충격파가 터진다${skill}`;
   }
   return `💥 Head-on clash: ${s1.en} and ${s2.en} open their jaws and fire flame cannons at each other as laser beams cross and a shockwave erupts${skill}`;
 }
@@ -187,8 +298,9 @@ function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner
   const ev1 = battle.events[1];
   const evClash = battle.events.find((e) => e.phase === 'clash');
 
+  // Short feature tag: the designed head and tail when known, otherwise a few words of the design text.
   const parts = (s: Side) => {
-    const p = l === 'ko' ? s.partsKo : s.partsEn;
+    const p = l === 'ko' ? (s.hasParts ? `${s.part.head} · ${s.part.tail}` : s.partsKo) : s.partsEn;
     return p ? ` (${p})` : '';
   };
   const epi = (s: Side) => (l === 'ko' ? EPITHET_KO[s.top] : EPITHET_EN[s.top]);
@@ -196,8 +308,8 @@ function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner
   const act1 =
     l === 'ko'
       ? [
-          `🔵 ${s1.ko}${parts(s1)} VS 🔴 ${s2.ko}${parts(s2)} — 두 괴수가 배양 아레나에서 서로를 노려본다.`,
-          `${s1.ko}은(는) ${epi(s1)}, ${s2.ko}은(는) ${epi(s2)} 상반된 생체 에너지가 정면으로 맞부딪친다.`,
+          `🔵 ${s1.ko}${parts(s1)} VS 🔴 ${s2.ko}${parts(s2)} — 두 괴수가 서로를 노려본다.`,
+          `${eun(s1.ko)} ${epi(s1)}, ${eun(s2.ko)} ${epi(s2)} 생체 에너지가 맞부딪친다.`,
         ]
       : [
           `🔵 ${s1.en}${parts(s1)} VS 🔴 ${s2.en}${parts(s2)} — the two beasts glare at each other across the bio-arena.`,
@@ -214,8 +326,8 @@ function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner
   const act3 =
     l === 'ko'
       ? [
-          `💀 ${winner.ko}이(가) ${winner.part.legs}로 도약해 ${winner.part.tail}로 ${loser.ko}의 ${loser.part.torso}을(를) 휘감아 바닥에 내리꽂는다 — K.O.!`,
-          `🏆 ${winner.ko}이(가) ${winner.part.head}을(를) 치켜들고 입에서 화염포를 하늘로 뿜으며 승리의 포효를 지른다!`,
+          `💀 ${iga(winner.ko)} ${ro(winner.part.legs)} 뛰어올라 ${ro(winner.part.tail)} ${loser.ko}의 ${eul(loser.part.torso)} 감아 내리꽂는다 — K.O.!`,
+          `🏆 ${iga(winner.ko)} ${eul(winner.part.head)} 치켜들고 하늘로 화염포를 뿜으며 포효한다!`,
         ]
       : [
           `💀 ${winner.en} leaps on its legs, coils its tail around ${loser.en}'s torso and slams it into the ground — K.O.!`,
