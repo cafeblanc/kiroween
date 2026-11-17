@@ -17,8 +17,36 @@ const pollLimiter = new SlidingWindowRateLimiter(60, 60_000);
 const UPSTREAM_TIMEOUT_MS = 50_000;
 // Vercel limits function responses to 4.5 MB; never relay larger bodies.
 const MAX_INLINE_VIDEO_BYTES = 4_000_000;
-const LUMA_BASE = "https://api.lumalabs.ai/dream-machine/v1/generations";
+
+// Luma Agents API (https://docs.agents.lumalabs.ai). The legacy Dream Machine API rejects Agents keys.
+const LUMA_BASE = "https://agents.lumalabs.ai/v1/generations";
+const LUMA_KEY_HINT = "LUMA_AGENTS_API_KEY or LUMA_API_KEY";
+// Agents API ids are UUIDs; this also admits the old opaque id charset.
 const LUMA_ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** LUMA_AGENTS_API_KEY is the documented name; LUMA_API_KEY stays as an alias. */
+function envLumaKey(): string | undefined {
+  return process.env.LUMA_AGENTS_API_KEY || process.env.LUMA_API_KEY || undefined;
+}
+
+/** Maps an upstream Luma error to a client-safe message. Never echoes credentials. */
+function lumaErrorMessage(status: number, data: any, fallback: string): string {
+  const detail = typeof data?.detail === "string" ? data.detail.slice(0, 300) : null;
+  switch (status) {
+    case 401:
+      return `Luma rejected the API key (invalid or missing). Check ${LUMA_KEY_HINT}.`;
+    case 402:
+      return "Luma account has insufficient balance. Add funds and retry.";
+    case 403:
+      return "Luma denied access (the key's account is suspended or deactivated).";
+    case 422:
+      return `Luma rejected the request: ${detail ?? "invalid parameters"}`;
+    case 429:
+      return "Luma rate limit or concurrent-job limit reached. Retry shortly.";
+    default:
+      return detail ?? fallback;
+  }
+}
 
 /** Only x-vercel-forwarded-for is set by Vercel's edge; x-forwarded-for is client-spoofable. */
 function clientIp(req: any): string {
@@ -76,9 +104,9 @@ async function handlePoll(req: any, res: any): Promise<any> {
   }
 
   // GET has no body, so a user-supplied key travels in a header (never in the URL).
-  const lumaKey = header(req, "x-luma-api-key") || process.env.LUMA_API_KEY;
+  const lumaKey = header(req, "x-luma-api-key") || envLumaKey();
   if (!lumaKey) {
-    return res.status(400).json({ error: "No Luma API key configured (LUMA_API_KEY)." });
+    return res.status(400).json({ error: `No Luma API key configured (${LUMA_KEY_HINT}).` });
   }
 
   const jobId: string = req.query.id;
@@ -91,10 +119,23 @@ async function handlePoll(req: any, res: any): Promise<any> {
     });
     const data: any = await r.json().catch(() => ({}));
     if (!r.ok) {
-      return res.status(r.status).json({ jobId, status: "failed", error: data?.detail || "Luma request failed" });
+      return res
+        .status(r.status)
+        .json({ jobId, status: "failed", error: lumaErrorMessage(r.status, data, "Luma request failed") });
     }
     const status = mapLumaState(data?.state);
-    const videoUrl = status === "completed" ? data?.assets?.video ?? null : null;
+    // Agents API: the presigned MP4 is output[].url with type "video" (1 h expiry).
+    const outputs: any[] = Array.isArray(data?.output) ? data.output : [];
+    const video = outputs.find((o) => o?.type === "video" && typeof o?.url === "string");
+    const videoUrl = status === "completed" ? video?.url ?? null : null;
+    if (status === "failed") {
+      return res.status(200).json({
+        jobId,
+        status,
+        videoUrl: null,
+        error: data?.failure_code || data?.failure_reason || "generation_failed",
+      });
+    }
     return res.status(200).json({ jobId, status, videoUrl });
   } catch (err: any) {
     if (err?.name === "AbortError") return res.status(504).json({ error: "Luma status check timed out" });
@@ -124,7 +165,7 @@ export default async function handler(req: any, res: any): Promise<any> {
 
   // Tokens are per provider: a user key for one provider is never sent to the other.
   const isLuma = provider === "luma";
-  const lumaKey = isLuma ? apiKey || process.env.LUMA_API_KEY : undefined;
+  const lumaKey = isLuma ? apiKey || envLumaKey() : undefined;
   const hfToken = isLuma ? undefined : apiKey || process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN;
 
   const controller = new AbortController();
@@ -133,7 +174,7 @@ export default async function handler(req: any, res: any): Promise<any> {
   try {
     if (isLuma) {
       if (!lumaKey) {
-        return res.status(400).json({ error: "No Luma API key configured (LUMA_API_KEY)." });
+        return res.status(400).json({ error: `No Luma API key configured (${LUMA_KEY_HINT}).` });
       }
       const lumaRes = await fetch(LUMA_BASE, {
         method: "POST",
@@ -141,14 +182,19 @@ export default async function handler(req: any, res: any): Promise<any> {
           Authorization: `Bearer ${lumaKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt, aspect_ratio: "16:9", loop: true }),
+        body: JSON.stringify({
+          model: "ray-3.2",
+          type: "video",
+          prompt,
+          aspect_ratio: "16:9",
+          video: { resolution: "720p", duration: "5s", loop: true },
+        }),
         signal: controller.signal,
       });
       const data: any = await lumaRes.json().catch(() => ({}));
       if (!lumaRes.ok || !data?.id) {
-        return res
-          .status(lumaRes.ok ? 502 : lumaRes.status)
-          .json({ error: data?.detail || "Luma job creation failed" });
+        const status = lumaRes.ok ? 502 : lumaRes.status;
+        return res.status(status).json({ error: lumaErrorMessage(status, data, "Luma job creation failed") });
       }
       return res.status(200).json({ jobId: data.id, status: mapLumaState(data.state) });
     }
@@ -166,12 +212,10 @@ export default async function handler(req: any, res: any): Promise<any> {
           signal: controller.signal,
         }
       );
-
       if (!hfRes.ok) {
         const text = await hfRes.text();
         return res.status(hfRes.status).json({ error: text });
       }
-
       const body = await readCapped(hfRes, MAX_INLINE_VIDEO_BYTES);
       if (!body) {
         return res.status(413).json({
@@ -182,7 +226,9 @@ export default async function handler(req: any, res: any): Promise<any> {
       return res.status(200).send(body);
     }
 
-    return res.status(400).json({ error: "No AI Video API token configured (HF_TOKEN or LUMA_API_KEY)." });
+    return res
+      .status(400)
+      .json({ error: "No AI Video API token configured (HF_TOKEN, LUMA_AGENTS_API_KEY or LUMA_API_KEY)." });
   } catch (err: any) {
     if (err?.name === "AbortError") {
       return res.status(504).json({ error: "Video generation timed out" });

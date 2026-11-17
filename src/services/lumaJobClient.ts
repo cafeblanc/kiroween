@@ -2,8 +2,8 @@ import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 
 /** Poll interval must stay >= 5 s (server poll limiter + Luma API courtesy). */
 export const LUMA_POLL_INTERVAL_MS = 5_000;
-/** Bounded total wait for a Luma job. */
-export const LUMA_POLL_TIMEOUT_MS = 180_000;
+/** Bounded total wait for a Luma job (Agents docs: video can exceed 2 min; 5 s/720p is typically faster). */
+export const LUMA_POLL_TIMEOUT_MS = 300_000;
 
 export type LumaJobOutcome =
   | { ok: true; videoUrl: string }
