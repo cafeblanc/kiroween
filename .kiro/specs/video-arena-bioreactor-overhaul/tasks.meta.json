@@ -1,0 +1,150 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 In `src/components/BioStitchLabView.tsx` and `src/components/bioreactor/arena/BattleMatrix.ts`, modify `selectPrebuiltBattleVideo`:": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391030
+      },
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879398654
+      }
+    ],
+    "1.2 When `selectPrebuiltBattleVideo` returns `null`, ensure `activeClashVideoUrl` is `null`, forcing the UI to render the Dual Confrontation Stage.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391167
+      }
+    ],
+    "1.3 Enhance the Dual Confrontation Stage JSX in `BioStitchLabView.tsx`:": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391249
+      }
+    ],
+    "1.4 Add unit and property tests in `src/components/bioreactor/arena/BattleMatrix.test.ts` verifying custom monsters never receive fallback clash videos.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391377
+      }
+    ],
+    "2.1 In `src/services/referenceVideoSelector.ts` and `src/data/comicMonsters.ts`, replace all incubator references to `battle_*.mp4` with appropriate biological growth or awakening sequences.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391475
+      }
+    ],
+    "2.2 Ensure `myth_frankenstein`, `alien_xenomorph`, and `myth_cerberus` use appropriate growth videos instead of battle clips.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391540
+      }
+    ],
+    "2.3 Verify `BioreactorScreen.tsx` preserves custom monster video seamlessly from Stage 1 (Stem Cell) through Stage 6 (Adult Awakening).": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391612
+      }
+    ],
+    "2.4 Update tests in `src/services/videoConcatenationService.test.ts` and `src/components/bioreactor/__tests__/growth-sequence.integration.test.tsx` to match clean video mappings.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391664
+      }
+    ],
+    "3.1 In `src/components/bioreactor/awakening/AwakeningRoar.tsx`, ensure the 3D burst overlay directly uses `monster.jumpscareImg || monster.avatarImg` with dynamic chromatic aberration and screen shockwave.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391733
+      }
+    ],
+    "3.2 Ensure the monster's roar audio (`monster.roarAudio`) and theme color (`monster.colorHex`) illuminate the glass cracks.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391799
+      }
+    ],
+    "4.1 Run `npx tsc --noEmit` and ensure 0 TypeScript errors.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391855
+      }
+    ],
+    "4.2 Run `npm test -- --run` and verify all 210+ test cases pass.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391904
+      }
+    ],
+    "4.3 Run `npm run build` and ensure production build completes.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879391953
+      }
+    ],
+    "4.4 Commit, push to `origin/main`, and verify successful deployment on `https://asura.cafeblanc.kr`.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794879392041
+      }
+    ],
+    "2.1 In `BattleMatrix.ts` and `BioStitchLabView.tsx`, rewrite `selectPrebuiltBattleVideo`:": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794881434245
+      }
+    ],
+    "2.2 When `selectPrebuiltBattleVideo` returns `null`, ensure `activeClashVideoUrl` is `null`, forcing the Dual Confrontation Stage to render.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794881435000
+      }
+    ],
+    "2.3 Enhance the Dual Confrontation Stage JSX in `BioStitchLabView.tsx`:": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794881435138
+      }
+    ],
+    "2.4 Add unit and property tests in `src/components/bioreactor/arena/BattleMatrix.test.ts`.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794881435276
+      }
+    ],
+    "2. Overhaul Arena Clash Selection to Feature Custom Monsters <!-- id: 2 -->": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794881435355
+      }
+    ],
+    "3.1 In `src/services/referenceVideoSelector.ts` and `src/data/comicMonsters.ts`, replace all incubator references to `battle_*.mp4` with appropriate biological growth sequences.": [
+      {
+        "executionId": "dbbf985a-e704-4bed-bb3d-51975f7b5380",
+        "chatSessionId": "sess_edfbd9ee-c33a-48d7-b37f-1d99e6f64a87",
+        "timestamp": 1794881439187
+      }
+    ]
+  }
+}
