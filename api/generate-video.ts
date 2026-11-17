@@ -57,7 +57,7 @@ const RESOLUTIONS: Readonly<Record<string, string>> = {
 
 // Cost guard: LTX bills per generated second, so cap creates per IP per UTC day (per instance, in memory).
 // Temporarily 10 (user-approved) while the static embryo and experiment clips are generated; back to 5 afterwards.
-export const LTX_DAILY_CREATE_CAP = 10;
+export const LTX_DAILY_CREATE_CAP = 5;
 const dailyCreates = new Map<string, { day: string; count: number }>();
 
 const SUPPORTED_PROVIDERS: readonly string[] = ["ltx"];
