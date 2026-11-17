@@ -42,7 +42,8 @@ describe('C1/C2 missing assets and routing (1.1, 1.2)', () => {
 
   it('C2: CustomMonsterStudio default videoSrc and roarAudio exist in public/', () => {
     const src = read('src/components/bioreactor/CustomMonsterStudio.tsx');
-    const video = /generatedVideoUrl\s*\|\|\s*"([^"]+)"/.exec(src)?.[1];
+    // Default clip used when no video exists yet (`videoSrc: <generated video> || "/videos/..."`).
+    const video = /videoSrc:\s*\w+\s*\|\|\s*"([^"]+)"/.exec(src)?.[1];
     const audio = /roarAudio:\s*"([^"]+)"/.exec(src)?.[1];
     expect(video).toBeTruthy();
     expect(audio).toBeTruthy();
@@ -107,8 +108,12 @@ describe('C6 Lab Manual (1.6)', () => {
   const src = read(LAB);
   const modal = src.slice(src.indexOf('{isHelpOpen && ('));
 
-  it('C6: a LIVE BIO-FEED badge exists', () => {
-    expect(src).toMatch(/LIVE BIO-FEED/);
+  // The LIVE BIO-FEED badge was removed at the user's request; the Help button now lives in the top header bar.
+  it('C6: the Help / Lab Guide button is in the header and opens the Lab Manual', () => {
+    const header = src.slice(src.indexOf('<header'), src.indexOf('</header>'));
+    expect(header).toMatch(/setIsHelpOpen\(true\)/);
+    expect(header).toMatch(/사용법/);
+    expect(src).not.toMatch(/LIVE BIO-FEED/);
   });
 
   it('C6: Lab Manual defines exactly 6 points (LAB_MANUAL_POINTS)', () => {

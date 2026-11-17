@@ -16,8 +16,15 @@ import { opponentsFor } from "../../utils/arenaRoster";
 interface CustomMonsterStudioProps {
   isKo: boolean;
   onAwakenCustomMonster: (monster: ComicMonster) => void;
-  onSendToArena?: (monster: ComicMonster) => void;
-  /** Optional HuggingFace token shared from the lab view; the local input below overrides it. */
+  /** The monster (with its finished video) enters the arena. `ltxError` is set when the local fallback was used. */
+  onSendToArena?: (monster: ComicMonster, ltxError?: string) => void;
+  /** The background image job finished: update the monster everywhere and play the 3D reveal. */
+  onMonsterImageReady?: (monster: ComicMonster) => void;
+  /** Arena launch started: show the waiting screen (image + rising roar) while the video renders. */
+  onSummonStart?: (monster: ComicMonster) => void;
+  onSummonProgress?: (pct: number) => void;
+  onSummonFailed?: (message: string) => void;
+  /** Optional HuggingFace token shared from the lab view (image generation only; the server HF_TOKEN also works). */
   initialHfToken?: string;
   /** Other designed monsters the new one can fight (sample monsters never fight). */
   opponentRoster?: ComicMonster[];
@@ -42,15 +49,19 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   isKo,
   onAwakenCustomMonster,
   onSendToArena,
+  onMonsterImageReady,
+  onSummonStart,
+  onSummonProgress,
+  onSummonFailed,
   initialHfToken,
   opponentRoster = [],
   onStartBattleVideo,
 }) => {
   const [opponentId, setOpponentId] = useState<string>("");
-  const [hfTokenInput, setHfTokenInput] = useState<string>("");
+
   const [imagePromptEn, setImagePromptEn] = useState<string | undefined>(undefined);
   const [videoSource, setVideoSource] = useState<"ltx" | "mediarecorder" | null>(null);
-  const hfToken = hfTokenInput.trim() || initialHfToken?.trim() || "";
+  const hfToken = initialHfToken?.trim() || "";
   const [selectedPreset, setSelectedPreset] = useState<MonsterStudioPreset>(
     MONSTER_STUDIO_PRESETS[0],
   );
@@ -109,8 +120,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     setLongPrompt(composeDescriptionFromParts(selectedPreset, nextParts));
   };
 
-  const handleGenerateImage = async () => {
-    if (isGeneratingImg) return;
+  /** Background image job (HuggingFace FLUX, procedural fallback). Returns the result so callers don't wait for state. */
+  const runImageJob = async (): Promise<{ imageUrl: string; promptEn?: string; themeHex: string } | null> => {
     setIsGeneratingImg(true);
     setStatusMessage(null);
     try {
@@ -134,12 +145,13 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
       setStatusMessage(
         result.source === "procedural"
           ? isKo
-            ? "외부 AI 응답 지연으로 부위별 변이 합성 이미지를 생성했습니다. 이제 동영상으로 변환하거나 배양기에 투입하세요."
-            : "Rendered procedural multi-part mutation image. Convert to video or launch bioreactor."
+            ? "외부 AI 응답 지연으로 부위별 변이 합성 이미지를 만들었습니다."
+            : "The AI image service was slow, so a procedural mutation image was rendered."
           : isKo
-          ? "입력하신 부위별 사양에 맞춰 새로운 AI 괴수 이미지를 생성했습니다! 이제 아래에서 동영상으로 변환하거나 배양기에 투입하세요."
-          : "Generated a brand-new AI monster image matching your specs! Convert to video or launch bioreactor.",
+          ? "설계한 부위대로 괴수 이미지가 완성되었습니다!"
+          : "Your monster image is ready!",
       );
+      return { imageUrl: result.imageUrl, promptEn: result.promptEn, themeHex: result.themeHex };
     } catch (err) {
       setStatusMessage(
         err instanceof Error
@@ -148,6 +160,7 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
           ? "이미지 생성 중 오류가 발생했습니다."
           : "Failed to generate monster image.",
       );
+      return null;
     } finally {
       setIsGeneratingImg(false);
     }
@@ -173,9 +186,13 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleGenerateVideo = async () => {
-    if (isGeneratingVideo) return;
-    const sourceImage = generatedImageUrl || selectedPreset.baseImageSrc;
+  /** Background video job (LTX-2.5 image-to-video, MediaRecorder fallback). Returns null on a hard failure. */
+  const runVideoJob = async (
+    sourceImage: string,
+    promptEn: string | undefined,
+    hex: string,
+    onProgress?: (pct: number) => void,
+  ): Promise<{ videoUrl: string; ltxError?: string } | null> => {
     setIsGeneratingVideo(true);
     setVideoProgress(0);
     setStatusMessage(null);
@@ -183,23 +200,27 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
       const result = await generateVideoFromMonsterImage({
         imageUrl: sourceImage,
         description: longPrompt,
-        accentColor: themeHex,
+        accentColor: hex,
         durationSec: 5,
-        onProgress: setVideoProgress,
+        onProgress: (pct) => {
+          setVideoProgress(pct);
+          onProgress?.(pct);
+        },
         hfToken: hfToken || undefined,
-        promptEn: imagePromptEn,
+        promptEn,
       });
       setGeneratedVideoUrl(result.videoUrl);
       setVideoSource(result.source);
       setStatusMessage(
         result.source === "ltx"
           ? isKo
-            ? "LTX-Video 실사 동영상 생성 완료! 재생, 다운로드 또는 15초 배양기에 바로 투입할 수 있습니다."
-            : "LTX-Video photoreal clip ready! Play, download, or start the 15s bioreactor."
+            ? "LTX 실사 동영상이 완성되어 결투장에 등장했습니다!"
+            : "The LTX video is ready and the monster entered the arena!"
           : isKo
-          ? `⚠️ LTX 실사 동영상 생성 실패: ${result.ltxError ?? "원인 불명"}. 대신 이미지를 움직이는 로컬 애니메이션(${result.durationSec}초)을 만들었습니다.`
-          : `⚠️ LTX video failed: ${result.ltxError ?? "unknown reason"}. A local animation of the image (${result.durationSec}s) was rendered instead.`,
+          ? `⚠️ LTX 실사 동영상 생성 실패: ${result.ltxError ?? "원인 불명"}. 대신 이미지를 움직이는 로컬 애니메이션(${result.durationSec}초)으로 출격했습니다.`
+          : `⚠️ LTX video failed: ${result.ltxError ?? "unknown reason"}. Sent out with a local animation of the image (${result.durationSec}s) instead.`,
       );
+      return { videoUrl: result.videoUrl, ltxError: result.source === "ltx" ? undefined : result.ltxError ?? "LTX failed" };
     } catch (err) {
       setStatusMessage(
         err instanceof Error
@@ -208,22 +229,32 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
           ? "동영상 생성 중 오류가 발생했습니다."
           : "Failed to generate monster video.",
       );
+      return null;
     } finally {
       setIsGeneratingVideo(false);
     }
   };
 
-  // 같은 설계(이름·프롬프트·능력치·이미지·영상)는 같은 id를 재사용: 배양기와 결투장 양쪽으로 보내도 보관함에는 1건(upsert)
+  // 같은 설계(종족·이름·부위 묘사·능력치)는 같은 id를 재사용: 이미지·영상이 백그라운드에서 나중에 도착해도 같은 괴수로 갱신되고,
+  // 배양기와 결투장 양쪽으로 보내도 보관함에는 1건(upsert)
   const buildIdRef = useRef<{ sig: string; id: string } | null>(null);
   const stableCustomId = (): string => {
-    const sig = JSON.stringify([selectedPreset.id, customName, longPrompt, themeHex, generatedImageUrl, generatedVideoUrl, bioStats]);
+    const sig = JSON.stringify([selectedPreset.id, customName, longPrompt, bioStats]);
     if (buildIdRef.current?.sig === sig) return buildIdRef.current.id;
     const id = `custom_${selectedPreset.id}_${Date.now()}`;
     buildIdRef.current = { sig, id };
     return id;
   };
 
-  const buildCustomMonsterObject = (): ComicMonster => ({
+  /** Media produced by a background job; state updates arrive a render later, so jobs pass their results in. */
+  type MediaOverride = { imageUrl?: string | null; videoUrl?: string | null; promptEn?: string; themeHex?: string };
+
+  const buildCustomMonsterObject = (over: MediaOverride = {}): ComicMonster => {
+    const image = (over.imageUrl !== undefined ? over.imageUrl : generatedImageUrl) || selectedPreset.baseImageSrc;
+    const video = over.videoUrl !== undefined ? over.videoUrl : generatedVideoUrl;
+    const enPrompt = over.promptEn ?? imagePromptEn;
+    const hex = over.themeHex ?? themeHex;
+    return {
     id: stableCustomId(),
     nameEn: customName || `${selectedPreset.nameEn} Custom`,
     nameKo: customName || `${selectedPreset.nameKo} 커스텀`,
@@ -231,7 +262,7 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     taglineEn: bioStats.elementLabelEn,
     icon: selectedPreset.icon,
     bpm: Math.round(95 + (bioStats.spd + bioStats.energy) * 0.4),
-    colorHex: themeHex,
+    colorHex: hex,
     badge: "CUSTOM AI",
     customStats: {
       atk: bioStats.atk,
@@ -241,16 +272,17 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
       energy: bioStats.energy,
     },
     // English for the video model: the translated image prompt when available (longPrompt is the Korean design text)
-    promptEn: `${imagePromptEn || longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
+    promptEn: `${enPrompt || longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
     bodyParts: { ...parts },
     promptKo: `${longPrompt}\n[전투 능력치: 공격력 ${bioStats.atk}, 방어력 ${bioStats.def}, 속도 ${bioStats.spd}, 재생력 ${bioStats.regen}, 에너지 ${bioStats.energy}]`,
-    avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,
-    jumpscareImg: generatedImageUrl || selectedPreset.baseImageSrc,
-    videoSrc: generatedVideoUrl || "/videos/chimera_growth_dragon_24s.mp4",
+    avatarImg: image,
+    jumpscareImg: image,
+    videoSrc: video || "/videos/chimera_growth_dragon_24s.mp4",
     roarAudio: "/sounds/monster_roar_ferocious.wav",
     funFactKo: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): 부위별 맞춤 유전자가 배양기에서 각성했습니다!`,
     funFactEn: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): Custom bio-parts awakened inside the chamber!`,
-  });
+    };
+  };
 
   // 보관함(IndexedDB) 저장: UI를 막지 않는 fire-and-forget. blob:/data:/http 이미지·영상을 Blob으로 변환해 저장하고,
   // 변환 실패 시 가능한 것만(나머지는 메타/기본 경로) 저장하며 앱 동작에는 영향을 주지 않는다.
@@ -265,16 +297,53 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     })();
   };
 
-  const handleStartCustomBioreactor = () => {
+  const isBusy = isGeneratingImg || isGeneratingVideo;
+
+  // ⚡ 괴수 배양기 가동: 설계한 괴수의 배양기를 바로 보여주고, 이미지는 그동안 백그라운드에서 생성 → 완성되면 3D로 튀어나오는 연출
+  const handleStartCustomBioreactor = async () => {
+    if (isBusy) return;
     const monster = buildCustomMonsterObject();
     persistToVault(monster, generatedImageUrl, generatedVideoUrl);
     onAwakenCustomMonster(monster);
+    if (generatedImageUrl) return; // 업로드했거나 이미 만든 이미지가 있으면 생성하지 않는다
+    const img = await runImageJob();
+    if (!img) return;
+    const ready = buildCustomMonsterObject({ imageUrl: img.imageUrl, promptEn: img.promptEn, themeHex: img.themeHex, videoUrl: null });
+    persistToVault(ready, img.imageUrl, null);
+    onMonsterImageReady?.(ready);
   };
 
-  const handleSendCustomToArena = () => {
-    const monster = buildCustomMonsterObject();
-    persistToVault(monster, generatedImageUrl, generatedVideoUrl);
-    onSendToArena?.(monster);
+  // ⚔️ 생성 괴수 결투장 출격: 동영상은 백그라운드에서 생성하고, 그동안 화면에는 배양기 이미지 + 점점 커지는 포효. 완성되면 결투장 등장
+  const handleSendCustomToArena = async () => {
+    if (isBusy) return;
+    let image = generatedImageUrl;
+    let promptEn = imagePromptEn;
+    let hex = themeHex;
+    if (image && generatedVideoUrl) {
+      const monster = buildCustomMonsterObject();
+      persistToVault(monster, image, generatedVideoUrl);
+      onSendToArena?.(monster);
+      return;
+    }
+    onSummonStart?.(buildCustomMonsterObject());
+    if (!image) {
+      const img = await runImageJob();
+      if (img) {
+        image = img.imageUrl;
+        promptEn = img.promptEn;
+        hex = img.themeHex;
+        onMonsterImageReady?.(buildCustomMonsterObject({ imageUrl: image, promptEn, themeHex: hex, videoUrl: null }));
+      }
+    }
+    const source = image || selectedPreset.baseImageSrc;
+    const video = await runVideoJob(source, promptEn, hex, onSummonProgress);
+    if (!video) {
+      onSummonFailed?.(isKo ? "동영상을 만들지 못했습니다. 잠시 후 다시 출격해 주세요." : "The video could not be made. Please try again shortly.");
+      return;
+    }
+    const monster = buildCustomMonsterObject({ imageUrl: image, promptEn, themeHex: hex, videoUrl: video.videoUrl });
+    persistToVault(monster, image, video.videoUrl);
+    onSendToArena?.(monster, video.ltxError);
   };
 
   const currentId = buildIdRef.current?.id ?? "";
@@ -490,90 +559,54 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         />
       </div>
 
-      {/* 3.5 Optional HF / LTX token + connection status badge */}
-      <div className="flex flex-wrap items-center gap-2 bg-slate-950/90 border border-slate-800 rounded-xl px-2.5 py-2">
-        <span
-          data-testid="ltx-status-badge"
-          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
-            videoSource === "ltx"
-              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
-              : videoSource === "mediarecorder"
-              ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
-              : "bg-slate-800 text-slate-300 border-slate-600"
+      {/* 4. One line: upload my image · start the bioreactor (image renders in the background) · send to the arena (video renders in the background) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <label
+          className={`bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs sm:text-sm px-3 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 ${
+            isBusy ? "opacity-50 cursor-not-allowed pointer-events-none" : "cursor-pointer"
           }`}
         >
-          {videoSource === "ltx"
-            ? isKo
-              ? "LTX-2.5 fast · 1080p 생성됨"
-              : "LTX-2.5 fast · 1080p ready"
-            : videoSource === "mediarecorder"
-            ? isKo
-              ? "LTX 실패 · 로컬 애니메이션(실사 영상 아님)"
-              : "LTX failed · local animation (not a real video)"
-            : isKo
-            ? "LTX-2.5 fast · 1080p (서버 프록시) → 실패 시 로컬 폴백"
-            : "LTX-2.5 fast · 1080p (server proxy) → local fallback"}
-        </span>
-        <input
-          type="password"
-          value={hfTokenInput}
-          onChange={(e) => setHfTokenInput(e.target.value)}
-          autoComplete="off"
-          placeholder={isKo ? "HF 토큰(이미지 생성 전용, 선택, 저장되지 않음)" : "HF token (image generation only, optional, not stored)"}
-          className="flex-1 min-w-[160px] bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-lg px-2 py-1 text-[11px] text-slate-200 outline-none"
-        />
-      </div>
-
-      {/* 4. AI Image & Image-to-Video Action Buttons */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={handleGenerateImage}
-          disabled={isGeneratingImg}
-          className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-black text-xs px-4 py-2 rounded-xl cursor-pointer transition shadow-lg flex items-center gap-1.5"
-        >
-          <span>🎨</span>
-          <span>
-            {isGeneratingImg
-              ? isKo
-                ? "AI 괴수 이미지 생성 중..."
-                : "Generating Image..."
-              : isKo
-              ? "AI 괴수 이미지 생성"
-              : "Generate Monster Image"}
-          </span>
-        </button>
-
-        <label className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs px-3 py-2 rounded-xl cursor-pointer transition flex items-center gap-1.5">
           <span>📁</span>
-          <span>{isKo ? "내 이미지 불러오기" : "Upload Image"}</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleUploadImage}
-            className="hidden"
-          />
+          <span>{isKo ? "내 이미지 불러오기" : "Upload my image"}</span>
+          <input type="file" accept="image/*" onChange={handleUploadImage} disabled={isBusy} className="hidden" />
         </label>
 
         <button
           type="button"
-          onClick={handleGenerateVideo}
-          disabled={isGeneratingVideo}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 text-white font-black text-xs px-4 py-2 rounded-xl cursor-pointer transition shadow-lg flex items-center gap-1.5"
+          onClick={() => void handleStartCustomBioreactor()}
+          disabled={isBusy}
+          className="bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:via-emerald-400 hover:to-cyan-400 disabled:opacity-60 disabled:cursor-wait text-slate-950 font-black text-xs sm:text-sm px-3 py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-1.5"
         >
-          <span>🎬</span>
+          <span>⚡</span>
+          <span>
+            {isGeneratingImg
+              ? isKo
+                ? "괴수 이미지 배양 중..."
+                : "Growing the image..."
+              : isKo
+              ? "괴수 배양기 가동"
+              : "Start the bioreactor"}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => void handleSendCustomToArena()}
+          disabled={isBusy || !onSendToArena}
+          className="bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 disabled:opacity-60 disabled:cursor-wait text-white font-black text-xs sm:text-sm px-3 py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-1.5"
+        >
+          <span>⚔️</span>
           <span>
             {isGeneratingVideo
               ? isKo
-                ? `동영상 제작 중 (${videoProgress}%)...`
-                : `Rendering Video (${videoProgress}%)...`
+                ? `출격 준비 중 (${videoProgress}%)...`
+                : `Preparing (${videoProgress}%)...`
               : isKo
-              ? "이 이미지로 AI 동영상 만들기"
-              : "Create AI Video from Image"}
+              ? "생성 괴수 결투장 출격"
+              : "Send to the arena"}
           </span>
         </button>
       </div>
-
       {statusMessage && (
         <div className="bg-slate-950/90 border border-cyan-500/30 rounded-xl px-3 py-2 text-[11px] text-cyan-200">
           {statusMessage}
@@ -670,36 +703,6 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         </div>
       )}
 
-      {/* 6. Direct Launch into 15s Bioreactor or Battle Arena */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={handleStartCustomBioreactor}
-          className="w-full bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:via-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs sm:text-sm py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-2"
-        >
-          <span>⚡</span>
-          <span>
-            {isKo
-              ? `[${customName}] 15초 배양기 가동`
-              : `Launch 15s Bioreactor`}
-          </span>
-        </button>
-
-        {onSendToArena && (
-          <button
-            type="button"
-            onClick={handleSendCustomToArena}
-            className="w-full bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-2"
-          >
-            <span>⚔️</span>
-            <span>
-              {isKo
-                ? `[${customName}] 결투장 바로 출격`
-                : `Send to Real-time Duel`}
-            </span>
-          </button>
-        )}
-      </div>
     </div>
   );
 };

@@ -22,6 +22,7 @@ import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { BATTLE_VIDEO_SECONDS, generateBattleVideo } from "../services/battleVideoService";
 import { canStartDesignedBattle, pickArenaFighters } from "../utils/arenaRoster";
+import { MONSTER_REVEAL_MS, SUMMON_ROAR_INTERVAL_MS, summonRoarVolume } from "../utils/summonTiming";
 import {
   actForEvent,
   cleanStoryName,
@@ -72,8 +73,8 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
   },
   {
     icon: "📡",
-    ko: { title: "2. LIVE BIO-FEED 뷰포트", body: "좌측 상단 LIVE BIO-FEED 영상은 음소거 현미경 영상과 공초점 사진을 겹쳐 보여주며, 화면을 누르면 내레이터가 켜지고 꺼집니다." },
-    en: { title: "2. LIVE BIO-FEED viewport", body: "The muted microscopy video is layered over a confocal photo. Tap the viewport to toggle the narrator." },
+    ko: { title: "2. 전체 화면 현미경 영상", body: "화면 전체에 음소거 현미경 영상과 공초점 사진을 겹쳐 보여주며, 화면을 누르면 내레이터가 켜지고 꺼집니다. 사용법은 맨 윗줄 [❓ 사용법] 버튼에 있습니다." },
+    en: { title: "2. Full-screen microscopy view", body: "The muted microscopy video is layered over a confocal photo across the whole screen. Tap it to toggle the narrator. This guide is under [❓ Help] in the top bar." },
   },
   {
     icon: "🌐",
@@ -92,8 +93,8 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
   },
   {
     icon: "🧬",
-    ko: { title: "6. 커스텀 괴수 설계", body: "커스텀 괴수 설계 버튼으로 나만의 괴수를 만들 수 있습니다. 가이드를 닫으면 진행 중인 실험 화면 그대로 돌아갑니다." },
-    en: { title: "6. Custom monster design", body: "Design your own creature with Custom Monster Design. Closing this guide returns you to the experiment exactly as you left it." },
+    ko: { title: "6. 괴수 설계실", body: "맨 윗줄 [괴수 설계실]에서 부위를 설계하고 [괴수 배양기 가동] 또는 [생성 괴수 결투장 출격]을 누르면 이미지와 영상이 백그라운드에서 만들어집니다. 가이드를 닫으면 진행 중인 화면 그대로 돌아갑니다." },
+    en: { title: "6. Monster Design Room", body: "Design the parts in [Monster Design Room] in the top bar, then press [Start the bioreactor] or [Send to the arena]; the image and video are made in the background. Closing this guide returns you to where you were." },
   },
 ];
 
@@ -232,6 +233,12 @@ export const BioStitchLabView: React.FC = () => {
   const [isCodeCopied, setIsCodeCopied] = useState<boolean>(false);
   const [isStitchModalOpen, setIsStitchModalOpen] = useState<boolean>(false);
   const [activeModalTab, setActiveModalTab] = useState<"chimera_assembler" | "monster_arena">("chimera_assembler");
+  // 괴수 설계실 → 배양기: 이미지가 백그라운드에서 완성되면 3D로 튀어나오는 연출 (포효와 함께)
+  const [revealMonster, setRevealMonster] = useState<ComicMonster | null>(null);
+  // 괴수 설계실 → 결투장 출격: 동영상이 완성될 때까지 이미지 + 점점 커지는 포효
+  const [summon, setSummon] = useState<{ monster: ComicMonster; progress: number; error: string | null } | null>(null);
+  // 초기 화면을 벗어난 상태: 내레이터를 즉시 멈춘다
+  const isAwayFromHome = isStitchModalOpen || isCustomMonsterModalOpen || summon !== null;
 
   // Monster Clash Arena State (Real-Time Visual Combat Engine)
   const [arenaFighter1, setArenaFighter1] = useState<ComicMonster>(COMIC_MONSTERS[0]);
@@ -726,6 +733,48 @@ export const BioStitchLabView: React.FC = () => {
   }, [arenaFighter1.id, arenaFighter2.id]);
 
   const arenaHasTwoDesigns = canStartDesignedBattle(arenaFighter1, arenaFighter2);
+
+  // ── 괴수 설계실 백그라운드 작업 연동 ──
+  // 이미지 완성: 로스터·배양기·출격 대기 화면의 괴수를 갱신하고, 배양기를 보고 있으면 3D로 튀어나오는 연출
+  const handleMonsterImageReady = (m: ComicMonster) => {
+    setCustomArenaRoster((prev) => addToRoster(prev, m));
+    setSelectedComicMonster((cur) => (cur.id === m.id ? m : cur));
+    setSummon((s) => (s && s.monster.id === m.id ? { ...s, monster: m } : s));
+    if (!summonRef.current) setRevealMonster(m);
+  };
+
+  const backToDesignRoom = () => {
+    setRevealMonster(null);
+    setSummon(null);
+    setIsStitchModalOpen(false);
+    setIsCustomMonsterModalOpen(true);
+  };
+
+  // 출격 대기 화면: 조용한 포효가 진행률에 따라 점점 커진다 (약 4초마다 한 번)
+  const summonRef = useRef<typeof summon>(null);
+  summonRef.current = summon;
+  const isSummoning = summon !== null && summon.error === null;
+  useEffect(() => {
+    if (!isSummoning) return;
+    const roarOnce = () => {
+      const s = summonRef.current;
+      if (!s) return;
+      const a = new Audio(s.monster.roarAudio || "/sounds/monster_roar_ferocious.wav");
+      a.volume = summonRoarVolume(s.progress);
+      a.play().catch(() => {});
+    };
+    roarOnce();
+    const t = window.setInterval(roarOnce, SUMMON_ROAR_INTERVAL_MS);
+    return () => window.clearInterval(t);
+  }, [isSummoning]);
+
+  // 3D 등장 연출은 잠깐 보여주고 자동으로 닫는다
+  useEffect(() => {
+    if (!revealMonster) return;
+    playChimeraRoar(revealMonster.roarAudio);
+    const t = window.setTimeout(() => setRevealMonster(null), MONSTER_REVEAL_MS);
+    return () => window.clearTimeout(t);
+  }, [revealMonster?.id, revealMonster?.avatarImg]);
 
   // 연대기 다시보기: 저장된 영상 Blob의 blob: URL은 교체/닫기/언마운트 시 해제
   const closeViewChronicle = () => {
@@ -1818,7 +1867,8 @@ export const BioStitchLabView: React.FC = () => {
       }
     };
 
-    if (!isSoundOn) {
+    // 초기 화면을 벗어나면(배양실·결투장·괴수 설계실) 내레이터와 바이오 비프음을 즉시 멈춘다
+    if (!isSoundOn || isAwayFromHome) {
       stopNarration();
       return;
     }
@@ -1838,7 +1888,7 @@ export const BioStitchLabView: React.FC = () => {
       stopNarration();
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
-  }, [isSoundOn, activeExp.id, selectedLangCode]);
+  }, [isSoundOn, activeExp.id, selectedLangCode, isAwayFromHome]);
 
   // Clear every pending arena battle timer on unmount.
   useEffect(() => {
@@ -2187,7 +2237,7 @@ export const BioStitchLabView: React.FC = () => {
               className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
             >
               <span>🧬</span>
-              <span>{isKo ? "커스텀 괴수 설계" : "Custom Monster Design"}</span>
+              <span>{isKo ? "괴수 설계실" : "Monster Design Room"}</span>
             </button>
             <button
               type="button"
@@ -2205,6 +2255,14 @@ export const BioStitchLabView: React.FC = () => {
                 : isKo
                 ? "🔇 내레이터"
                 : "🔇 Narrator"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsHelpOpen(true)}
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
+            >
+              <span>❓</span>
+              <span>{isKo ? "사용법" : "Help / Lab Guide"}</span>
             </button>
           </div>
         </div>
@@ -2268,28 +2326,6 @@ export const BioStitchLabView: React.FC = () => {
                   "radial-gradient(circle at center, transparent 28%, rgba(2, 6, 23, 0.88) 100%), repeating-linear-gradient(0deg, rgba(16, 185, 129, 0.04) 0px, rgba(16, 185, 129, 0.04) 1px, transparent 1px, transparent 3px)"
               }}
             />
-
-            {/* Top-left: LIVE BIO-FEED badge with the Help / Lab Guide button right next to it */}
-            <div
-              className="absolute top-2 left-2 z-20 flex items-center gap-1.5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span
-                translate="no"
-                className="flex items-center gap-1 bg-black/75 border border-red-500/60 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px]"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                LIVE BIO-FEED
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsHelpOpen(true)}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-2 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-cyan-300/50 active:scale-95"
-              >
-                <span>❓</span>
-                <span>{isKo ? "사용법(Help / Lab Guide)" : "Help / Lab Guide"}</span>
-              </button>
-            </div>
 
             {/* BOTTOM OVERLAY (all viewports): chat overlay, experiment photo strip, input line */}
             <div
@@ -2423,12 +2459,13 @@ export const BioStitchLabView: React.FC = () => {
                       ? "질문 또는 생물학 미스터리 검색 (실시간 PubMed)..."
                       : "Ask Dr. Kiro or search PubMed live..."
                   }
-                  className="flex-1 min-w-0 bg-black/80 backdrop-blur-md border border-emerald-500/40 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 placeholder-slate-400"
+                  aria-label={isKo ? "질문 입력" : "Ask a question"}
+                  className="flex-1 min-w-0 bg-slate-950/90 backdrop-blur-md border-2 border-cyan-400/90 rounded-lg px-3 py-2 text-sm text-white shadow-[0_0_14px_rgba(34,211,238,0.45)] focus:outline-none focus:border-emerald-300 focus:shadow-[0_0_18px_rgba(110,231,183,0.7)] placeholder-slate-300"
                 />
                 <button
                   type="submit"
                   disabled={isQueryingApi}
-                  className="bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 rounded-lg text-xs font-black text-slate-950 shrink-0 cursor-pointer shadow"
+                  className="bg-emerald-500 hover:bg-emerald-400 border-2 border-emerald-300 px-4 py-2 rounded-lg text-sm font-black text-slate-950 shrink-0 cursor-pointer shadow-[0_0_14px_rgba(16,185,129,0.5)]"
                 >
                   {isQueryingApi ? "..." : isKo ? "전송" : "Send"}
                 </button>
@@ -2489,13 +2526,22 @@ export const BioStitchLabView: React.FC = () => {
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setIsStitchModalOpen(false)}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer shrink-0 whitespace-nowrap"
-                    >
-                      ✕ {isKo ? "닫기" : "Close"}
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={backToDesignRoom}
+                        className="bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-200 border border-cyan-400/60 px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer whitespace-nowrap"
+                      >
+                        🧬 {isKo ? "괴수 설계실로" : "Design Room"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsStitchModalOpen(false)}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer shrink-0 whitespace-nowrap"
+                      >
+                        ✕ {isKo ? "닫기" : "Close"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* TAB 1: MYTHIC CHIMERA ASSEMBLER & VIDEO-LIKE BIOREACTOR MORPHING */}
@@ -2970,10 +3016,13 @@ export const BioStitchLabView: React.FC = () => {
         </div>
       )}
 
-      {/* INDEPENDENT CUSTOM MONSTER BIOREACTOR STUDIO MODAL */}
-      {isCustomMonsterModalOpen && (
+      {/* 괴수 설계실 (MONSTER DESIGN ROOM): 닫아도 마운트를 유지해 설계 내용과 백그라운드 이미지·영상 작업이 이어진다 */}
+      {(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-2 sm:p-4"
+          aria-hidden={!isCustomMonsterModalOpen}
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-2 sm:p-4 ${
+            isCustomMonsterModalOpen ? "" : "hidden"
+          }`}
           onClick={() => setIsCustomMonsterModalOpen(false)}
         >
           <div
@@ -2984,7 +3033,7 @@ export const BioStitchLabView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="text-lg">🧬</span>
                 <h2 className="text-xs sm:text-sm font-black text-cyan-300">
-                  {isKo ? "커스텀 괴수 배양기 (독립 제작실)" : "Custom Monster Bioreactor Studio"}
+                  {isKo ? "괴수 설계실" : "Monster Design Room"}
                 </h2>
               </div>
               <button
@@ -3028,7 +3077,18 @@ export const BioStitchLabView: React.FC = () => {
                   setActiveModalTab("chimera_assembler");
                   handleSelectAndAwakenMonster(customMonster);
                 }}
+                onMonsterImageReady={handleMonsterImageReady}
+                onSummonStart={(m) => {
+                  setIsCustomMonsterModalOpen(false);
+                  setRevealMonster(null);
+                  setSummon({ monster: m, progress: 0, error: null });
+                }}
+                onSummonProgress={(pct) => setSummon((s) => (s ? { ...s, progress: pct } : s))}
+                onSummonFailed={(message) => setSummon((s) => (s ? { ...s, error: message } : s))}
                 onSendToArena={(customMonster) => {
+                  // 동영상 완성: 출격 대기 화면을 닫고 결투장에 등장 (마지막 포효는 최대 음량)
+                  if (summonRef.current) playChimeraRoar(customMonster.roarAudio);
+                  setSummon(null);
                   setCustomArenaRoster((prev) => addToRoster(prev, customMonster));
                   cancelArenaBattle();
                   setArenaFighter1(customMonster);
@@ -3045,6 +3105,61 @@ export const BioStitchLabView: React.FC = () => {
                 }}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚡ 배양기 가동 중 이미지 완성: "짠" 하고 3D로 포효하며 화면 밖으로 튀어나오는 연출 */}
+      {revealMonster && (
+        <div
+          key={revealMonster.avatarImg}
+          className="fixed inset-0 z-[70] pointer-events-none flex items-center justify-center overflow-hidden monster-reveal-stage"
+          aria-hidden="true"
+        >
+          <div className="absolute inset-0 monster-reveal-flash" />
+          <img
+            src={revealMonster.jumpscareImg || revealMonster.avatarImg}
+            alt=""
+            className="monster-reveal-burst relative max-w-[78vw] max-h-[78vh] object-contain"
+            style={{ ["--reveal-glow" as string]: revealMonster.colorHex } as React.CSSProperties}
+          />
+        </div>
+      )}
+
+      {/* ⚔️ 결투장 출격 대기: 백그라운드에서 동영상을 만드는 동안 배양기 이미지 + 점점 커지는 포효 */}
+      {summon && (
+        <div className="fixed inset-0 z-[65] bg-black flex flex-col items-center justify-center gap-4 p-4 text-slate-100">
+          <img
+            src={summon.monster.avatarImg}
+            alt={summon.monster.nameKo}
+            className="summon-breath max-w-[88vw] max-h-[68vh] object-contain rounded-2xl"
+            style={{ ["--reveal-glow" as string]: summon.monster.colorHex } as React.CSSProperties}
+          />
+          {summon.error ? (
+            <p role="alert" className="text-sm font-bold text-rose-300 text-center">⚠️ {summon.error}</p>
+          ) : (
+            <div className="w-full max-w-md flex flex-col items-center gap-1.5" role="status" aria-live="polite">
+              <p className="text-xs font-black text-amber-300">
+                {isKo ? `⚔️ ${summon.monster.nameKo} 결투장 출격 준비 중...` : `⚔️ ${summon.monster.nameEn} is getting ready for the arena...`}
+              </p>
+              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 transition-all duration-500" style={{ width: `${Math.max(3, summon.progress)}%` }} />
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={backToDesignRoom}
+              className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
+            >
+              🧬 {isKo ? "괴수 설계실로 돌아가기" : "Back to the Design Room"}
+            </button>
+            {!summon.error && (
+              <span className="text-[10px] text-slate-500">
+                {isKo ? "돌아가도 동영상은 계속 만들어지고, 완성되면 결투장에 등장합니다." : "The video keeps rendering; the monster enters the arena when it is ready."}
+              </span>
+            )}
           </div>
         </div>
       )}

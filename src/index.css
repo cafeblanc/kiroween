@@ -399,3 +399,44 @@ body {
   .arena-hit-flash, .arena-damage-float, .arena-skill-pop { animation: none; }
   .arena-slash, .arena-bolt { display: none; }
 }
+
+/* ── Monster Design Room: 3D reveal when the background image is ready (2.8 s = MONSTER_REVEAL_MS) ── */
+.monster-reveal-stage { perspective: 900px; animation: revealStageShake 2.8s ease-out forwards; }
+.monster-reveal-burst {
+  transform-origin: center;
+  filter: drop-shadow(0 0 40px var(--reveal-glow, #10b981));
+  animation: monsterRevealBurst 2.8s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+}
+.monster-reveal-flash {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.85), rgba(16, 185, 129, 0.25) 40%, transparent 70%);
+  animation: revealFlash 2.8s ease-out forwards;
+}
+/* Arena waiting screen: the bioreactor image breathes while the video renders */
+.summon-breath {
+  filter: drop-shadow(0 0 32px var(--reveal-glow, #ef4444));
+  animation: summonBreath 3.6s ease-in-out infinite;
+}
+@keyframes monsterRevealBurst {
+  0% { transform: translateZ(-600px) scale(0.25) rotateX(18deg); opacity: 0; }
+  18% { transform: translateZ(0) scale(1.05) rotateX(0deg); opacity: 1; }
+  28% { transform: translateZ(60px) scale(0.98); }
+  62% { transform: translateZ(140px) scale(1.12); opacity: 1; }
+  100% { transform: translateZ(820px) scale(2.6); opacity: 0; filter: drop-shadow(0 0 80px var(--reveal-glow, #10b981)) blur(6px); }
+}
+@keyframes revealFlash { 0% { opacity: 0; } 12% { opacity: 1; } 40% { opacity: 0.25; } 100% { opacity: 0; } }
+@keyframes revealStageShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-10px, 6px); }
+  26% { transform: translate(9px, -7px); }
+  32% { transform: translate(-6px, 4px); }
+  38% { transform: translate(4px, -3px); }
+  60% { transform: translate(0, 0); }
+}
+@keyframes summonBreath { 0%, 100% { transform: scale(1); opacity: 0.88; } 50% { transform: scale(1.04); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .monster-reveal-stage, .summon-breath { animation: none; }
+  .monster-reveal-burst { animation: revealFadeOnly 2.8s ease-out forwards; }
+  .monster-reveal-flash { display: none; }
+}
+@keyframes revealFadeOnly { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
