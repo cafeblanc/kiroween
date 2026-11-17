@@ -12,7 +12,7 @@
   - 커스텀 괴수 생성 (`Text → Image → Video`) → `15초 배양기 가동` → `AwakeningRoar` 3D 각성 → `실시간 결투` 전체 흐름 수동/통합 검증
   - 6종 기본 괴수(`CURATED_6_MONSTERS`)와의 대결 영상(`BattleMatrix`) 및 성체 구간 루프 확인
 
-- [-] **Task 4: 품질 검증 및 프로덕션 배포**
+- [x] **Task 4: 품질 검증 및 프로덕션 배포**
   - `npx tsc --noEmit` (0 errors)
   - `npm test` (all test files passing)
   - `npm run build`

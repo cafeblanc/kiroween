@@ -18,28 +18,31 @@ export const STAGE_LABELS: readonly string[] = [
   "⑥ ADULT",
 ];
 
-/** Generic battle video used when no reference exists for a monster (Requirements 4.2). */
-export const FALLBACK_REFERENCE_VIDEO = "/videos/battles/battle_dragon_vs_kraken.mp4";
+/** Generic biological growth video used when no reference exists for a monster (Requirements 4.2). */
+export const FALLBACK_REFERENCE_VIDEO = "/videos/chimera_growth_deepsea_abyss_30s.mp4";
 
 export const FALLBACK_MESSAGE = "Reference video unavailable, using generic growth sequence";
 
 /** Reference videos (existing files under public/videos) keyed by monster id. */
-const BATTLE_XENO = "/videos/battles/battle_xeno_vs_frankenstein.mp4";
-const BATTLE_CERBERUS = "/videos/battles/battle_cerberus_vs_hydra.mp4";
+// Incubator footage must be biological growth/awakening, never arena battle clips.
+const GROWTH_DRAGON = "/videos/chimera_growth_dragon_24s.mp4";
+const GROWTH_KRAKEN = "/videos/chimera_growth_kraken_24s.mp4";
+const GROWTH_ABYSS = "/videos/chimera_growth_deepsea_abyss_30s.mp4";
+const AWAKENING_CYBER = "/videos/chimera_awakening_cyber.mp4";
 
 export const REFERENCE_VIDEOS: Readonly<Record<string, string>> = {
-  myth_dragon: "/videos/chimera_growth_dragon_24s.mp4",
-  myth_kraken: "/videos/chimera_growth_kraken_24s.mp4",
-  myth_leviathan: "/videos/chimera_growth_deepsea_abyss_30s.mp4",
-  myth_chimera: BATTLE_CERBERUS,
-  myth_hydra: BATTLE_CERBERUS,
-  myth_cerberus: BATTLE_CERBERUS,
-  myth_basilisk: BATTLE_CERBERUS,
-  myth_sphinx: BATTLE_CERBERUS,
-  myth_frankenstein: BATTLE_XENO,
-  alien_xenomorph: BATTLE_XENO,
-  alien_arachno: BATTLE_XENO,
-  alien_void_slug: "/videos/chimera_growth_deepsea_abyss_30s.mp4",
+  myth_dragon: GROWTH_DRAGON,
+  myth_kraken: GROWTH_KRAKEN,
+  myth_leviathan: GROWTH_ABYSS,
+  myth_chimera: GROWTH_DRAGON,
+  myth_hydra: GROWTH_KRAKEN,
+  myth_cerberus: GROWTH_DRAGON,
+  myth_basilisk: GROWTH_DRAGON,
+  myth_sphinx: GROWTH_DRAGON,
+  myth_frankenstein: AWAKENING_CYBER,
+  alien_xenomorph: GROWTH_ABYSS,
+  alien_arachno: GROWTH_ABYSS,
+  alien_void_slug: GROWTH_ABYSS,
   human_prometheus: "/videos/chimera_awakening_cyber.mp4",
 };
 

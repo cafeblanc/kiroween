@@ -1,7 +1,6 @@
 import { COMIC_MONSTERS } from "../data/comicMonsters";
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { SlidingWindowRateLimiter } from "../utils/rateLimiter";
-import { pollLumaJob, LUMA_POLL_TIMEOUT_MS } from "./lumaJobClient";
 import type {
   AIVideoGenerator,
   VideoCacheEntry,
@@ -156,10 +155,7 @@ async function generateSingleStage(
   }
 
   const controller = new AbortController();
-  // Luma jobs are polled for up to LUMA_POLL_TIMEOUT_MS after the create call.
-  const totalTimeout =
-    provider === "luma" ? AI_VIDEO_TIMEOUT_MS + LUMA_POLL_TIMEOUT_MS : AI_VIDEO_TIMEOUT_MS;
-  const timer = setTimeout(() => controller.abort(), totalTimeout);
+  const timer = setTimeout(() => controller.abort(), AI_VIDEO_TIMEOUT_MS);
 
   try {
     let url: string | null = null;
@@ -177,13 +173,7 @@ async function generateSingleStage(
         url = createTrackedBlobUrl(prompt, await res.blob());
       } else {
         const data = await res.json();
-        if (typeof data?.jobId === "string") {
-          const job = await pollLumaJob(data.jobId, apiKey, { signal: controller.signal });
-          url = job.ok ? job.videoUrl : null;
-          if (!job.ok) console.warn(`${LOG} luma job ended: ${job.error}`);
-        } else {
-          url = pickVideoUrl(data);
-        }
+        url = pickVideoUrl(data);
       }
     } else {
       console.warn(`${LOG} proxy responded ${res.status}`);

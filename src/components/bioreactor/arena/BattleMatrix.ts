@@ -5,10 +5,15 @@ import type {
 } from '../../../types/kiroween';
 import { COMIC_MONSTERS } from '../../../data/comicMonsters';
 
-/** Generic battle video used when no pre-made video exists for a pair (no error). */
-export const FALLBACK_BATTLE_VIDEO = '/videos/battles/battle_dragon_vs_kraken.mp4';
-
 const BATTLES_DIR = '/videos/battles';
+
+/** Custom (user-designed) monsters always have ids starting with this prefix. */
+export const CUSTOM_MONSTER_ID_PREFIX = 'custom_';
+
+/** True for a monster the user designed (id starts with "custom_"). */
+export function isCustomFighterId(id: string): boolean {
+  return typeof id === 'string' && id.startsWith(CUSTOM_MONSTER_ID_PREFIX);
+}
 
 /** Short names used in battle file names where they differ from the monster id suffix. */
 const SHORT_NAME_ALIASES: Readonly<Record<string, string>> = {
@@ -36,7 +41,13 @@ function pairKey(f1Id: string, f2Id: string): string {
   return `${f1Id}|${f2Id}`;
 }
 
+/**
+ * The genuine pre-authored clash video for exactly this pair, or null.
+ * Custom monsters and unknown/self pairs never get one.
+ */
 function premadeUrl(f1Id: string, f2Id: string): string | null {
+  if (isCustomFighterId(f1Id) || isCustomFighterId(f2Id)) return null;
+  if (f1Id === f2Id) return null;
   const a = toShortName(f1Id);
   const b = toShortName(f2Id);
   const hit = PREMADE_BATTLES.find(
@@ -48,10 +59,12 @@ function premadeUrl(f1Id: string, f2Id: string): string | null {
 let sharedMatrix: BattleMatrix | null = null;
 
 /**
- * Battle video for a pair of fighters using a lazily built 16x16 matrix over
- * COMIC_MONSTERS. Unknown or missing pairs resolve to FALLBACK_BATTLE_VIDEO.
+ * Pre-authored battle video for a pair of fighters using a lazily built 16x16 matrix over
+ * COMIC_MONSTERS. Returns null (never a generic substitute clip) when either fighter is custom
+ * or when no genuine clash video exists for the exact pair; the UI then renders the
+ * Dual Confrontation Stage with the two real fighters.
  */
-export function getBattleVideoForPair(f1Id: string, f2Id: string): string {
+export function getBattleVideoForPair(f1Id: string, f2Id: string): string | null {
   if (!sharedMatrix) {
     sharedMatrix = new BattleMatrix(
       COMIC_MONSTERS.map((m) => ({ id: m.id }) as MonsterDefinition),
@@ -62,7 +75,7 @@ export function getBattleVideoForPair(f1Id: string, f2Id: string): string {
 
 /**
  * 16x16 battle matrix: every ordered pair (f1, f2) with f1 !== f2.
- * For 16 monsters that is 16 * 15 = 240 mappings.
+ * For 16 monsters that is 16 * 15 = 240 mappings. Pairs without a pre-made video map to null.
  */
 export class BattleMatrix implements BattleMatrixContract {
   private mappings = new Map<string, BattleVideoMapping>();
@@ -81,20 +94,16 @@ export class BattleMatrix implements BattleMatrixContract {
         this.mappings.set(pairKey(f1Id, f2Id), {
           f1Id,
           f2Id,
-          videoUrl: url ?? FALLBACK_BATTLE_VIDEO,
+          videoUrl: url,
           isPreMade: url !== null,
         });
       }
     }
   }
 
-  /** Returns the pair's video URL, or the generic fallback for unknown/missing pairs. */
-  getBattleVideo(f1Id: string, f2Id: string): string {
-    return (
-      this.mappings.get(pairKey(f1Id, f2Id))?.videoUrl ??
-      premadeUrl(f1Id, f2Id) ??
-      FALLBACK_BATTLE_VIDEO
-    );
+  /** Returns the pair's pre-made video URL, or null when none exists (including any custom fighter). */
+  getBattleVideo(f1Id: string, f2Id: string): string | null {
+    return premadeUrl(f1Id, f2Id);
   }
 
   getMapping(f1Id: string, f2Id: string): BattleVideoMapping | undefined {

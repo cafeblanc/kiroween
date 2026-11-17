@@ -35,6 +35,12 @@ export interface BattleEvent {
   /** Which fighter's roar to play, if any. */
   roarOf: 1 | 2 | null;
   thumpMs: number;
+  /** Fighter performing the strike (null for the head-on clash and the K.O. verdict). */
+  attacker: 1 | 2 | null;
+  /** Stat-driven special skill name used in this event, if any. */
+  skill: string | null;
+  /** True when the defender dodged (no damage). */
+  evaded: boolean;
 }
 
 export interface BattleResult {
@@ -182,6 +188,9 @@ export function resolveBattle(f1: FighterInfo, f2: FighterInfo, rng: Rng): Battl
       : `[R1] ${names[firstAttacker]}의 ${r1.skill ?? (r1.crit ? "치명타 선공!" : "기습 타격")} (${dmgText(r1)} DMG)`,
     roarOf: firstAttacker,
     thumpMs: 180,
+    attacker: firstAttacker,
+    skill: r1.skill,
+    evaded: r1.evaded,
   });
 
   // R2: counterattack by the second fighter
@@ -207,6 +216,9 @@ export function resolveBattle(f1: FighterInfo, f2: FighterInfo, rng: Rng): Battl
       : `[R2] ${names[secondAttacker]}의 ${r2.skill ?? (r2.crit ? "극대 반격!" : "돌진 반격")} (${dmgText(r2)} DMG)`,
     roarOf: secondAttacker,
     thumpMs: 200,
+    attacker: secondAttacker,
+    skill: r2.skill,
+    evaded: r2.evaded,
   });
 
   // R3: head-on clash (both strike)
@@ -229,6 +241,9 @@ export function resolveBattle(f1: FighterInfo, f2: FighterInfo, rng: Rng): Battl
     logLine: `[R3] 양측 정면 대충돌! 충격파 발생 (-${maxDmg * 10} DMG)${clashSkill ? ` · ${clashSkill}` : ""}`,
     roarOf: null,
     thumpMs: 240,
+    attacker: null,
+    skill: clashSkill,
+    evaded: false,
   });
 
   // R4: final verdict; REGEN/ENERGY give comeback potential on top of random variance
@@ -250,7 +265,105 @@ export function resolveBattle(f1: FighterInfo, f2: FighterInfo, rng: Rng): Battl
     logLine: `🏆 [K.O.] ${names[winner]} 최종 승리!${comeback ? " (극적인 역전승!)" : ""}`,
     roarOf: winner,
     thumpMs: 0,
+    attacker: null,
+    skill: null,
+    evaded: false,
   });
 
   return { firstAttacker, winner, events };
+}
+
+// ---------------------------------------------------------------------------
+// Element-based special skills (presentation only; resolveBattle() is untouched)
+// ---------------------------------------------------------------------------
+
+export type ArenaElement = "fire" | "electric" | "poison" | "acid";
+
+export interface ElementSource {
+  id?: string;
+  nameEn?: string;
+  nameKo?: string;
+  promptEn?: string;
+  promptKo?: string;
+  colorHex?: string;
+  customStats?: Partial<CombatStats>;
+}
+
+export interface ElementInfo {
+  skill: string;
+  /** Short English phrase used in the video prompt. */
+  promptEn: string;
+  /** Hit flash tint used by the arena UI. */
+  fx: string;
+}
+
+export const ELEMENT_INFO: Readonly<Record<ArenaElement, ElementInfo>> = {
+  fire: { skill: "🌋 초고온 마그마 일격", promptEn: "molten magma fire", fx: "rgba(249,115,22,0.6)" },
+  electric: { skill: "⚡ 고전압 스파크 반격", promptEn: "high-voltage electric lightning", fx: "rgba(56,189,248,0.6)" },
+  poison: { skill: "☠️ 맹독 안개 침투", promptEn: "toxic venom poison mist", fx: "rgba(168,85,247,0.55)" },
+  acid: { skill: "🧪 초강산 부식 분사", promptEn: "corrosive acid spray", fx: "rgba(132,204,22,0.55)" },
+};
+
+const ELEMENT_KEYWORDS: ReadonlyArray<readonly [ArenaElement, RegExp]> = [
+  ["fire", /(화염|용암|마그마|불꽃|fire|flame|lava|magma|ember|inferno|volcan)/i],
+  ["electric", /(전기|번개|스파크|볼트|전격|electric|lightning|volt|spark|thunder|storm)/i],
+  ["poison", /(맹독|독침|독액|독성|독사|venom|poison|toxic|spore|serpent|viper)/i],
+  ["acid", /(산성|부식|키틴|제노|acid|corros|chitin|xeno|slime)/i],
+];
+
+/** Hue (0..360) of a #rrggbb color, or null when it is not a valid hex color. */
+export function hueOfHex(hex: string | undefined): number | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (d === 0) return null;
+  let h: number;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+/**
+ * Deterministic element of a fighter, derived from its parts/design text first, then its
+ * colorHex hue, then its dominant stat. Never random, never null.
+ */
+export function detectArenaElement(f: ElementSource): ArenaElement {
+  const text = [f.nameEn, f.nameKo, f.promptEn, f.promptKo].filter(Boolean).join(" ");
+  for (const [el, re] of ELEMENT_KEYWORDS) if (re.test(text)) return el;
+  const hue = hueOfHex(f.colorHex);
+  if (hue !== null) {
+    if (hue < 45 || hue >= 330) return "fire";
+    if (hue < 70) return "electric";
+    if (hue < 170) return "acid";
+    if (hue < 270) return "electric";
+    return "poison";
+  }
+  const s = resolveCombatStats(f.customStats);
+  if (s.energy >= s.atk && s.energy >= s.def) return "electric";
+  if (s.atk >= s.def) return "fire";
+  if (s.regen >= s.def) return "poison";
+  return "acid";
+}
+
+export function elementSkillName(el: ArenaElement): string {
+  return ELEMENT_INFO[el].skill;
+}
+
+/**
+ * Skill label to pop up for a battle event. A dodged strike shows none; a head-on clash keeps the
+ * resolver's own skill; any landed strike uses the attacker's element skill.
+ */
+export function resolveEventSkill(
+  el: ArenaElement,
+  ev: { attacker: 1 | 2 | null; evaded: boolean; skill: string | null },
+): string | null {
+  if (ev.evaded) return null;
+  if (ev.attacker === null) return ev.skill;
+  return elementSkillName(el);
 }

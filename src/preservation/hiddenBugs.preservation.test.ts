@@ -262,7 +262,6 @@ describe("3.6 generate-video 405 / 400 / 400", () => {
   beforeEach(() => {
     delete process.env.HF_TOKEN;
     delete process.env.HUGGINGFACE_TOKEN;
-    delete process.env.LUMA_API_KEY;
   });
   afterEach(() => {
     process.env = { ...saved };
@@ -313,7 +312,7 @@ describe("3.6 generate-video 405 / 400 / 400", () => {
   it("returns 400 when no provider token is configured", async () => {
     const out = await call("POST", { prompt: "a cell", provider: "huggingface_wan2" });
     expect(out.status).toBe(400);
-    expect(JSON.stringify(out.json)).toMatch(/token|HF_TOKEN|LUMA/i);
+    expect(JSON.stringify(out.json)).toMatch(/token|HF_TOKEN/i);
   });
 });
 

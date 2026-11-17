@@ -55,12 +55,13 @@ export interface MonsterDefinition {
 export interface BattleVideoMapping {
   f1Id: string;
   f2Id: string;
-  videoUrl: string;
+  /** null when no genuine pre-authored clash video exists for the pair (custom monsters always). */
+  videoUrl: string | null;
   isPreMade: boolean; // true if the MP4 file exists
 }
 
 export interface BattleMatrix {
-  getBattleVideo(f1Id: string, f2Id: string): string;
+  getBattleVideo(f1Id: string, f2Id: string): string | null;
   generateMatrix(monsters: MonsterDefinition[]): void;
 }
 
@@ -68,7 +69,7 @@ export interface BattleMatrix {
 // Video pipeline
 // ---------------------------------------------------------------------------
 
-export type VideoProvider = 'huggingface_wan2' | 'luma';
+export type VideoProvider = 'huggingface_wan2';
 
 export type VideoSourceKind = 'ai' | 'reference' | 'cache';
 

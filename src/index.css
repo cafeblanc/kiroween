@@ -336,3 +336,66 @@ iframe.goog-te-banner-frame,
 body {
   top: 0px !important;
 }
+
+/* ===== Dual Confrontation Stage (arena) ===== */
+.arena-fighter {
+  transition: transform 300ms ease-out, width 300ms ease-out, opacity 300ms ease-out, filter 300ms ease-out;
+  will-change: transform;
+}
+.arena-shake { animation: arenaShake 420ms linear; }
+.arena-stage-shake-a { animation: arenaStageShakeA 380ms linear; }
+.arena-stage-shake-b { animation: arenaStageShakeB 380ms linear; }
+.arena-aura {
+  box-shadow: inset 0 0 70px 10px var(--aura, #10b981);
+  background: radial-gradient(circle at 50% 62%, color-mix(in srgb, var(--aura, #10b981) 35%, transparent), transparent 70%);
+  animation: arenaAuraPulse 1.6s ease-in-out infinite;
+}
+.arena-portrait-breath { animation: arenaPortraitBreath 3.2s ease-in-out infinite; }
+.arena-hit-flash { animation: arenaHitFlash 520ms ease-out forwards; }
+.arena-slash {
+  background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.95) 49%, rgba(255,80,80,0.9) 52%, transparent 60%);
+  animation: arenaSlash 380ms ease-out forwards;
+}
+.arena-damage-float { animation: arenaDamageFloat 900ms ease-out forwards; }
+.arena-skill-pop { animation: arenaSkillPop 1100ms ease-out forwards; }
+.arena-bolt { stroke-dasharray: 260; animation: arenaBolt 650ms ease-out forwards; }
+.arena-shock-ring { animation: arenaShockRing 700ms ease-out forwards; }
+
+@keyframes arenaShake {
+  0%, 100% { translate: 0 0; }
+  15% { translate: -7px 3px; }
+  30% { translate: 6px -4px; }
+  45% { translate: -5px 2px; }
+  60% { translate: 4px -2px; }
+  80% { translate: -2px 1px; }
+}
+@keyframes arenaStageShakeA {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -6px 4px; }
+  40% { translate: 5px -4px; }
+  60% { translate: -4px 2px; }
+  80% { translate: 3px -1px; }
+}
+@keyframes arenaStageShakeB {
+  0%, 100% { translate: 0 0; }
+  20% { translate: 6px -4px; }
+  40% { translate: -5px 4px; }
+  60% { translate: 4px -2px; }
+  80% { translate: -3px 1px; }
+}
+@keyframes arenaAuraPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.95; } }
+@keyframes arenaPortraitBreath { 0%, 100% { transform: scale(1.08); } 50% { transform: scale(1.14); } }
+@keyframes arenaHitFlash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+@keyframes arenaSlash { 0% { transform: translateX(-60%); opacity: 1; } 100% { transform: translateX(60%); opacity: 0; } }
+@keyframes arenaDamageFloat { 0% { transform: translateY(14px) scale(0.7); opacity: 0; } 20% { opacity: 1; transform: translateY(0) scale(1.1); } 100% { transform: translateY(-26px) scale(1); opacity: 0; } }
+@keyframes arenaSkillPop { 0% { transform: scale(0.6); opacity: 0; } 15% { transform: scale(1.12); opacity: 1; } 80% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+@keyframes arenaBolt { 0% { stroke-dashoffset: 260; opacity: 1; } 70% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes arenaShockRing { 0% { transform: scale(0.2); opacity: 1; } 100% { transform: scale(2.4); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-fighter { transition: none; }
+  .arena-shake, .arena-stage-shake-a, .arena-stage-shake-b { animation: none; }
+  .arena-aura, .arena-portrait-breath, .arena-slash, .arena-bolt, .arena-shock-ring { animation: none; }
+  .arena-hit-flash, .arena-damage-float, .arena-skill-pop { animation: none; }
+  .arena-slash, .arena-bolt { display: none; }
+}

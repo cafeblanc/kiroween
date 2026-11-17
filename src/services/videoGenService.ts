@@ -1,9 +1,8 @@
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
-import { pollLumaJob } from "./lumaJobClient";
 
 export interface VideoGenRequest {
   prompt: string;
-  provider: "huggingface_wan2" | "luma" | "replicate";
+  provider: "huggingface_wan2";
   apiKey?: string;
   /** Local-only: the caller owns (and revokes) any blob URL instead of the shared single-slot tracker. */
   keepBlobUrl?: boolean;
@@ -56,12 +55,6 @@ export async function generateMonsterVideo(fullReq: VideoGenRequest): Promise<Vi
         };
       }
       const data = await serverRes.json();
-      if (typeof data?.jobId === "string") {
-        const job = await pollLumaJob(data.jobId, req.apiKey, { signal });
-        return job.ok
-          ? { success: true, videoUrl: job.videoUrl, provider: req.provider }
-          : { success: false, provider: req.provider, error: job.error };
-      }
       const safeUrl = sanitizeVideoUrl(data.videoUrl);
       if (safeUrl) {
         return {

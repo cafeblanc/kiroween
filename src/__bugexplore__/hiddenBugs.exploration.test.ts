@@ -163,7 +163,7 @@ describe('C8/C9 generate-video handler (1.8, 1.9)', () => {
   }
   async function loadHandler() {
     vi.resetModules();
-    for (const k of ['HF_TOKEN', 'HUGGINGFACE_TOKEN', 'LUMA_API_KEY']) delete process.env[k];
+    for (const k of ['HF_TOKEN', 'HUGGINGFACE_TOKEN']) delete process.env[k];
     return (await import('../../api/generate-video')).default;
   }
   const post = (body: any, headers: Record<string, string> = {}) => ({
@@ -201,18 +201,18 @@ describe('C8/C9 generate-video handler (1.8, 1.9)', () => {
     expect(size, 'handler sent a >4.5MB Buffer via res.send').toBeLessThanOrEqual(4_500_000);
   });
 
-  it('C8: Luma create returns a pollable jobId', async () => {
+  it('C8: provider "luma" is rejected with 400 "unsupported provider" and calls no upstream', async () => {
     const handler = await loadHandler();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(JSON.stringify({ id: 'gen-1', state: 'queued' }), { status: 201 })),
-    );
+    const f = vi.fn();
+    vi.stubGlobal('fetch', f);
     const res = mockRes();
     await handler(post({ prompt: 'p', provider: 'luma', apiKey: 'luma_x' }), res);
-    expect((res.body as any)?.jobId).toBe('gen-1');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.stringify(res.body)).toMatch(/unsupported provider/i);
+    expect(f).not.toHaveBeenCalled();
   });
 
-  it('C8: a luma request without a Luma key never falls through to HuggingFace', async () => {
+  it('C8: a luma request never falls through to HuggingFace', async () => {
     const handler = await loadHandler();
     process.env.HF_TOKEN = 'hf_env_token';
     const f = vi.fn(async () => new Response('x', { status: 200 }));

@@ -14,13 +14,13 @@ describe('Property 8: Arena Battle Matrix Completeness', () => {
   const matrix = new BattleMatrix(monsters);
 
   const isValidUrl = (u: unknown) =>
-    typeof u === 'string' && /^\/videos\/.+\.mp4$/.test(u);
+    u === null || (typeof u === 'string' && /^\/videos\/battles\/.+\.mp4$/.test(u));
 
   const distinctPair = fc
     .tuple(fc.integer({ min: 0, max: ids.length - 1 }), fc.integer({ min: 1, max: ids.length - 1 }))
     .map(([a, off]) => [ids[a], ids[(a + off) % ids.length]] as const);
 
-  it('any two distinct monsters yield a valid battle video URL without throwing', () => {
+  it('any two distinct monsters yield a pre-made battle URL or null without throwing', () => {
     fc.assert(
       fc.property(distinctPair, ([a, b]) => {
         const url = matrix.getBattleVideo(a, b);

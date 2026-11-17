@@ -4,7 +4,7 @@
  * on the component sources. A real browser run is still required for playback/audio.
  */
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { adultSegmentStart, shouldResolveViaPipeline, isCustomMonsterId } from './customMonsterFlow';
 import { getBattleVideoForPair } from '../components/bioreactor/arena';
@@ -59,13 +59,11 @@ describe('blob: video through the incubator/awakening definitions', () => {
 });
 
 describe('BattleMatrix: custom monster vs the 6 curated monsters', () => {
-  it('always resolves to an existing battle video, in both fighter orders', () => {
+  it('never gets a pre-made clash video (null), in both fighter orders', () => {
     const custom = 'custom_myth_dragon_1700000000000';
     for (const id of CURATED_IDS) {
-      for (const url of [getBattleVideoForPair(custom, id), getBattleVideoForPair(id, custom)]) {
-        expect(url.startsWith('/videos/battles/battle_')).toBe(true);
-        expect(existsSync(resolve(ROOT, 'public' + url)), url).toBe(true);
-      }
+      expect(getBattleVideoForPair(custom, id)).toBeNull();
+      expect(getBattleVideoForPair(id, custom)).toBeNull();
     }
   });
 });

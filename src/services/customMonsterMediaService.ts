@@ -519,7 +519,7 @@ const LTX_MOTION_SUFFIX =
 
 /**
  * Tier 1: server proxy /api/generate-video, then direct HuggingFace Lightricks/LTX-Video when an hfToken exists
- * (reuses generateMonsterVideo: allowlist checks, 413 -> direct HF, Luma jobId polling).
+ * (reuses generateMonsterVideo: allowlist checks, 413 -> direct HF).
  * Returns null when unconfigured or failed so the caller can fall back to MediaRecorder.
  */
 async function tryGenerateLtxVideo(params: {

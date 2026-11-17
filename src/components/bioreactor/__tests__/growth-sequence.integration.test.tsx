@@ -16,7 +16,16 @@ import { BioreactorContainer } from '../BioreactorContainer';
 import { StageProgressHUD, getBpmZone } from '../StageProgressHUD';
 import { AwakeningRoar } from '../awakening/AwakeningRoar';
 import { createVideoPipeline } from '../../../services/videoPipeline';
-import { referenceVideoSelector, REFERENCE_VIDEOS } from '../../../services/referenceVideoSelector';
+import {
+  referenceVideoSelector,
+  REFERENCE_VIDEOS,
+  FALLBACK_REFERENCE_VIDEO,
+} from '../../../services/referenceVideoSelector';
+import { COMIC_MONSTERS } from '../../../data/comicMonsters';
+import { shouldResolveViaPipeline } from '../../../utils/customMonsterFlow';
+import fc from 'fast-check';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   getLastConcatenationPlan,
   videoConcatenationService,
@@ -66,6 +75,55 @@ function runSequence(frameMs: number) {
   }
   return { stageEvents, completeEvents };
 }
+
+describe('Incubator never uses arena battle clips (task 3)', () => {
+  const pub = (url: string) => resolve(__dirname, '../../../../public', url.replace(/^\//, ''));
+  const incubatorUrls = [
+    ...Object.values(REFERENCE_VIDEOS),
+    FALLBACK_REFERENCE_VIDEO,
+    ...COMIC_MONSTERS.map((m) => m.videoSrc),
+  ];
+
+  it('no incubator mapping references battle_*.mp4 or /videos/battles/', () => {
+    for (const url of incubatorUrls) expect(url).not.toMatch(/battle/i);
+  });
+
+  it('every incubator video exists in public/videos', () => {
+    for (const url of new Set(incubatorUrls)) expect(existsSync(pub(url)), url).toBe(true);
+  });
+
+  it('myth_frankenstein, alien_xenomorph and myth_cerberus use growth/awakening videos', () => {
+    const ok = /^\/videos\/chimera_(growth|awakening)_[a-z0-9_]+\.mp4$/;
+    for (const id of ['myth_frankenstein', 'alien_xenomorph', 'myth_cerberus']) {
+      expect(REFERENCE_VIDEOS[id], id).toMatch(ok);
+      expect(COMIC_MONSTERS.find((m) => m.id === id)!.videoSrc, id).toMatch(ok);
+    }
+  });
+
+  it('property: for any monster id (known or random) the selector never yields a battle clip', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const known = Object.keys(REFERENCE_VIDEOS);
+    fc.assert(
+      fc.property(fc.oneof(fc.constantFrom(...known), fc.string()), (id) => {
+        const res = referenceVideoSelector.select(id);
+        return !/battle/i.test(res.videoUrl) && res.clips.every((c) => !/battle/i.test(c.videoUrl));
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it('BioreactorScreen keeps a custom monster own clip: pipeline skipped, reference never applied', () => {
+    const src = readFileSync(resolve(__dirname, '../BioreactorScreen.tsx'), 'utf8');
+    expect(shouldResolveViaPipeline({ id: 'custom_x_1', videoSrc: 'blob:http://l/abc' })).toBe(false);
+    expect(src).toMatch(/useState\(monster\.videoSrc\)/);
+    expect(src).toMatch(/setVideoUrl\(monster\.videoSrc\);[\s\S]*?if \(!shouldResolveViaPipeline/);
+    // Only AI/cache results may replace the clip; a "reference" result never does.
+    expect(src).toMatch(/res\.source === 'ai' \|\| res\.source === 'cache'/);
+    // All 6 stages seek within the same <video>, 1/6 of its duration each.
+    expect(src).toMatch(/v\.duration \/ STAGE_COUNT/);
+    expect(src).toMatch(/\(stage - 1\) \* segment/);
+  });
+});
 
 describe('Full growth sequence integration', () => {
   beforeEach(() => {

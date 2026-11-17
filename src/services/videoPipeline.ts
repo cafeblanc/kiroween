@@ -38,12 +38,9 @@ function readKey(envName: string, storageKey: string): string {
   }
 }
 
-/** True if an HF token or Luma key is configured (Vite env or localStorage). */
+/** True if an HF (LTX) token is configured (Vite env or localStorage). */
 export function isAIVideoAvailable(): boolean {
-  return Boolean(
-    readKey('VITE_HF_TOKEN', 'kiroween_hf_token') ||
-      readKey('VITE_LUMA_API_KEY', 'kiroween_luma_api_key'),
-  );
+  return Boolean(readKey('VITE_HF_TOKEN', 'kiroween_hf_token'));
 }
 
 async function pickExport<T>(modPromise: Promise<any>, names: string[], label: string): Promise<T> {

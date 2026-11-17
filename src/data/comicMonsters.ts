@@ -250,7 +250,7 @@ export const COMIC_MONSTERS: ComicMonster[] = [
     promptEn: "Terrifying xenomorph alien titan with shiny obsidian exoskeleton, elongated skull, and razor blade tail in amniotic chamber",
     avatarImg: "/images/chimera_alien_xenomorph.jpg",
     jumpscareImg: "/images/chimera_alien_xenomorph.jpg",
-    videoSrc: "/videos/battles/battle_xeno_vs_frankenstein.mp4",
+    videoSrc: "/videos/chimera_growth_deepsea_abyss_30s.mp4",
     roarAudio: "/sounds/monster_roar_ferocious.wav",
     funFactKo: "불소 수지 기반의 생체 중합체 혈관을 형성하여 pH 0.1의 초강산 체액 순환을 견뎌냅니다.",
     funFactEn: "Reinforced with fluoropolymer-lined vascular endothelium to withstand hyper-acidic metabolic circulation."
@@ -326,7 +326,7 @@ export const COMIC_MONSTERS: ComicMonster[] = [
     promptEn: "Modern Bio-Frankenstein synthetic giant awakening inside an electric amniotic vat, surgical stitches glowing",
     avatarImg: "/images/frankenstein_chimera.jpg",
     jumpscareImg: "/images/frankenstein_chimera.jpg",
-    videoSrc: "/videos/battles/battle_xeno_vs_frankenstein.mp4",
+    videoSrc: "/videos/chimera_awakening_cyber.mp4",
     roarAudio: "/sounds/monster_roar_ferocious.wav",
     funFactKo: "메리 셸리의 1818년 원작 소설 부제인 'The Modern Prometheus'를 2026년 첨단 재생의학으로 완벽히 재해석한 본 프로젝트의 정점입니다.",
     funFactEn: "The ultimate climax of the PROMETHEUS project, reviving Mary Shelley's 1818 masterpiece through modern regenerative biology."

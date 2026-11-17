@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   MONSTER_STUDIO_PRESETS,
   MonsterBodyParts,
@@ -9,6 +9,8 @@ import {
   generateVideoFromMonsterImage,
 } from "../../services/customMonsterMediaService";
 import type { ComicMonster } from "../../data/comicMonsters";
+import { saveMonster } from "../../services/monsterVaultService";
+import { monsterToVaultInput, urlToBlob } from "../../services/customMonsterVaultMapping";
 
 interface CustomMonsterStudioProps {
   isKo: boolean;
@@ -203,8 +205,18 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     }
   };
 
+  // 같은 설계(이름·프롬프트·능력치·이미지·영상)는 같은 id를 재사용: 배양기와 결투장 양쪽으로 보내도 보관함에는 1건(upsert)
+  const buildIdRef = useRef<{ sig: string; id: string } | null>(null);
+  const stableCustomId = (): string => {
+    const sig = JSON.stringify([selectedPreset.id, customName, longPrompt, themeHex, generatedImageUrl, generatedVideoUrl, bioStats]);
+    if (buildIdRef.current?.sig === sig) return buildIdRef.current.id;
+    const id = `custom_${selectedPreset.id}_${Date.now()}`;
+    buildIdRef.current = { sig, id };
+    return id;
+  };
+
   const buildCustomMonsterObject = (): ComicMonster => ({
-    id: `custom_${selectedPreset.id}_${Date.now()}`,
+    id: stableCustomId(),
     nameEn: customName || `${selectedPreset.nameEn} Custom`,
     nameKo: customName || `${selectedPreset.nameKo} 커스텀`,
     taglineKo: bioStats.elementLabelKo,
@@ -230,12 +242,29 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     funFactEn: `${customName} (ATK ${bioStats.atk} · DEF ${bioStats.def} · SPD ${bioStats.spd}): Custom bio-parts awakened inside the chamber!`,
   });
 
+  // 보관함(IndexedDB) 저장: UI를 막지 않는 fire-and-forget. blob:/data:/http 이미지·영상을 Blob으로 변환해 저장하고,
+  // 변환 실패 시 가능한 것만(나머지는 메타/기본 경로) 저장하며 앱 동작에는 영향을 주지 않는다.
+  const persistToVault = (monster: ComicMonster, imageUrl: string | null, videoUrl: string | null) => {
+    void (async () => {
+      try {
+        const [image, video] = await Promise.all([urlToBlob(imageUrl), urlToBlob(videoUrl)]);
+        await saveMonster(monsterToVaultInput(monster, image, video));
+      } catch (err) {
+        console.warn("[CustomMonsterStudio] vault save failed", err);
+      }
+    })();
+  };
+
   const handleStartCustomBioreactor = () => {
-    onAwakenCustomMonster(buildCustomMonsterObject());
+    const monster = buildCustomMonsterObject();
+    persistToVault(monster, generatedImageUrl, generatedVideoUrl);
+    onAwakenCustomMonster(monster);
   };
 
   const handleSendCustomToArena = () => {
-    onSendToArena?.(buildCustomMonsterObject());
+    const monster = buildCustomMonsterObject();
+    persistToVault(monster, generatedImageUrl, generatedVideoUrl);
+    onSendToArena?.(monster);
   };
 
   const applyMutationChip = (field: keyof MonsterBodyParts, appendKo: string) => {

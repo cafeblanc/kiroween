@@ -18,7 +18,7 @@ import {
   referenceVideoSelector,
 } from './referenceVideoSelector';
 
-const URL_A = '/videos/battles/battle_dragon_vs_kraken.mp4';
+const URL_A = '/videos/chimera_growth_dragon_24s.mp4';
 
 describe('crossfade transition timing', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -117,12 +117,18 @@ describe('ReferenceVideoSelector stage extraction', () => {
     expect(result.message).toBeUndefined();
   });
 
-  it('falls back to dragon_vs_kraken for unknown monsters', () => {
+  it('falls back to a biological growth video (never a battle clip) for unknown monsters', () => {
     const result = referenceVideoSelector.select('unknown_monster');
     expect(result.videoUrl).toBe(FALLBACK_REFERENCE_VIDEO);
-    expect(FALLBACK_REFERENCE_VIDEO).toContain('dragon_vs_kraken');
+    expect(FALLBACK_REFERENCE_VIDEO).toMatch(/chimera_growth_/);
+    expect(FALLBACK_REFERENCE_VIDEO).not.toMatch(/battle/i);
     expect(result.message).toBe(FALLBACK_MESSAGE);
     expect(result.clips).toHaveLength(6);
+  });
+
+  it('maps no monster to a battle_*.mp4 clip', () => {
+    for (const url of Object.values(REFERENCE_VIDEOS)) expect(url).not.toMatch(/battle/i);
+    expect(REFERENCE_VIDEOS.alien_xenomorph).toMatch(/chimera_(growth|awakening)_/);
   });
 
   it('does not treat prototype keys as monsters', () => {
