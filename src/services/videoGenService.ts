@@ -5,6 +5,10 @@ export interface VideoGenRequest {
   prompt: string;
   provider: "huggingface_wan2" | "luma" | "replicate";
   apiKey?: string;
+  /** Local-only: the caller owns (and revokes) any blob URL instead of the shared single-slot tracker. */
+  keepBlobUrl?: boolean;
+  /** Local-only: aborts the proxy / direct HuggingFace requests. */
+  signal?: AbortSignal;
 }
 
 export interface VideoGenResult {
@@ -27,13 +31,18 @@ function createTrackedBlobUrl(blob: Blob): string {
  * Generates a live AI combat or 3D awakening video via HuggingFace (Wan2.1 / LTX-Video)
  * or server-side proxy (/api/generate-video).
  */
-export async function generateMonsterVideo(req: VideoGenRequest): Promise<VideoGenResult> {
+export async function generateMonsterVideo(fullReq: VideoGenRequest): Promise<VideoGenResult> {
+  // Local-only options must never be serialized into the proxy request body.
+  const { keepBlobUrl, signal, ...req } = fullReq;
+  const toBlobUrl = (blob: Blob): string =>
+    keepBlobUrl ? URL.createObjectURL(blob) : createTrackedBlobUrl(blob);
   try {
     // 1. Try local/Vercel serverless endpoint first (uses server env keys if configured)
     const serverRes = await fetch(assertAllowedApiEndpoint("/api/generate-video"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
+      signal,
     });
 
     if (serverRes.ok) {
@@ -42,13 +51,13 @@ export async function generateMonsterVideo(req: VideoGenRequest): Promise<VideoG
         const blob = await serverRes.blob();
         return {
           success: true,
-          videoUrl: createTrackedBlobUrl(blob),
+          videoUrl: toBlobUrl(blob),
           provider: req.provider,
         };
       }
       const data = await serverRes.json();
       if (typeof data?.jobId === "string") {
-        const job = await pollLumaJob(data.jobId, req.apiKey);
+        const job = await pollLumaJob(data.jobId, req.apiKey, { signal });
         return job.ok
           ? { success: true, videoUrl: job.videoUrl, provider: req.provider }
           : { success: false, provider: req.provider, error: job.error };
@@ -74,6 +83,7 @@ export async function generateMonsterVideo(req: VideoGenRequest): Promise<VideoG
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ inputs: req.prompt }),
+          signal,
         }
       );
 
@@ -81,7 +91,7 @@ export async function generateMonsterVideo(req: VideoGenRequest): Promise<VideoG
         const blob = await hfRes.blob();
         return {
           success: true,
-          videoUrl: createTrackedBlobUrl(blob),
+          videoUrl: toBlobUrl(blob),
           provider: "huggingface_ltx_video",
         };
       }

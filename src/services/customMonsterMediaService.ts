@@ -1,5 +1,6 @@
-import { assertAllowedApiEndpoint } from "../utils/security";
+import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { translateTextToLanguage } from "./scienceStitchService";
+import { generateMonsterVideo } from "./videoGenService";
 
 export interface MonsterBodyParts {
   head: string;
@@ -257,13 +258,63 @@ function hashString(str: string): number {
   return Math.abs(h);
 }
 
-async function buildEnglishMonsterPrompt(
+export type MonsterCombatStats = Pick<MonsterBioStats, "atk" | "def" | "spd" | "regen" | "energy">;
+
+const MAX_TRANSLATED_DESCRIPTION_CHARS = 1100;
+
+function statTier(value: number, low: string, mid: string, high: string): string {
+  return value >= 80 ? high : value >= 60 ? mid : low;
+}
+
+/** Pure: turns combat stats into visual English cues that always carry the literal ATK/DEF/SPD/REGEN/ENERGY values. */
+export function describeStatsForPrompt(stats: MonsterCombatStats): string {
+  const cues = [
+    statTier(stats.atk, "restrained claws", "sharp predatory claws and fangs", "razor-sharp apex claws and fangs, aggressive attack stance"),
+    statTier(stats.def, "thin exposed skin", "layered armored plating", "massive thick armored carapace"),
+    statTier(stats.spd, "heavy grounded build", "athletic agile build", "lean hyper-agile build poised to lunge"),
+    statTier(stats.regen, "scarred wounds", "visible regenerating tissue", "rapidly regenerating glowing flesh"),
+    statTier(stats.energy, "dim glow", "pulsing bioluminescence", "intense crackling energy aura"),
+  ];
+  return `${cues.join(", ")} (combat stats ATK ${stats.atk}, DEF ${stats.def}, SPD ${stats.spd}, REGEN ${stats.regen}, ENERGY ${stats.energy})`;
+}
+
+/**
+ * Pure: composes the final English image prompt from the already-translated per-part description
+ * (head, horns/crown/electrodes, torso, arms/tentacles/wings, legs, tail, skin/aura) and the stats.
+ */
+export function composeEnglishMonsterPrompt(
+  presetNameEn: string,
+  translatedDescription: string,
+  stats?: MonsterCombatStats,
+): string {
+  const compact = translatedDescription
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_TRANSLATED_DESCRIPTION_CHARS);
+  const statClause = stats ? `, ${describeStatsForPrompt(stats)}` : "";
+  return `Photorealistic bio-engineered ${presetNameEn} monster inside a dark sci-fi laboratory bioreactor chamber, ${compact}${statClause}, cinematic studio lighting, ultra detailed creature anatomy, no text`;
+}
+
+export async function buildEnglishMonsterPrompt(
   preset: MonsterStudioPreset,
   description: string,
+  stats?: MonsterCombatStats,
 ): Promise<string> {
   const translated = await translateTextToLanguage(description, "en", "ko");
-  const compact = translated.replace(/\s+/g, " ").trim().slice(0, 520);
-  return `Photorealistic bio-engineered ${preset.nameEn} monster inside a dark sci-fi laboratory bioreactor chamber, ${compact}, cinematic studio lighting, ultra detailed creature anatomy, no text`;
+  return composeEnglishMonsterPrompt(preset.nameEn, translated, stats);
+}
+
+let seedCounter = 0;
+
+/** Every call gets a different seed: the nonce (time) and a per-call counter are mixed into the description/stat hash. */
+export function buildImageSeed(
+  description: string,
+  stats?: MonsterCombatStats,
+  nonce: number = Date.now(),
+): number {
+  seedCounter = (seedCounter + 1) % 1_000_003;
+  const statKey = stats ? `${stats.atk}/${stats.def}/${stats.spd}/${stats.regen}/${stats.energy}` : "";
+  return (hashString(`${description}|${statKey}`) + nonce * 31 + seedCounter * 7919) % 2_147_483_647;
 }
 
 async function fetchImageBlobAsDataUrl(url: string, init?: RequestInit, timeoutMs = 15000): Promise<string> {
@@ -294,11 +345,18 @@ export async function generateCustomMonsterImage(params: {
   preset: MonsterStudioPreset;
   description: string;
   hfToken?: string;
-}): Promise<{ imageUrl: string; themeHex: string; source: "hf" | "pollinations" | "procedural" }> {
-  const { preset, description, hfToken } = params;
+  stats?: MonsterCombatStats;
+}): Promise<{
+  imageUrl: string;
+  themeHex: string;
+  source: "hf" | "pollinations" | "procedural";
+  promptEn: string;
+  seed: number;
+}> {
+  const { preset, description, hfToken, stats } = params;
   const theme = detectVisualTheme(description, preset.colorHex);
-  const seed = (hashString(description) % 900000) + (Date.now() % 999);
-  const englishPrompt = await buildEnglishMonsterPrompt(preset, description);
+  const seed = buildImageSeed(description, stats);
+  const englishPrompt = await buildEnglishMonsterPrompt(preset, description, stats);
 
   // 1. Optional HuggingFace Inference (FLUX / LTX ecosystem) when HF token is provided
   if (hfToken?.trim()) {
@@ -311,11 +369,11 @@ export async function generateCustomMonsterImage(params: {
             Authorization: `Bearer ${hfToken.trim()}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ inputs: englishPrompt }),
+          body: JSON.stringify({ inputs: englishPrompt, parameters: { seed } }),
         },
         20000,
       );
-      return { imageUrl: dataUrl, themeHex: theme.primary, source: "hf" };
+      return { imageUrl: dataUrl, themeHex: theme.primary, source: "hf", promptEn: englishPrompt, seed };
     } catch {
       // Fall through to zero-key AI generation
     }
@@ -327,7 +385,7 @@ export async function generateCustomMonsterImage(params: {
       englishPrompt,
     )}?width=768&height=768&nologo=true&seed=${seed}`;
     const dataUrl = await fetchImageBlobAsDataUrl(pollinationsUrl, undefined, 16000);
-    return { imageUrl: dataUrl, themeHex: theme.primary, source: "pollinations" };
+    return { imageUrl: dataUrl, themeHex: theme.primary, source: "pollinations", promptEn: englishPrompt, seed };
   } catch {
     // Fall through to procedural multi-part mutation canvas
   }
@@ -437,13 +495,100 @@ export async function generateCustomMonsterImage(params: {
     imageUrl: canvas.toDataURL("image/png"),
     themeHex: theme.primary,
     source: "procedural",
+    promptEn: englishPrompt,
+    seed,
   };
 }
 
 // Last generated blob URL per source image; regenerating from the same image revokes the replaced blob.
 const blobUrlByImage = new Map<string, string>();
 
+export type MonsterVideoSource = "ltx" | "mediarecorder";
+
+export interface MonsterVideoResult {
+  videoUrl: string;
+  mimeType: string;
+  durationSec: number;
+  source: MonsterVideoSource;
+}
+
+// LTX-Video generation can take a while; abort and fall back after this long.
+const LTX_TIMEOUT_MS = 90_000;
+const LTX_MOTION_SUFFIX =
+  "the creature slowly breathes, flexes its limbs and roars, smooth cinematic motion, photorealistic CGI, 4k";
+
+/**
+ * Tier 1: server proxy /api/generate-video, then direct HuggingFace Lightricks/LTX-Video when an hfToken exists
+ * (reuses generateMonsterVideo: allowlist checks, 413 -> direct HF, Luma jobId polling).
+ * Returns null when unconfigured or failed so the caller can fall back to MediaRecorder.
+ */
+async function tryGenerateLtxVideo(params: {
+  description: string;
+  promptEn?: string;
+  hfToken?: string;
+  imageKey: string;
+  signal: AbortSignal;
+}): Promise<string | null> {
+  const { description, promptEn, hfToken, imageKey, signal } = params;
+  try {
+    const base =
+      promptEn?.trim() ||
+      (await translateTextToLanguage(description, "en", "ko")).replace(/\s+/g, " ").trim().slice(0, 600);
+    const res = await generateMonsterVideo({
+      prompt: `${base}, ${LTX_MOTION_SUFFIX}`,
+      provider: "huggingface_wan2",
+      apiKey: hfToken?.trim() || undefined,
+      keepBlobUrl: true,
+      signal,
+    });
+    if (!res.success || !res.videoUrl) return null;
+    const safe = sanitizeVideoUrl(res.videoUrl);
+    if (!safe) return null;
+    if (safe.startsWith("blob:")) {
+      const prev = blobUrlByImage.get(imageKey);
+      if (prev && prev !== safe) URL.revokeObjectURL(prev);
+      blobUrlByImage.set(imageKey, safe);
+    }
+    return safe;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateVideoFromMonsterImage(params: {
+  imageUrl: string;
+  description: string;
+  accentColor: string;
+  durationSec?: number;
+  onProgress?: (pct: number) => void;
+  hfToken?: string;
+  promptEn?: string;
+}): Promise<MonsterVideoResult> {
+  const { imageUrl, description, hfToken, promptEn, onProgress } = params;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LTX_TIMEOUT_MS);
+  onProgress?.(2);
+  let ltxUrl: string | null = null;
+  try {
+    ltxUrl = await tryGenerateLtxVideo({
+      description,
+      promptEn,
+      hfToken,
+      imageKey: imageUrl,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (ltxUrl) {
+    onProgress?.(100);
+    return { videoUrl: ltxUrl, mimeType: "video/mp4", durationSec: 5, source: "ltx" };
+  }
+  const local = await generateMediaRecorderVideo(params);
+  return { ...local, source: "mediarecorder" };
+}
+
+async function generateMediaRecorderVideo(params: {
   imageUrl: string;
   description: string;
   accentColor: string;

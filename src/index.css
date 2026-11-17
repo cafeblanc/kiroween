@@ -306,11 +306,31 @@
   animation: vatTwitchingIdle 2.4s infinite ease-in-out;
 }
 
-/* Hide Google Translate top banner so 100dvh layout never shifts */
+/* Hide Google Translate top banner, rating/feedback balloon, and hover tooltips */
 iframe.goog-te-banner-frame,
 .VIpgJd-ZVi9od-ORHb-OEVmcd,
-.skiptranslate > iframe {
+.skiptranslate > iframe,
+.goog-te-balloon-frame,
+.goog-te-balloon,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-tooltip:hover,
+.VIpgJd-ZVi9od-aZ2wEe,
+.VIpgJd-ZVi9od-aZ2wEe-OVi9kf,
+.VIpgJd-y60Sfe-r93Du,
+.VIpgJd-ZVi9od-xl07Ob-OWhvd {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  z-index: -9999 !important;
+}
+
+.goog-text-highlight {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 body {

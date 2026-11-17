@@ -2776,6 +2776,7 @@ export const BioStitchLabView: React.FC = () => {
             </div>
             <div className="flex-1 overflow-y-auto p-3 sm:p-4">
               <CustomMonsterStudio
+                initialHfToken={hfTokenInput}
                 isKo={isKo}
                 onAwakenCustomMonster={(customMonster) => {
                   setCustomArenaRoster((prev) => [customMonster, ...prev.slice(0, 5)]);

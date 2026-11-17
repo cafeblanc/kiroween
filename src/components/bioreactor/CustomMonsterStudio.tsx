@@ -14,6 +14,8 @@ interface CustomMonsterStudioProps {
   isKo: boolean;
   onAwakenCustomMonster: (monster: ComicMonster) => void;
   onSendToArena?: (monster: ComicMonster) => void;
+  /** Optional HuggingFace token shared from the lab view; the local input below overrides it. */
+  initialHfToken?: string;
 }
 
 const MUTATION_CHIPS: Array<{
@@ -33,7 +35,12 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   isKo,
   onAwakenCustomMonster,
   onSendToArena,
+  initialHfToken,
 }) => {
+  const [hfTokenInput, setHfTokenInput] = useState<string>("");
+  const [imagePromptEn, setImagePromptEn] = useState<string | undefined>(undefined);
+  const [videoSource, setVideoSource] = useState<"ltx" | "mediarecorder" | null>(null);
+  const hfToken = hfTokenInput.trim() || initialHfToken?.trim() || "";
   const [selectedPreset, setSelectedPreset] = useState<MonsterStudioPreset>(
     MONSTER_STUDIO_PRESETS[0],
   );
@@ -79,6 +86,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     setLongPrompt(composeDescriptionFromParts(preset, preset.defaultParts));
     setThemeHex(preset.colorHex);
     setStatOverrides({});
+    setImagePromptEn(undefined);
+    setVideoSource(null);
     setGeneratedImageUrl(null);
     setGeneratedVideoUrl(null);
     setStatusMessage(null);
@@ -98,7 +107,17 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
       const result = await generateCustomMonsterImage({
         preset: selectedPreset,
         description: longPrompt,
+        hfToken: hfToken || undefined,
+        stats: {
+          atk: bioStats.atk,
+          def: bioStats.def,
+          spd: bioStats.spd,
+          regen: bioStats.regen,
+          energy: bioStats.energy,
+        },
       });
+      setImagePromptEn(result.promptEn);
+      setVideoSource(null);
       setGeneratedImageUrl(result.imageUrl);
       setThemeHex(result.themeHex);
       setGeneratedVideoUrl(null);
@@ -131,6 +150,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     reader.onload = () => {
       if (typeof reader.result === "string") {
         setGeneratedImageUrl(reader.result);
+        setImagePromptEn(undefined);
+        setVideoSource(null);
         setGeneratedVideoUrl(null);
         setStatusMessage(
           isKo
@@ -155,12 +176,19 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         accentColor: themeHex,
         durationSec: 5,
         onProgress: setVideoProgress,
+        hfToken: hfToken || undefined,
+        promptEn: imagePromptEn,
       });
       setGeneratedVideoUrl(result.videoUrl);
+      setVideoSource(result.source);
       setStatusMessage(
-        isKo
-          ? `AI 괴수 동영상(${result.durationSec}초) 생성 완료! 재생, 다운로드 또는 15초 배양기에 바로 투입할 수 있습니다.`
-          : `AI monster video (${result.durationSec}s) ready! Play, download, or start 15s bioreactor.`,
+        result.source === "ltx"
+          ? isKo
+            ? "LTX-Video 실사 동영상 생성 완료! 재생, 다운로드 또는 15초 배양기에 바로 투입할 수 있습니다."
+            : "LTX-Video photoreal clip ready! Play, download, or start the 15s bioreactor."
+          : isKo
+          ? `LTX 미연결 또는 실패로 로컬 애니메이션 동영상(${result.durationSec}초)을 생성했습니다. 재생, 다운로드 또는 15초 배양기에 투입할 수 있습니다.`
+          : `LTX unavailable, so a local animated video (${result.durationSec}s) was rendered. Play, download, or start the 15s bioreactor.`,
       );
     } catch (err) {
       setStatusMessage(
@@ -317,17 +345,24 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         </div>
         <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-[11px] font-black text-emerald-300">
-              🧬{" "}
-              {isKo
-                ? "괴수 전투 능력치 조절 (슬라이더를 움직여 능력치 직접 설정)"
-                : "Monster Combat Stats Tuner (Drag sliders to adjust)"}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-black text-emerald-300">
+                🧬{" "}
+                {isKo
+                  ? "괴수 생체 전투 능력치 조절 (슬라이더로 직접 설정 가능)"
+                  : "Monster Combat Stats Tuner (Interactive Sliders)"}
+              </span>
+              <span className="text-[9px] text-slate-400 font-sans">
+                {isKo
+                  ? "부위 묘사에 따라 자동 계산되며, 슬라이더를 당겨 직접 조절하면 AI 이미지·동영상 및 결투장에 실시간 반영됩니다."
+                  : "Auto-computed from part descriptions; dragging sliders directly overrides values for AI image/video & Arena."}
+              </span>
+            </div>
             {Object.keys(statOverrides).length > 0 && (
               <button
                 type="button"
                 onClick={() => setStatOverrides({})}
-                className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-600 cursor-pointer"
+                className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-600 cursor-pointer transition"
               >
                 {isKo ? "↺ 자동 분석값으로 복원" : "↺ Reset to Auto"}
               </button>
@@ -336,30 +371,35 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {(
               [
-                { key: "atk", labelKo: "공격력 (ATK)", labelEn: "ATK", val: bioStats.atk, accent: "accent-rose-500", text: "text-rose-300" },
-                { key: "def", labelKo: "방어력 (DEF)", labelEn: "DEF", val: bioStats.def, accent: "accent-amber-400", text: "text-amber-300" },
-                { key: "spd", labelKo: "속도 (SPD)", labelEn: "SPD", val: bioStats.spd, accent: "accent-cyan-400", text: "text-cyan-300" },
-                { key: "regen", labelKo: "재생력 (REGEN)", labelEn: "REGEN", val: bioStats.regen, accent: "accent-emerald-400", text: "text-emerald-300" },
-                { key: "energy", labelKo: "에너지 (ENERGY)", labelEn: "ENERGY", val: bioStats.energy, accent: "accent-purple-400", text: "text-purple-300" },
+                { key: "atk", labelKo: "공격력 (ATK)", labelEn: "ATK", subKo: "타격·파괴력", subEn: "Attack Power", val: bioStats.atk, accent: "accent-rose-500", text: "text-rose-400" },
+                { key: "def", labelKo: "방어력 (DEF)", labelEn: "DEF", subKo: "외골격·장갑", subEn: "Defense Armor", val: bioStats.def, accent: "accent-amber-400", text: "text-amber-400" },
+                { key: "spd", labelKo: "속도 (SPD)", labelEn: "SPD", subKo: "민첩·공속", subEn: "Speed & Agility", val: bioStats.spd, accent: "accent-cyan-400", text: "text-cyan-400" },
+                { key: "regen", labelKo: "재생력 (REGEN)", labelEn: "REGEN", subKo: "체력 자가회복", subEn: "Regeneration", val: bioStats.regen, accent: "accent-emerald-400", text: "text-emerald-400" },
+                { key: "energy", labelKo: "에너지 (ENERGY)", labelEn: "ENERGY", subKo: "생체오라·BPM", subEn: "Energy & Aura", val: bioStats.energy, accent: "accent-purple-400", text: "text-purple-400" },
               ] as const
             ).map((stat) => (
-              <div key={stat.key} className="bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col gap-1">
+              <div key={stat.key} className="bg-slate-900/95 border border-slate-800 rounded-lg p-2 flex flex-col gap-1.5 shadow-sm">
                 <div className="flex justify-between items-center text-[10px] font-mono font-bold">
                   <span className={stat.text}>{isKo ? stat.labelKo : stat.labelEn}</span>
-                  <span className="text-white">{stat.val}</span>
+                  <span className="text-white font-black bg-slate-800/80 px-1.5 py-0.5 rounded text-[10px] border border-slate-700/60">{stat.val}</span>
+                </div>
+                <div className="text-[9px] text-slate-400 flex justify-between items-center font-sans">
+                  <span>{isKo ? stat.subKo : stat.subEn}</span>
+                  <span className="text-[8px] text-slate-400 font-mono">20~99</span>
                 </div>
                 <input
                   type="range"
                   min={20}
                   max={99}
                   value={stat.val}
+                  aria-label={stat.labelKo}
                   onChange={(e) =>
                     setStatOverrides((prev) => ({
                       ...prev,
                       [stat.key]: Number(e.target.value),
                     }))
                   }
-                  className={`w-full h-1.5 cursor-pointer ${stat.accent}`}
+                  className={`w-full h-2 cursor-pointer rounded-lg bg-slate-800 ${stat.accent}`}
                 />
               </div>
             ))}
@@ -389,6 +429,46 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
               : "Describe the head, horns, arms, legs, torso, tail, skin texture, and aura in full detail..."
           }
           className="w-full min-h-[140px] bg-slate-950 border border-emerald-500/40 focus:border-emerald-400 rounded-xl p-3 text-xs text-slate-100 leading-relaxed outline-none resize-y shadow-inner"
+        />
+      </div>
+
+      {/* 3.5 Optional HF / LTX token + connection status badge */}
+      <div className="flex flex-wrap items-center gap-2 bg-slate-950/90 border border-slate-800 rounded-xl px-2.5 py-2">
+        <span
+          data-testid="ltx-status-badge"
+          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+            videoSource === "ltx"
+              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+              : videoSource === "mediarecorder"
+              ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
+              : hfToken
+              ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+              : "bg-slate-800 text-slate-300 border-slate-600"
+          }`}
+        >
+          {videoSource === "ltx"
+            ? isKo
+              ? "LTX 실사 생성됨"
+              : "LTX photoreal ready"
+            : videoSource === "mediarecorder"
+            ? isKo
+              ? "LTX 미연결 · 로컬 폴백 사용"
+              : "LTX offline · local fallback"
+            : hfToken
+            ? isKo
+              ? "LTX 연결 대기 (HF 토큰 입력됨)"
+              : "LTX ready (HF token set)"
+            : isKo
+            ? "LTX 서버 프록시 시도 → 실패 시 로컬 폴백"
+            : "LTX via server proxy → local fallback"}
+        </span>
+        <input
+          type="password"
+          value={hfTokenInput}
+          onChange={(e) => setHfTokenInput(e.target.value)}
+          autoComplete="off"
+          placeholder={isKo ? "HF/LTX 토큰(선택, 저장되지 않음)" : "HF/LTX token (optional, not stored)"}
+          className="flex-1 min-w-[160px] bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-lg px-2 py-1 text-[11px] text-slate-200 outline-none"
         />
       </div>
 
@@ -481,10 +561,12 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
                 </span>
                 <a
                   href={generatedVideoUrl}
-                  download={`${selectedPreset.id}_custom.webm`}
+                  download={`${selectedPreset.id}_custom.${videoSource === "ltx" ? "mp4" : "webm"}`}
                   className="text-[10px] font-bold text-emerald-400 hover:underline"
                 >
-                  {isKo ? "동영상 저장 (.webm)" : "Download Video"}
+                  {isKo
+                    ? `동영상 저장 (.${videoSource === "ltx" ? "mp4" : "webm"})`
+                    : "Download Video"}
                 </a>
               </div>
               <video

@@ -137,7 +137,7 @@ This plan fixes the 12 hidden bugs from `bugfix.md` following the rollout order 
   - Run `tsc --noEmit` (src and api), `vitest --run`, and `vite build`
   - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 5. Deploy (ONLY after explicit user approval)
+- [x] 5. Deploy (ONLY after explicit user approval)
   - **GATE**: Do NOT start this task until the user has reviewed the results of task 4 and explicitly approved deployment. If approval is not given, stop and report.
   - Present a summary of the changes per batch and the check results (`tsc`, `vitest`, `vite build`) and ask for approval
   - Confirm the deploy target (branch, Vercel project, environment) with the user before running any command; if it differs from what was assumed, stop and ask
