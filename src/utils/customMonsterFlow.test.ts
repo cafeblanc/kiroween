@@ -95,7 +95,8 @@ describe('structural: cleanup and stale-state guards', () => {
     expect(lab.match(/aiClashAbortRef\.current\?\.abort\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     // the arena entrance roar interval and the incubation phase tick are cleared by their effect cleanups
     expect(lab).toMatch(/return \(\) => window\.clearInterval\(t\);/);
-    expect(lab).toMatch(/return \(\) => window\.clearInterval\(timer\);/);
+    // Incubation has no tick timer any more (the clip's timeupdate drives it); its bubbling sound is stopped on cleanup.
+    expect(lab).toMatch(/const stop = startBubbleSound\(\);\s*return stop;/);
     expect(lab).toMatch(/activeModalTab === "monster_arena"\) return;/);
   });
 

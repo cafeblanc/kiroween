@@ -4,7 +4,7 @@
  * - Arena launch: while the video renders, a quiet roar repeats and grows louder with the progress.
  */
 
-/** How long the 3D reveal stays on screen (matches the monster-reveal-burst CSS animation). */
+/** How long the 3D reveal stays on screen (matches the monster-reveal-burst / incubate-expand CSS animations). */
 export const MONSTER_REVEAL_MS = 2000;
 
 /** Gap between roars on the arena waiting screen. */
@@ -60,6 +60,39 @@ export function incubationPhase(elapsedSinceReadyMs: number | null | undefined):
   if (elapsedSinceReadyMs < INCUBATE_MATERIALISE_MS + MONSTER_REVEAL_MS) return "reveal";
   return "done";
 }
+/** Clip time (s) where the embryo-growth part ends; handy for logs and tests. */
+export function tankEmbryoEndSec(durationSec: number): number {
+  return Number.isFinite(durationSec) && durationSec > 0 ? durationSec * TANK_EMBRYO_END_FRACTION : 0;
+}
+
+/**
+ * Bioreactor tank clip timing (fractions of the clip length, so they fit any clip).
+ * The stock tank clip shows its own adult creature from ADULT_SEGMENT_START (0.68, customMonsterFlow); the hand-off to
+ * the user's monster happens just before that, after the embryo-growth part, and the clip never plays past it.
+ */
+/** Embryo growth is over: before this point the hand-off never starts, even if the image is already ready. */
+export const TANK_EMBRYO_END_FRACTION = 0.55;
+/** Hand-off point (just before a creature-like shape appears in the stock clip). The clip never plays past it. */
+export const TANK_HANDOFF_FRACTION = 0.6;
+/** While waiting for a slow image, the clip loops back to here (the late-embryo stretch before the hand-off). */
+export const TANK_HOLD_LOOP_START_FRACTION = 0.45;
+
+export type TankClipAction = "play" | "loop-back" | "handoff";
+
+/**
+ * What the tank clip should do at `currentTimeSec`:
+ *   play      keep playing (embryo growth still running, or waiting before the hand-off point)
+ *   loop-back the image is not ready yet at the hand-off point: seek back to the hold-loop start
+ *   handoff   the hand-off point is reached and the image is ready: pause and expand the image
+ * Unknown/invalid duration -> "play" (the clip is still loading).
+ */
+export function tankClipAction(currentTimeSec: number, durationSec: number, imageReady: boolean): TankClipAction {
+  if (!Number.isFinite(durationSec) || durationSec <= 0 || !Number.isFinite(currentTimeSec)) return "play";
+  const handoffAt = durationSec * TANK_HANDOFF_FRACTION;
+  if (currentTimeSec < handoffAt) return "play";
+  return imageReady ? "handoff" : "loop-back";
+}
+
 /** Reduced motion: a plain cross-fade of this length replaces the materialise effects. */
 export const INCUBATE_REDUCED_FADE_MS = 400;
 /** Fade from the still image to the entrance video once its first frame is decoded. */

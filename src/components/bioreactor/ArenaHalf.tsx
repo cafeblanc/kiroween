@@ -78,9 +78,7 @@ export const ArenaHalf: React.FC<ArenaHalfProps> = ({ monster, angleDeg, isKo, e
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 pointer-events-none">
-              <p className="text-xs sm:text-sm font-black text-white truncate">{isKo ? monster.nameKo : monster.nameEn}</p>
-            </div>
+            {/* No name caption on the battle stage: the names are in the match list above */}
           </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-center px-4">

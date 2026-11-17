@@ -324,51 +324,6 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pulseBpm: 62
   },
   {
-    id: "case-04-dishbrain",
-    codeName: "CASE #04 · DISHBRAIN SBI",
-    badgeIcon: "🕹️🧬",
-    shortTitle: "Living Neurons Play Pong",
-    koreanShortTitle: "게임하는 인간 뇌세포",
-    headline: "DishBrain: 800,000 Human Stem-Cell Neurons Fused to a Silicon Chip Learn Pong",
-    koreanHeadline: "컴퓨터 칩 위에 배양된 80만 개의 인간 줄기세포 뇌가 5분 만에 스스로 게임을 깨우치다",
-    institution: "Cortical Labs & Monash University",
-    leadScientist: "Dr. Brett Kagan et al.",
-    journalCitation: "Neuron (2022) — In vitro neurons learn and exhibit sentience",
-    pmidOrDoi: "PMID: 36228614 / DOI: 10.1016/j.neuron.2022.09.001",
-    pubMedSearchQuery: "In vitro neurons learn and exhibit sentience when embodied in a simulated game-world",
-    wikiTitle: "Wetware_computer",
-    videoUrl: "https://upload.wikimedia.org/wikipedia/commons/1/14/2D-and-3D-Self-Assembling-Nanofiber-Hydrogels-for-Cardiomyocyte-Culture-285678.f1.ogv",
-    fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/04/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s001.ogv",
-    microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e8/Pipeline_for_multiscale_hyperdimensional_analysis_of_organoids.webp",
-    secondaryPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/d/db/Cerebral_organoid_flowchart.png",
-    hostTissueA: "High-Density CMOS Multi-Electrode Silicon Array (HD-MEA)",
-    koreanHostTissueA: "고밀도 CMOS 다중 미세전극 반도체 실리콘 칩 (HD-MEA)",
-    stemCellBridge: {
-      factors: ["NGN2 Direct Reprogramming", "hiPSC Cortical Differentiation", "Laminin Bio-Coat"],
-      lineage: "800,000 Living Human Cortical Neurons Stitched to Gold Micro-Electrodes",
-      koreanLineage: "금 미세전극과 직접 시냅스를 형성한 80만 개의 살아있는 인간 대뇌 뉴런",
-      viabilityPercent: 95,
-      fusionMechanism: "Pluripotent stem-cell dendrites physically wrap around silicon micro-transistors, exchanging bi-directional electrical impulses to minimize variational free energy.",
-      koreanFusionMechanism: "만능줄기세포에서 분화한 신경 수상돌기들이 실리콘 칩의 미세 트랜지스터를 직접 감싸 안으며 양방향 전기 신호를 주고받고 스스로 학습 회로를 재구성합니다."
-    },
-    donorTissueB: "Human iPSC-Derived Cortical Neural Network ('Synthetic Biological Intelligence')",
-    koreanDonorTissueB: "인간 유도만능줄기세포(hiPSC) 유래 대뇌 신경망 ('합성 생물학적 지능')",
-    eerieRealitySummary: "By growing 800,000 human stem-cell neurons directly onto a computer chip and feeding them electrical coordinates of a Pong ball, the disembodied brain cells realized they were inside a game world and taught themselves to move the paddle within 5 minutes.",
-    koreanSummary: "인간 유도만능줄기세포(hiPSC)로 분화시킨 80만 개의 살아있는 대뇌 신경세포를 반도체 실리콘 칩 위에 직접 접합했습니다. 이 '접시 위의 뇌(DishBrain)'에 전기 신호로 고전 게임 '퐁(Pong)'의 공 위치를 알려주자, 눈도 손도 없는 뇌세포들이 단 5분 만에 스스로 라켓을 움직여 공을 받아치는 법을 터득했습니다.",
-    narratorScript: [
-      "Case Zero-Four: DishBrain Synthetic Biological Intelligence.",
-      "Eight hundred thousand living human cortical neurons, derived from pluripotent stem cells, were fused directly onto a CMOS silicon microchip.",
-      "When connected to the video game Pong via electrical feedback, the living cells self-organized and learned to hit the ball within five minutes."
-    ],
-    koreanNarratorScript: [
-      "네 번째 사례는 디시브레인 합성 생물학 지능입니다.",
-      "유도만능줄기세포에서 분화시킨 팔십만 개의 살아있는 인간 뇌 신경세포를 반도체 마이크로칩 위에 직접 융합시켰습니다.",
-      "고전 게임 퐁의 공 위치를 전기 자극으로 전달하자, 배양 접시 속 뇌세포들이 스스로 조직화하며 단 오 분 만에 공을 받아치는 법을 학습했습니다."
-    ],
-    themeColor: "cyan",
-    pulseBpm: 105
-  },
-  {
     id: "case-06-human-pig-chimera",
     codeName: "CASE #06 · INTERSPECIES CHIMERA",
     badgeIcon: "🐷🧬",

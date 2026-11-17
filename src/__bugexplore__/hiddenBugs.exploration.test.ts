@@ -263,7 +263,9 @@ describe('C10 resource leaks (1.10)', () => {
     expect(src).not.toMatch(/arenaTimersRef/);
     expect(src).toMatch(/return \(\) => window\.clearTimeout\(t\);/); // duel-ready delay and 3D reveal timer
     expect(src).toMatch(/return \(\) => window\.clearInterval\(t\);/); // entrance roar interval
-    expect(src).toMatch(/return \(\) => window\.clearInterval\(timer\);/); // incubation phase tick
+    // Incubation: no tick timer any more (the tank clip's timeupdate drives the hand-off); the bubbling sound it
+    // starts must be stopped on cleanup.
+    expect(src).toMatch(/const stop = startBubbleSound\(\);\s*return stop;/);
     expect(src).toMatch(/return\s*\(\)\s*=>\s*\{[^}]*aiClashAbortRef\.current\?\.abort\(\)/); // unmount aborts generation
   });
 });

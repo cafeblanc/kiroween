@@ -439,25 +439,46 @@ body {
   .monster-reveal-burst { animation: revealFadeOnly 2s ease-out forwards; }
   .monster-reveal-flash { display: none; }
 }
-/* Bioreactor hand-off: the finished image forms inside the tank over the playing video (1.4 s = INCUBATE_MATERIALISE_MS) */
-.incubate-image {
-  animation: incubateMaterialise 1.4s cubic-bezier(0.25, 0.8, 0.3, 1) forwards;
-  filter: drop-shadow(0 0 36px var(--reveal-glow, #10b981));
+/*
+ * Bioreactor hand-off (2 s = MONSTER_REVEAL_MS): at the hand-off point the finished image bursts out of the tank
+ * centre in 3D and expands rapidly until it covers the whole screen. It ENDS covering the screen (no fade-out), so the
+ * paused tank clip never shows again before the Design Room reopens.
+ */
+.incubate-expand-stage { perspective: 800px; background: transparent; animation: incubateStageShake 2s ease-out forwards; }
+.incubate-expand {
+  transform-origin: 50% 55%;
+  will-change: transform, opacity, filter;
+  animation: incubateExpand 2s cubic-bezier(0.16, 0.9, 0.3, 1) forwards;
 }
-.incubate-liquid {
-  background: radial-gradient(circle at 50% 55%, var(--reveal-glow, #10b981) 0%, rgba(16, 185, 129, 0.25) 45%, transparent 75%);
-  mix-blend-mode: screen;
-  animation: incubateLiquid 1.4s ease-in-out forwards;
+.incubate-expand-flash {
+  background: radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.95), var(--reveal-glow, #10b981) 30%, transparent 70%);
+  animation: incubateFlash 2s ease-out forwards;
 }
-@keyframes incubateMaterialise {
-  0% { opacity: 0; filter: blur(26px) saturate(0.4) drop-shadow(0 0 60px var(--reveal-glow, #10b981)); transform: scale(0.94); }
-  70% { opacity: 1; filter: blur(0px) saturate(1) drop-shadow(0 0 44px var(--reveal-glow, #10b981)); transform: scale(1); }
-  100% { opacity: 1; filter: blur(0px) saturate(1) drop-shadow(0 0 36px var(--reveal-glow, #10b981)); transform: scale(1); }
+/* Rapid 3D expansion with a small overshoot, then the finished adult settles to exactly fill the screen (scale 1,
+   object-cover) and holds there for the last ~40% (≈0.8 s) until the Design Room reopens. */
+@keyframes incubateExpand {
+  0% { transform: translateZ(-900px) scale(0.12); opacity: 0; filter: blur(18px) brightness(1.8); }
+  12% { transform: translateZ(-300px) scale(0.45); opacity: 1; filter: blur(4px) brightness(1.4); }
+  36% { transform: translateZ(90px) scale(1.12); filter: blur(0px) brightness(1.15); }
+  60% { transform: translateZ(0) scale(1); filter: none; }
+  100% { transform: translateZ(0) scale(1); opacity: 1; filter: none; }
 }
-@keyframes incubateLiquid { 0% { opacity: 0; } 45% { opacity: 0.85; } 100% { opacity: 0.35; } }
+@keyframes incubateFlash { 0% { opacity: 0; } 10% { opacity: 1; } 35% { opacity: 0.2; } 100% { opacity: 0; } }
+/* The paused tank frame fades to black behind the expanding image, so only the finished adult remains */
+.incubate-expand-backing { animation: incubateBacking 2s ease-out forwards; }
+@keyframes incubateBacking { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes incubateStageShake {
+  0%, 100% { transform: translate(0, 0); }
+  14% { transform: translate(-12px, 7px); }
+  20% { transform: translate(10px, -8px); }
+  26% { transform: translate(-6px, 5px); }
+  34% { transform: translate(4px, -3px); }
+  45% { transform: translate(0, 0); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .incubate-image { animation: incubateFade 0.4s ease-out forwards; filter: none; }
-  .incubate-liquid { display: none; }
+  .incubate-expand-stage { animation: none; }
+  .incubate-expand { animation: incubateFade 0.4s ease-out forwards; transform: none; }
+  .incubate-expand-flash { display: none; }
 }
 @keyframes incubateFade { 0% { opacity: 0; } 100% { opacity: 1; } }
 @keyframes revealFadeOnly { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }

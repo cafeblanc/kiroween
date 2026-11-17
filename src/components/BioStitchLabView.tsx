@@ -33,14 +33,15 @@ import {
 } from "../utils/arenaRoster";
 import {
   ARENA_TURN_MS,
-  INCUBATE_REDUCED_FADE_MS,
-  incubationPhase,
   type IncubationPhase,
   MONSTER_REVEAL_MS,
   SUMMON_ROAR_INTERVAL_MS,
+  TANK_HOLD_LOOP_START_FRACTION,
   faceOffAngleDeg,
   summonRoarVolume,
+  tankClipAction,
 } from "../utils/summonTiming";
+import { startBubbleSound } from "../utils/bubbleSound";
 import {
   cleanStoryName,
   composeBattleStory,
@@ -100,8 +101,8 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
   },
   {
     icon: "💬",
-    ko: { title: "4. 논문·백과사전 채팅", body: "맨 아래 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 영상 위에 답변을 보여주고, 약 3초 뒤 위로 사라집니다. 하단 사진 목록에서 7개 실험을 고를 수 있습니다." },
-    en: { title: "4. Paper & encyclopedia chat", body: "Ask in the input line at the very bottom. The lab searches PubMed and Wikipedia live, shows the answer over the video, and it slides away after about 3 seconds. Pick one of the 7 experiments from the photo strip at the bottom." },
+    ko: { title: "4. 논문·백과사전 채팅", body: "맨 아래 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 영상 위에 답변을 보여주고, 약 3초 뒤 위로 사라집니다. 하단 사진 목록에서 6개 실험을 고를 수 있습니다." },
+    en: { title: "4. Paper & encyclopedia chat", body: "Ask in the input line at the very bottom. The lab searches PubMed and Wikipedia live, shows the answer over the video, and it slides away after about 3 seconds. Pick one of the 6 experiments from the photo strip at the bottom." },
   },
   {
     icon: "⚡",
@@ -377,7 +378,7 @@ export const BioStitchLabView: React.FC = () => {
       id: "init-1",
       sender: "ai",
       textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 실제 실험을 내레이터와 함께 살펴보거나, [괴수 설계 & 전투] 버튼을 눌러 나만의 괴수를 설계하고 대결해 보세요!",
-      textEn: "🧬 PROMETHEUS-iPSC Lab Online. Explore the 7 real-world stem-cell experiments in the photo strip with the narrator, or press [Monster Design & Battle] to design your own monster and fight!",
+      textEn: "🧬 PROMETHEUS-iPSC Lab Online. Explore the 6 real-world stem-cell experiments in the photo strip with the narrator, or press [Monster Design & Battle] to design your own monster and fight!",
       subTextKo: "질문을 입력하면 실시간으로 PubMed 논문과 백과사전을 검색해 답변합니다.",
       subTextEn: "Type any question to query live PubMed papers and Wikipedia archives.",
       pmidBadge: "PMID: 36224417 (Nature)",
@@ -729,29 +730,48 @@ export const BioStitchLabView: React.FC = () => {
       } catch {
         /* 디코딩 실패해도 연출은 계속 (브라우저가 그리면서 로드) */
       }
-      setIncubating((s) => (s ? { ...s, ready: m, readyAt: Date.now(), phase: "materialising" } : s));
+      // Only marks the image as ready. The hand-off itself waits for the tank clip to reach TANK_HANDOFF_FRACTION
+      // (embryo growth fully shown), see onTankTimeUpdate.
+      setIncubating((s) => (s ? { ...s, ready: m, readyAt: Date.now() } : s));
     })();
   };
 
-  // 배양기 영상 위에서 이미지가 형성(materialising) → 유리 파열 + 3D 튀어나옴(reveal). 경과 시간 → 단계는 순수 함수 incubationPhase
-  const incubateReadyAt = incubating?.readyAt ?? null;
+  // 배양기 영상: 배아 성장 구간이 다 지나 괴수 모습이 나오기 직전(TANK_HANDOFF_FRACTION)에서만 연결한다.
+  // 이미지가 빨리 끝나도 이 지점까지 기다리고, 늦으면 직전 구간을 되감아 반복한다. 영상은 이 지점을 넘어 재생되지 않는다.
+  const onTankTimeUpdate = (v: HTMLVideoElement) => {
+    const s = incubatingRef.current;
+    if (!s || s.phase !== "growing") return;
+    const action = tankClipAction(v.currentTime, v.duration, s.ready !== null);
+    if (action === "loop-back") {
+      v.currentTime = v.duration * TANK_HOLD_LOOP_START_FRACTION;
+      return;
+    }
+    if (action === "handoff" && s.ready) {
+      v.pause(); // the stock clip's later footage (its own creature) must never follow
+      setIncubating((cur) => (cur ? { ...cur, phase: "reveal" } : cur));
+    }
+  };
+
+  // 3D 급팽창: 이미지가 전체 화면을 덮은 채로 끝나고, 배양기 영상으로 되돌아가지 않고 바로 괴수 설계실로 복귀
+  const incubatePhase = incubating?.phase ?? null;
   useEffect(() => {
-    if (incubateReadyAt === null) return;
-    const tick = () => {
-      const phase = incubationPhase(Date.now() - incubateReadyAt);
-      const ready = incubatingRef.current?.ready ?? null;
-      if (phase === "reveal" || phase === "done") {
-        window.clearInterval(timer);
-        setIncubating((s) => (s ? { ...s, phase: "reveal" } : s));
-        if (ready) setRevealMonster(ready);
-        return;
-      }
-      setIncubating((s) => (s && s.phase !== phase ? { ...s, phase } : s));
-    };
-    const timer = window.setInterval(tick, 50);
-    tick();
-    return () => window.clearInterval(timer);
-  }, [incubateReadyAt]);
+    if (incubatePhase !== "reveal") return;
+    const ready = incubatingRef.current?.ready;
+    if (ready) playChimeraRoar(ready.roarAudio);
+    const t = window.setTimeout(() => {
+      setIncubating(null);
+      setIsCustomMonsterModalOpen(true);
+    }, MONSTER_REVEAL_MS);
+    return () => window.clearTimeout(t);
+  }, [incubatePhase]);
+
+  // 배양 중에는 뽀글거리는 소리 (WebAudio 합성). 팽창 연출이 시작되면 멈춘다
+  const isIncubationGrowing = incubatePhase === "growing";
+  useEffect(() => {
+    if (!isIncubationGrowing) return;
+    const stop = startBubbleSound();
+    return stop;
+  }, [isIncubationGrowing]);
 
   const backToDesignRoom = () => {
     setRevealMonster(null);
@@ -2030,9 +2050,9 @@ export const BioStitchLabView: React.FC = () => {
         id: (Date.now() + 1).toString() + "-ai",
         sender: "ai",
         textKo:
-          "하단 사진 목록에서 7개 실제 줄기세포 실험을 전환하고, 같은 줄의 [괴수 설계 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
+          "하단 사진 목록에서 6개 실제 줄기세포 실험을 전환하고, 같은 줄의 [괴수 설계 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
         textEn:
-          "Switch between 7 real stem-cell cases in the photo strip at the bottom, or open the Monster Design & Battle button in the same strip to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
+          "Switch between 6 real stem-cell cases in the photo strip at the bottom, or open the Monster Design & Battle button in the same strip to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
         pmidBadge: "LAB GUIDE",
         timestamp: new Date().toLocaleTimeString()
       };
@@ -2055,9 +2075,7 @@ export const BioStitchLabView: React.FC = () => {
         ((lower.includes("영장류") || lower.includes("원숭이") || lower.includes("형광") || lower.includes("monkey")) &&
           c.id.includes("chimeric-monkey")) ||
         ((lower.includes("아홀로틀") || lower.includes("도롱뇽") || lower.includes("사지") || lower.includes("axolotl")) &&
-          c.id.includes("axolotl")) ||
-        ((lower.includes("pong") || lower.includes("게임") || lower.includes("dishbrain")) &&
-          c.id.includes("dishbrain"))
+          c.id.includes("axolotl"))
     );
 
     const isContextualFollowUp =
@@ -2183,6 +2201,19 @@ export const BioStitchLabView: React.FC = () => {
             >
               <span>🧬</span>
               <span>{isKo ? "괴수 설계실" : "Monster Design Room"}</span>
+            </button>
+            {/* 결투장으로 바로: DB에 저장된 괴수들로 다시 결투하거나 만든 결투 영상을 다시 본다 */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsCustomMonsterModalOpen(false);
+                setActiveModalTab("monster_arena");
+                setIsStitchModalOpen(true);
+              }}
+              className="bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-rose-300/50 active:scale-95"
+            >
+              <span>⚔️</span>
+              <span>{isKo ? "괴수 결투장" : "Monster Arena"}</span>
             </button>
             <button
               type="button"
@@ -2767,28 +2798,26 @@ export const BioStitchLabView: React.FC = () => {
                           </div>
                         )}
                         {arenaHasTwoDesigns && isGeneratingAiClash && (
-                          <div role="status" aria-live="polite" className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl bg-black/75 border border-amber-400/50 max-w-xs text-center">
-                            <div className="w-8 h-8 rounded-full border-4 border-amber-300/30 border-t-amber-300 animate-spin motion-reduce:animate-none" />
-                            <p className="text-xs font-black text-amber-200">
-                              {isKo ? `⚔️ ${BATTLE_VIDEO_SECONDS}초 전투 영상 생성 중...` : `⚔️ Generating the ${BATTLE_VIDEO_SECONDS} s battle video...`}
-                            </p>
-                            <p className="text-[10px] text-slate-400">{isKo ? "보통 1~2분, 최대 4분 걸립니다." : "Usually 1-2 minutes, up to 4."}</p>
-                          </div>
+                          /* 전투 장면에는 자막을 띄우지 않는다: 회전 표시만 (스크린 리더용 이름은 유지) */
+                          <div
+                            role="status"
+                            aria-label={isKo ? `${BATTLE_VIDEO_SECONDS}초 전투 영상 생성 중` : `Generating the ${BATTLE_VIDEO_SECONDS} s battle video`}
+                            className="w-10 h-10 rounded-full border-4 border-amber-300/30 border-t-amber-300 animate-spin motion-reduce:animate-none"
+                          />
                         )}
                         {arenaHasTwoDesigns && !isGeneratingAiClash && duelReady && (
                           <div className="pointer-events-auto flex flex-col items-center gap-1">
+                            {/* 비용 안내는 화면 자막 대신 마우스를 올렸을 때(title)만 보인다 */}
                             <button
                               type="button"
                               onClick={handleDuel}
+                              title={aiClashUrl
+                                ? (isKo ? "이미 만든 영상이라 무료" : "Already made, free")
+                                : (isKo ? `${BATTLE_VIDEO_SECONDS}초 전투 영상 약 $1.56` : `${BATTLE_VIDEO_SECONDS} s battle video, about $1.56`)}
                               className="px-6 py-3 rounded-2xl text-base sm:text-lg font-black text-white bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 shadow-[0_0_30px_rgba(244,63,94,0.6)] motion-safe:animate-pulse"
                             >
                               {aiClashUrl ? (isKo ? "▶ 결투 다시 보기" : "▶ Replay the duel") : (isKo ? "⚔️ 결투" : "⚔️ Duel")}
                             </button>
-                            <span className="text-[10px] font-bold text-amber-200/90 bg-black/60 rounded px-2 py-0.5">
-                              {aiClashUrl
-                                ? (isKo ? "이미 만든 영상이라 무료" : "Already made, free")
-                                : (isKo ? `${BATTLE_VIDEO_SECONDS}초 전투 영상 약 $1.56` : `${BATTLE_VIDEO_SECONDS} s battle video, about $1.56`)}
-                            </span>
                           </div>
                         )}
                       </div>
@@ -3024,46 +3053,41 @@ export const BioStitchLabView: React.FC = () => {
       {/* ⚡ 배양기 가동: 전체 화면 배양기 영상 → 이미지가 탱크 안에서 형성 → (reveal) 유리 파열 3D 연출이 위에 겹친다. 영상은 끝까지 마운트되어 검은 프레임이 없다 */}
       {incubating && (
         <div className="fixed inset-0 z-[66] bg-black overflow-hidden text-slate-100" role="status" aria-live="polite">
+          {/* No `loop`: the clip is steered by tankClipAction and paused at the hand-off point */}
           <video
             src="/videos/chimera_growth_dragon_24s.mp4"
             autoPlay
-            loop
             muted
             playsInline
-            className="absolute inset-0 w-full h-full object-cover transition-[filter] duration-700 motion-reduce:transition-none"
-            style={{ filter: incubating.phase === "growing" ? "none" : "brightness(0.5) saturate(1.2)" }}
+            onTimeUpdate={(e) => onTankTimeUpdate(e.currentTarget)}
+            className="absolute inset-0 w-full h-full object-cover"
           />
-          {incubating.ready && (
-            <>
-              <div
-                className="incubate-liquid absolute inset-0 pointer-events-none"
+          {incubating.phase === "reveal" && incubating.ready && (
+            /* The image grows out of the tank centre in 3D and expands until it covers the whole screen; it ends
+               covering the screen, so the tank clip never shows again before the Design Room reopens. */
+            <div className="absolute inset-0 overflow-hidden incubate-expand-stage pointer-events-none" aria-hidden="true">
+              {/* Black backing appears with the image so the finished adult fills the screen on its own */}
+              <div className="absolute inset-0 bg-black incubate-expand-backing" />
+              <div className="absolute inset-0 incubate-expand-flash" />
+              <img
+                src={incubating.ready.jumpscareImg || incubating.ready.avatarImg}
+                alt=""
+                className="incubate-expand absolute inset-0 w-full h-full object-cover"
                 style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
               />
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity motion-reduce:transition-none" style={{ opacity: incubating.phase === "reveal" ? 0 : 1, transitionDuration: `${INCUBATE_REDUCED_FADE_MS}ms` }}>
-                <img
-                  src={incubating.ready.jumpscareImg || incubating.ready.avatarImg}
-                  alt=""
-                  className="incubate-image max-w-[78vw] max-h-[78vh] object-contain"
-                  style={{
-                    ["--reveal-glow" as string]: incubating.ready.colorHex,
-                  } as React.CSSProperties}
-                />
-              </div>
-            </>
-          )}
-          {!incubating.ready && (
-            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-4 bg-gradient-to-t from-black/80 to-transparent">
-              <p className="text-xs sm:text-sm font-black text-emerald-300">
-                {isKo ? `🧬 ${incubating.monster.nameKo} 배양 중... 이미지가 만들어지는 동안 기다려 주세요.` : `🧬 Culturing ${incubating.monster.nameEn}... the image is being made.`}
-              </p>
-              <button
-                type="button"
-                onClick={backToDesignRoom}
-                className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
-              >
-                🧬 {isKo ? "괴수 설계실로 돌아가기" : "Back to the Design Room"}
-              </button>
             </div>
+          )}
+          {/* 배양기 장면에는 자막을 띄우지 않는다: 설계실로 돌아가는 작은 아이콘 버튼만 둔다 */}
+          {incubating.phase === "growing" && (
+            <button
+              type="button"
+              onClick={backToDesignRoom}
+              aria-label={isKo ? "괴수 설계실로 돌아가기" : "Back to the Design Room"}
+              title={isKo ? "괴수 설계실로 돌아가기" : "Back to the Design Room"}
+              className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-black/50 border border-slate-600 text-slate-200 hover:bg-black/80"
+            >
+              ✕
+            </button>
           )}
         </div>
       )}
@@ -3094,32 +3118,30 @@ export const BioStitchLabView: React.FC = () => {
             className="summon-breath max-w-[88vw] max-h-[68vh] object-contain rounded-2xl"
             style={{ ["--reveal-glow" as string]: summon.monster.colorHex } as React.CSSProperties}
           />
+          {/* 출격 대기 화면에는 자막을 띄우지 않는다: 진행 막대(글자 없음)와 아이콘 버튼만. 오류는 알려야 하므로 표시 */}
           {summon.error ? (
             <p role="alert" className="text-sm font-bold text-rose-300 text-center">⚠️ {summon.error}</p>
           ) : (
-            <div className="w-full max-w-md flex flex-col items-center gap-1.5" role="status" aria-live="polite">
-              <p className="text-xs font-black text-amber-300">
-                {isKo ? `⚔️ ${summon.monster.nameKo} 결투장 출격 준비 중...` : `⚔️ ${summon.monster.nameEn} is getting ready for the arena...`}
-              </p>
-              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 transition-all duration-500" style={{ width: `${Math.max(3, summon.progress)}%` }} />
-              </div>
+            <div
+              className="w-full max-w-md h-1.5 bg-slate-800/80 rounded-full overflow-hidden"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(summon.progress)}
+              aria-label={isKo ? "결투장 출격 준비" : "Getting ready for the arena"}
+            >
+              <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 transition-all duration-500" style={{ width: `${Math.max(3, summon.progress)}%` }} />
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={backToDesignRoom}
-              className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
-            >
-              🧬 {isKo ? "괴수 설계실로 돌아가기" : "Back to the Design Room"}
-            </button>
-            {!summon.error && (
-              <span className="text-[10px] text-slate-500">
-                {isKo ? "돌아가도 동영상은 계속 만들어지고, 완성되면 결투장에 등장합니다." : "The video keeps rendering; the monster enters the arena when it is ready."}
-              </span>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={backToDesignRoom}
+            aria-label={isKo ? "괴수 설계실로 돌아가기 (영상은 계속 만들어집니다)" : "Back to the Design Room (the video keeps rendering)"}
+            title={isKo ? "괴수 설계실로 돌아가기 (영상은 계속 만들어집니다)" : "Back to the Design Room (the video keeps rendering)"}
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/50 border border-slate-600 text-slate-200 hover:bg-black/80"
+          >
+            ✕
+          </button>
         </div>
       )}
 

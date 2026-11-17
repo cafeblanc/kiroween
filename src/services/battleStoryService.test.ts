@@ -138,7 +138,8 @@ describe('composeBattleStory (examples)', () => {
     fc.assert(
       fc.property(fighterArb, fighterArb, fc.integer(), (a, b, seed) => {
         const { s } = story(a, b, seed);
-        expect(s.textKo).not.toMatch(/\((을|를|이|가|은|는|과|와|으로|로)\)/);
+        // A particle placeholder sits right after a word ("꼬리을(를)"); a design tag like " (가)" is content.
+        expect(s.textKo).not.toMatch(/[가-힣A-Za-z0-9]\((을|를|이|가|은|는|과|와|으로|로)\)/);
         expect(s.textKo).not.toContain('…');
       }),
     );
