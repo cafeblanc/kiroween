@@ -8,14 +8,16 @@ param(
 $ErrorActionPreference = 'Stop'
 $dir = Join-Path $PSScriptRoot '..\public\images\incubation'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
-$style = 'photorealistic scientific microscope photograph, inside a glass bioreactor filled with glowing nutrient fluid, dark background, soft cyan and teal bioluminescent light, macro lens, shallow depth of field, ultra detailed, cinematic, no text, no letters, no watermark'
+# Game-style (not scientific) incubation: one consistent teal palette, simple shapes, and the creature is never
+# recognisable, so any designed monster can burst out of the last frame.
+$style = 'fantasy sci-fi game art, centered in a cylindrical glass bioreactor tank filled with glowing teal-green fluid, rising tiny bubbles, dark laboratory background, consistent teal and cyan bioluminescent color palette, cinematic lighting, highly detailed, no text, no letters, no watermark'
 $stages = @(
-  @('stage1_stem_cell',    'a single round pluripotent stem cell floating in fluid, translucent membrane, visible nucleus and organelles'),
-  @('stage2_division',     'one stem cell dividing into two daughter cells during mitosis, translucent membranes, chromosomes visible'),
-  @('stage3_morula',       'a morula embryo under a microscope: a compact raspberry-shaped ball of about sixteen distinct round translucent cells pressed tightly together, each cell with a visible nucleus, enclosed by a thin clear zona pellucida ring'),
-  @('stage4_blastocyst',   'a blastocyst, a hollow translucent sphere of cells with an inner cell mass on one side'),
-  @('stage5_early_embryo', 'an early vertebrate embryo under a microscope: a small curled C-shaped body with a large rounded head bulge, rows of small somite segments along the back and tiny limb buds, translucent pale pink tissue, inside a clear fluid-filled amniotic sac, generic embryo of no recognizable species'),
-  @('stage6_late_embryo',  'a later stage embryo curled up inside a glowing translucent amniotic sac: visible curved spine, small paddle-shaped limbs, smooth translucent skin with fine red blood vessels, attached umbilical cord, generic creature of no recognizable species, no face details')
+  @('stage1_stem_cell',    'a single small glowing orb of living cell floating in the middle of the tank'),
+  @('stage2_division',     'the glowing living orb splitting into two glowing orbs side by side, connected by a thin bright bridge'),
+  @('stage3_morula',       'a round clump of many small glowing orbs stuck together into one bright ball'),
+  @('stage4_blastocyst',   'a larger glowing translucent egg with a bright pulsing core inside'),
+  @('stage5_early_embryo', 'a glowing translucent egg with a dark blurry curled shadow forming inside it, the shape completely unclear'),
+  @('stage6_late_embryo',  'a big glowing translucent egg with a dark curled silhouette and pulsing glowing veins inside, the creature shape still blurry and unrecognizable, about to hatch')
 )
 $name = $stages[$Index - 1][0]
 $prompt = [uri]::EscapeDataString("$($stages[$Index - 1][1]), $style")

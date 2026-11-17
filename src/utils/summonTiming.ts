@@ -72,11 +72,46 @@ export const EMBRYO_FRAMES: readonly string[] = [
   "/images/incubation/stage5_early_embryo.jpg",
   "/images/incubation/stage6_late_embryo.jpg",
 ];
-/** Time per embryo frame; 6 x 2.5 s = 15 s, the same length as the bioreactor's 6 growth stages. */
-export const EMBRYO_STAGE_MS = 2500;
-export const EMBRYO_TOTAL_MS = EMBRYO_FRAMES.length * EMBRYO_STAGE_MS;
-/** Cross-fade between two embryo frames. */
-export const EMBRYO_CROSSFADE_MS = 900;
+/**
+ * Time per embryo frame. The middle division stages (2 cells, morula, blastocyst) get the most time so the splitting
+ * can be watched; total 23.5 s.
+ */
+export const EMBRYO_STAGE_DURATIONS_MS: readonly number[] = [3000, 4500, 4500, 4500, 3500, 3500];
+export const EMBRYO_TOTAL_MS = EMBRYO_STAGE_DURATIONS_MS.reduce((a, b) => a + b, 0);
+/** Start time of each stage (cumulative). */
+export const EMBRYO_STAGE_STARTS_MS: readonly number[] = EMBRYO_STAGE_DURATIONS_MS.map((_, i) =>
+  EMBRYO_STAGE_DURATIONS_MS.slice(0, i).reduce((a, b) => a + b, 0),
+);
+/**
+ * After the last embryo frame, the user's finished monster slowly emerges inside the egg (blurred and dark -> sharp and
+ * lit) before the 3D burst, so the complete form appears gradually instead of popping out of an empty egg.
+ */
+export const MONSTER_EMERGE_MS = 4000;
+/** Cross-fade between two embryo frames (slow, so one stage melts into the next). */
+export const EMBRYO_CROSSFADE_MS = 1400;
+
+/**
+ * LTX-2.5 transition clips between consecutive embryo frames (frame k -> k+1, made with first + last frame, 6 s each).
+ * Played back to back; each clip ends on the frame the next one starts with, so the development is continuous.
+ * The photo sequence above stays as the fallback when a clip cannot be played.
+ */
+export const EMBRYO_CLIPS: readonly string[] = [
+  "/videos/incubation/embryo_1_2.mp4",
+  "/videos/incubation/embryo_2_3.mp4",
+  "/videos/incubation/embryo_3_4.mp4",
+  "/videos/incubation/embryo_4_5.mp4",
+  "/videos/incubation/embryo_5_6.mp4",
+];
+/** Playback speed: 5 clips x 6 s / 1.25 = 24 s, close to the 23.5 s photo sequence. */
+export const EMBRYO_CLIP_RATE = 1.25;
+
+/** After clip `index` ends: play the next one, or the development is complete. */
+export function nextEmbryoClip(index: number): { index: number; done: boolean } {
+  const last = EMBRYO_CLIPS.length - 1;
+  if (!Number.isFinite(index) || index < 0) return { index: 0, done: false };
+  if (index >= last) return { index: last, done: true };
+  return { index: Math.floor(index) + 1, done: false };
+}
 
 export type EmbryoAction = "play" | "hold" | "handoff";
 
@@ -91,7 +126,8 @@ export type EmbryoAction = "play" | "hold" | "handoff";
 export function embryoSequence(elapsedMs: number, imageReady: boolean): { stage: number; action: EmbryoAction } {
   const last = EMBRYO_FRAMES.length - 1;
   const t = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
-  const stage = Math.min(last, Math.floor(t / EMBRYO_STAGE_MS));
+  let stage = 0;
+  for (let i = 0; i <= last; i++) if (t >= EMBRYO_STAGE_STARTS_MS[i]) stage = i;
   if (t < EMBRYO_TOTAL_MS) return { stage, action: "play" };
   return { stage: last, action: imageReady ? "handoff" : "hold" };
 }

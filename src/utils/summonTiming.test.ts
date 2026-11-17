@@ -2,14 +2,20 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import {
   ARENA_FACE_OFF_DEG,
+  EMBRYO_CLIPS,
+  EMBRYO_CLIP_RATE,
+  EMBRYO_CROSSFADE_MS,
   EMBRYO_FRAMES,
-  EMBRYO_STAGE_MS,
+  EMBRYO_STAGE_DURATIONS_MS,
+  EMBRYO_STAGE_STARTS_MS,
   EMBRYO_TOTAL_MS,
   ENTRANCE_PLAY_SECONDS,
+  MONSTER_EMERGE_MS,
   SUMMON_ROAR_MAX_VOLUME,
   SUMMON_ROAR_MIN_VOLUME,
   embryoSequence,
   faceOffAngleDeg,
+  nextEmbryoClip,
   shouldFreezeEntrance,
   summonRoarVolume,
 } from "./summonTiming";
@@ -17,16 +23,28 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 describe("embryoSequence (photorealistic embryo development, then the finished adult)", () => {
-  it("has six frames that exist in public/ and lasts as long as the 6 growth stages (15 s)", () => {
+  it("has six frames that exist in public/ and develops slowly (23.5 s)", () => {
     expect(EMBRYO_FRAMES).toHaveLength(6);
     for (const f of EMBRYO_FRAMES) expect(existsSync(resolve(__dirname, "../../public" + f)), f).toBe(true);
-    expect(EMBRYO_TOTAL_MS).toBe(6 * EMBRYO_STAGE_MS);
-    expect(EMBRYO_TOTAL_MS).toBe(15000);
+    expect(EMBRYO_STAGE_DURATIONS_MS).toHaveLength(EMBRYO_FRAMES.length);
+    expect(EMBRYO_TOTAL_MS).toBe(23500);
   });
-  it("steps through the stages in order", () => {
+  it("gives the middle division stages (2 cells, morula, blastocyst) the most time", () => {
+    const [stem, two, morula, blasto, early, late] = EMBRYO_STAGE_DURATIONS_MS;
+    for (const mid of [two, morula, blasto]) {
+      expect(mid).toBeGreaterThan(stem);
+      expect(mid).toBeGreaterThan(early);
+      expect(mid).toBeGreaterThan(late);
+      // Each stage stays clearly visible well beyond the cross-fade into the next one.
+      expect(mid - EMBRYO_CROSSFADE_MS).toBeGreaterThanOrEqual(3000);
+    }
+  });
+  it("steps through the stages in order at their own start times", () => {
     expect(embryoSequence(0, false)).toEqual({ stage: 0, action: "play" });
-    expect(embryoSequence(EMBRYO_STAGE_MS - 1, false).stage).toBe(0);
-    expect(embryoSequence(EMBRYO_STAGE_MS, false).stage).toBe(1);
+    EMBRYO_STAGE_STARTS_MS.forEach((start, i) => {
+      if (i > 0) expect(embryoSequence(start - 1, false).stage).toBe(i - 1);
+      expect(embryoSequence(start, false).stage).toBe(i);
+    });
     expect(embryoSequence(EMBRYO_TOTAL_MS - 1, false)).toEqual({ stage: 5, action: "play" });
   });
   it("an early image still waits for the whole embryo development", () => {
@@ -52,12 +70,35 @@ describe("embryoSequence (photorealistic embryo development, then the finished a
   });
 });
 
+describe("embryo transition clips (LTX frame k -> k+1)", () => {
+  it("has one clip per pair of consecutive frames, all present in public/", () => {
+    expect(EMBRYO_CLIPS).toHaveLength(EMBRYO_FRAMES.length - 1);
+    for (const c of EMBRYO_CLIPS) expect(existsSync(resolve(__dirname, "../../public" + c)), c).toBe(true);
+  });
+  it("plays the clips in order and reports when the development is complete", () => {
+    expect(nextEmbryoClip(0)).toEqual({ index: 1, done: false });
+    expect(nextEmbryoClip(3)).toEqual({ index: 4, done: false });
+    expect(nextEmbryoClip(4)).toEqual({ index: 4, done: true });
+    expect(nextEmbryoClip(99)).toEqual({ index: 4, done: true });
+    expect(nextEmbryoClip(-1)).toEqual({ index: 0, done: false });
+    expect(nextEmbryoClip(Number.NaN)).toEqual({ index: 0, done: false });
+  });
+  it("keeps the whole development at a watchable length (about 24 s)", () => {
+    const totalSec = (EMBRYO_CLIPS.length * 6) / EMBRYO_CLIP_RATE;
+    expect(totalSec).toBeGreaterThanOrEqual(20);
+    expect(totalSec).toBeLessThanOrEqual(30);
+  });
+});
+
 describe("bioreactor overlay wiring", () => {
   const lab = readFileSync(resolve(__dirname, "../components/BioStitchLabView.tsx"), "utf8");
   const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
-  it("uses the embryo frames, not the stock tank clip that showed its own creature", () => {
+  it("plays the LTX embryo clips with the photos as fallback, never the stock tank clip", () => {
     const overlay = lab.slice(lab.indexOf("{incubating && ("), lab.indexOf("{revealMonster && ("));
-    expect(overlay).toMatch(/EMBRYO_FRAMES\.map/);
+    expect(overlay).toMatch(/src=\{EMBRYO_CLIPS\[embryoClip\]\}/);
+    expect(overlay).toMatch(/poster=\{EMBRYO_FRAMES\[embryoClip\]\}/); // no black gap between clips
+    expect(overlay).toMatch(/onError=\{\(\) => setEmbryoUseStills\(true\)\}/);
+    expect(overlay).toMatch(/embryoUseStills && EMBRYO_FRAMES\.map/);
     expect(overlay).not.toMatch(/chimera_growth_dragon_24s\.mp4/);
   });
   it("keeps the frames enlarged from the top-left so the generator watermark never shows", () => {
@@ -66,14 +107,22 @@ describe("bioreactor overlay wiring", () => {
     const scale = Number(/scale\(([\d.]+)\)/.exec(rule)?.[1]);
     expect(scale).toBeGreaterThanOrEqual(1.14);
   });
+  it("the finished form emerges slowly inside the egg before the burst", () => {
+    expect(MONSTER_EMERGE_MS).toBeGreaterThanOrEqual(3000);
+    expect(lab).toMatch(/phase: "materialising"/);
+    expect(lab).toMatch(/className="incubate-emerge /);
+    const kf = /@keyframes incubateEmerge\s*\{([\s\S]*?)\r?\n\}/.exec(css)?.[1] ?? "";
+    expect(kf).toMatch(/0%\s*\{[^}]*opacity:\s*0[^}]*blur\(28px\)/);
+    expect(kf).toMatch(/100%\s*\{[^}]*opacity:\s*1[^}]*blur\(0\)/);
+  });
   it("the expansion ends with the finished adult filling the screen (scale 1, no fade-out)", () => {
     const kf = /@keyframes incubateExpand\s*\{([\s\S]*?)\r?\n\}/.exec(css)?.[1] ?? "";
     expect(kf).toMatch(/100%\s*\{[^}]*scale\(1\)[^}]*opacity:\s*1/);
     expect(lab).toMatch(/incubate-expand absolute inset-0 w-full h-full object-cover/);
   });
-  it("the bubbling sound runs only while the embryo grows and is stopped on cleanup", () => {
+  it("the bubbling sound runs while the embryo grows and the form emerges, stops at the burst and on cleanup", () => {
     expect(lab).toMatch(/const stop = startBubbleSound\(\);\s*return stop;/);
-    expect(lab).toMatch(/const isIncubationGrowing = incubatePhase === "growing";/);
+    expect(lab).toMatch(/const isIncubationGrowing = incubatePhase === "growing" \|\| incubatePhase === "materialising";/);
   });
 });
 describe("summonRoarVolume (arena waiting screen: a quiet roar that grows louder)", () => {

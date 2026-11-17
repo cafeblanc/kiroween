@@ -36,10 +36,15 @@ import {
   type IncubationPhase,
   MONSTER_REVEAL_MS,
   SUMMON_ROAR_INTERVAL_MS,
+  EMBRYO_CLIPS,
+  EMBRYO_CLIP_RATE,
   EMBRYO_CROSSFADE_MS,
   EMBRYO_FRAMES,
+  EMBRYO_STAGE_DURATIONS_MS,
   type EmbryoAction,
+  MONSTER_EMERGE_MS,
   embryoSequence,
+  nextEmbryoClip,
   faceOffAngleDeg,
   summonRoarVolume,
 } from "../utils/summonTiming";
@@ -745,8 +750,24 @@ export const BioStitchLabView: React.FC = () => {
   // 이미지가 빨리 끝나도 마지막 단계까지 보여 주고, 늦으면 마지막 배아가 맥동하며 기다린다 (embryoSequence).
   const [embryo, setEmbryo] = useState<{ stage: number; action: EmbryoAction }>({ stage: 0, action: "play" });
   const incubationKey = incubating?.monster.id ?? null;
+  // LTX 전환 영상 5편(1→2 … 5→6)을 이어서 재생. 영상을 못 쓰면 사진 시퀀스(embryoSequence)로 대체한다
+  const [embryoClip, setEmbryoClip] = useState<number>(0);
+  const [embryoClipsDone, setEmbryoClipsDone] = useState<boolean>(false);
+  const [embryoUseStills, setEmbryoUseStills] = useState<boolean>(false);
   useEffect(() => {
     if (incubatePhase !== "growing") return;
+    setEmbryoClip(0);
+    setEmbryoClipsDone(false);
+    setEmbryoUseStills(false);
+  }, [incubationKey]);
+  // Clip mode: hand off once the last clip ended and the image is ready; until then the last egg frame pulses.
+  const incubateReady = incubating?.ready !== null && incubating?.ready !== undefined;
+  useEffect(() => {
+    if (embryoUseStills || incubatePhase !== "growing" || !embryoClipsDone || !incubateReady) return;
+    setIncubating((cur) => (cur && cur.phase === "growing" ? { ...cur, phase: "materialising" } : cur));
+  }, [embryoUseStills, incubatePhase, embryoClipsDone, incubateReady]);
+  useEffect(() => {
+    if (!embryoUseStills || incubatePhase !== "growing") return;
     const started = Date.now();
     setEmbryo({ stage: 0, action: "play" });
     const t = window.setInterval(() => {
@@ -756,10 +777,20 @@ export const BioStitchLabView: React.FC = () => {
       setEmbryo((cur) => (cur.stage === next.stage && cur.action === next.action ? cur : next));
       if (next.action === "handoff") {
         window.clearInterval(t);
-        setIncubating((cur) => (cur && cur.phase === "growing" ? { ...cur, phase: "reveal" } : cur));
+        // The finished form first emerges slowly inside the egg, then bursts out (reveal)
+        setIncubating((cur) => (cur && cur.phase === "growing" ? { ...cur, phase: "materialising" } : cur));
       }
     }, 100);
     return () => window.clearInterval(t);
+  }, [incubatePhase, incubationKey, embryoUseStills]);
+
+  // 완성된 모습이 알 속에서 천천히 드러난 뒤(MONSTER_EMERGE_MS) 3D 급팽창으로 넘어간다
+  useEffect(() => {
+    if (incubatePhase !== "materialising") return;
+    const t = window.setTimeout(() => {
+      setIncubating((cur) => (cur && cur.phase === "materialising" ? { ...cur, phase: "reveal" } : cur));
+    }, MONSTER_EMERGE_MS);
+    return () => window.clearTimeout(t);
   }, [incubatePhase, incubationKey]);
   useEffect(() => {
     if (incubatePhase !== "reveal") return;
@@ -772,8 +803,8 @@ export const BioStitchLabView: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [incubatePhase]);
 
-  // 배양 중에는 뽀글거리는 소리 (WebAudio 합성). 팽창 연출이 시작되면 멈춘다
-  const isIncubationGrowing = incubatePhase === "growing";
+  // 배양 중에는 뽀글거리는 소리 (WebAudio 합성). 완성된 모습이 드러나는 동안에도 계속되고, 팽창 연출이 시작되면 멈춘다
+  const isIncubationGrowing = incubatePhase === "growing" || incubatePhase === "materialising";
   useEffect(() => {
     if (!isIncubationGrowing) return;
     const stop = startBubbleSound();
@@ -3060,9 +3091,43 @@ export const BioStitchLabView: React.FC = () => {
       {/* ⚡ 배양기 가동: 전체 화면 배양기 영상 → 이미지가 탱크 안에서 형성 → (reveal) 유리 파열 3D 연출이 위에 겹친다. 영상은 끝까지 마운트되어 검은 프레임이 없다 */}
       {incubating && (
         <div className="fixed inset-0 z-[66] bg-black overflow-hidden text-slate-100" role="status" aria-live="polite">
-          {/* Photorealistic embryo development: the six frames cross-fade with a slow zoom; the image is anchored at its
-              top-left and enlarged so the generator's bottom-right watermark stays off screen. Tinted with the monster colour. */}
-          {EMBRYO_FRAMES.map((src, i) => (
+          {/* Embryo development as LTX clips (frame k -> k+1) played back to back. The poster is the clip's start frame and
+              the next clip is preloaded, so there is no black gap. After the last clip the final egg frame pulses
+              until the monster image is ready. Enlarged from the top-left like the photos (watermark off screen). */}
+          {!embryoUseStills && (
+            <>
+              {embryoClipsDone ? (
+                <img
+                  src={EMBRYO_FRAMES[EMBRYO_FRAMES.length - 1]}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover embryo-frame embryo-frame-hold"
+                />
+              ) : (
+                <video
+                  key={EMBRYO_CLIPS[embryoClip]}
+                  src={EMBRYO_CLIPS[embryoClip]}
+                  poster={EMBRYO_FRAMES[embryoClip]}
+                  autoPlay
+                  muted
+                  playsInline
+                  onLoadedMetadata={(e) => { e.currentTarget.playbackRate = EMBRYO_CLIP_RATE; }}
+                  onEnded={() => {
+                    const n = nextEmbryoClip(embryoClip);
+                    if (n.done) setEmbryoClipsDone(true);
+                    else setEmbryoClip(n.index);
+                  }}
+                  onError={() => setEmbryoUseStills(true)}
+                  className="absolute inset-0 w-full h-full object-cover embryo-frame"
+                />
+              )}
+              {!embryoClipsDone && embryoClip + 1 < EMBRYO_CLIPS.length && (
+                <video src={EMBRYO_CLIPS[embryoClip + 1]} preload="auto" muted playsInline className="hidden" aria-hidden="true" />
+              )}
+            </>
+          )}
+          {/* Fallback: the six photos cross-fade with a slow zoom. Tinted with the monster colour like the clips. */}
+          {embryoUseStills && EMBRYO_FRAMES.map((src, i) => (
             <img
               key={src}
               src={src}
@@ -3071,7 +3136,12 @@ export const BioStitchLabView: React.FC = () => {
               className={`absolute inset-0 w-full h-full object-cover embryo-frame ${i === embryo.stage ? "embryo-frame-active" : ""} ${
                 i === embryo.stage && embryo.action === "hold" ? "embryo-frame-hold" : ""
               }`}
-              style={{ opacity: i === embryo.stage ? 1 : 0, transitionDuration: `${EMBRYO_CROSSFADE_MS}ms` }}
+              style={{
+                opacity: i === embryo.stage ? 1 : 0,
+                transitionDuration: `${EMBRYO_CROSSFADE_MS}ms`,
+                // The slow zoom lasts as long as this stage (the division stages are the longest)
+                ["--stage-ms" as string]: `${EMBRYO_STAGE_DURATIONS_MS[i]}ms`,
+              } as React.CSSProperties}
             />
           ))}
           <div
@@ -3079,6 +3149,17 @@ export const BioStitchLabView: React.FC = () => {
             style={{ backgroundColor: incubating.monster.colorHex }}
             aria-hidden="true"
           />
+          {/* The finished form emerges slowly where the egg's shadow was: blurred and dark, then sharp and lit */}
+          {(incubating.phase === "materialising" || incubating.phase === "reveal") && incubating.ready && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+              <img
+                src={incubating.ready.jumpscareImg || incubating.ready.avatarImg}
+                alt=""
+                className="incubate-emerge max-w-[62vw] max-h-[62vh] object-contain"
+                style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
+              />
+            </div>
+          )}
           {incubating.phase === "reveal" && incubating.ready && (
             /* The image grows out of the tank centre in 3D and expands until it covers the whole screen; it ends
                covering the screen, so the tank clip never shows again before the Design Room reopens. */
