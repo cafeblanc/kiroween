@@ -1,48 +1,51 @@
-# 🎯 [Kiro 정밀 작업 지시서] 이미지와 실감나는 3D 전투 동영상 중심의 전면 개편
+# 🎮 [Kiro 정밀 작업 지시서] 게임앱 수준의 3~5초 실감나는 3D 전투 동영상 제작 및 전면 개편
 
-> **최우선 절대 원칙**:  
-> **"가장 중요한 것은 고품질 이미지와 실감나는 3D 전투 동영상이다!"**  
-> 1. **샘플 6개**: 배양기에서 6단계 줄기세포 성장 과정이 어떻게 표시되는지 보여주는 레퍼런스 표본.
-> 2. **모의 전투신 3개 샘플**: (드래곤 vs 크라켄, 케르베로스 vs 히드라, 제노모프 vs 프랑켄슈타인) 오직 해당 3개 매칭에만 시연용으로 적용.
-> 3. **그 외의 모든 전투신**: **"사용자가 설계한 괴수들로 실감나는 3D 전투 장면을 직접 연출"**한다.
-> 4. **영속 저장소 (Monster Vault DB)**: 생성된 고해상도 이미지와 3D 전투 동영상이 새로고침해도 날아가지 않도록 **브라우저 IndexedDB에 영구 보존**한다.
-
----
-
-## 🚨 핵심 개발 과제 (Core Objectives)
-
-### 1. 실감나는 3D 전투 동영상 & 실시간 듀얼 격돌 엔진 (Cinematic 3D Clash Engine)
-- **파일**: `src/components/BioStitchLabView.tsx`, `src/components/bioreactor/arena/BattleMatrix.ts`
-- **엉터리 고정 영상 차단**:
-  - `selectPrebuiltBattleVideo`: 커스텀 괴수가 포함되어 있거나 3대 샘플 매칭이 아닌 경우 **무조건 `null` 반환** (옛날 드래곤 vs 크라켄 영상 강제 덮어쓰기 완전 박멸).
-- **실감나는 3D 전투 무대 (Dual Dynamic 3D Arena)**:
-  - 좌/우 링 위에 두 괴수의 **실제 3D/AI 영상(`videoSrc`)** 또는 **생체 오라가 맥동하는 입체적 캔버스**가 대치.
-  - 전투 라운드 타이머(`f1_strike`, `f2_strike`, `clash`, `ko`)에 맞춰 **실제 타격 액션** 연출:
-    - **입체적 돌진 타격**: 공격 괴수가 카메라 앞으로 튀어나오듯 확대(Zoom-in 1.25x)되며 상대 진영으로 맹렬히 돌진(+60px lunge), 베기/할퀴기 3D 광선 이펙트 및 충격파 방출.
-    - **피격 리액션**: 맞은 괴수가 뒤로 크게 밀려나며 화면 전체에 붉은 섬광과 카메라 쉐이크(Screen Shake).
-    - **속성 필살기 폭발**: 능력치(ATK, DEF, SPD, REGEN, ENERGY)에 맞춘 고유 3D 스킬(`🌋 초고온 마그마 일격`, `⚡ 고전압 스파크 반격`, `☣️ 맹독 산성 분사` 등) 폭발.
-    - **최후의 KO & 승리 포효**: 승리 괴수가 3D 클로즈업되며 승리의 포효를 내지르고 승리 엠블럼 표출.
-- **두 괴수의 'AI 3D 실사 격돌 동영상(LTX/Luma)' 원클릭 생성**:
-  - 결투장 툴바에 **`⚔️ 두 괴수의 AI 3D 실사 격돌 영상 생성`** 버튼 배치.
-  - 두 괴수의 부위별 프롬프트와 스탯을 합성하여 LTX-Video / Luma로 요청 -> 실제 두 괴수가 서로 맞붙어 싸우는 고유 시네마틱 MP4를 생성하여 결투장에 즉시 상영.
+> **절대 핵심 과제**:  
+> **"짧지만 강렬하고 실감나는 '게임앱(AAA 모바일 게임/언리얼 엔진 5 시네마틱 컷씬) 수준'의 3D 전투 동영상을 구현하라!"**  
+> 
+> 1. **역할 분담**:
+>    - **샘플 6개**: 배양기에서 6단계 줄기세포 성장 과정이 어떻게 표시되는지 보여주는 레퍼런스 표본.
+>    - **모의 전투신 3개 샘플**: (드래곤 vs 크라켄, 케르베로스 vs 히드라, 제노모프 vs 프랑켄슈타인) 오직 해당 3개 매칭에만 시연용으로 적용.
+>    - **그 외의 모든 전투신**: **"사용자가 설계한 괴수들로 3~5초 게임앱 수준의 실감나는 3D 전투 장면을 연출"**한다.
+> 2. **Monster Vault (IndexedDB 영속 저장소)**: 생성된 고해상도 이미지와 3D 전투 비디오(Blob)를 브라우저 DB에 영구 보존하여 새로고침 후에도 언제든 즉시 재생/대전 가능하도록 구축한다.
 
 ---
 
-### 2. 고화질 이미지 & 동영상 영구 보존 DB (Monster Vault IndexedDB)
+## 🚨 핵심 개발 규격 (Game-App Level 3D Combat Specifications)
+
+### 1. 게임앱 수준의 3~5초 3D 전투 컷씬 & 듀얼 격돌 엔진
+- **파일**: `src/components/BioStitchLabView.tsx`, `src/services/videoGenService.ts`, `src/utils/arenaBattle.ts`
+- **시네마틱 게임 컷씬 프롬프트 엔진**:
+  - 두 설계 괴수의 대전 비디오 생성 시, AAA 모바일 게임 트레일러 수준의 3D 연출 프롬프트를 자동 합성:
+    ```text
+    "AAA mobile game cinematic battle cutscene, 3D bio-engineered creature clash, dynamic action camera angle, motion blur, glowing bioluminescent energy particles, intense shockwave impact, dramatic rim lighting, photorealistic creature rendering, 4k game trailer quality, no text"
+    ```
+  - LTX-Video / Luma API 프록시를 통해 **짧고 강렬한 3~5초 실사 3D 전투 영상(`aiBattleVideoUrl`)**을 렌더링하여 결투장 중앙에 풀화면으로 박진감 넘치게 상영.
+- **실시간 듀얼 3D 아레나 무대 (Dual Dynamic 3D Arena)**:
+  - 사전 제작 3종 매칭이 아닌 경우, 옛날 드래곤 vs 크라켄 영상을 덮어쓰지 말고 **무조건 두 괴수가 직접 싸우는 듀얼 아레나 링**을 가동 (`activeClashVideoUrl === null`).
+  - **게임앱 수준의 역동적 전투 모션 연출**:
+    - **도약 & 카메라 줌**: 공격 괴수가 화면 앞(카메라 쪽)으로 1.3배 확대되며 상대 진영으로 맹렬히 돌진(`scale-125`, `translate-x-16`).
+    - **타격 임팩트 & 파티클**: 타격 순간 게임 특유의 크리티컬 슬래시 섬광 및 화면 흔들림(Camera Shake).
+    - **능력치 필살기 팝업**: 괴수의 속성(화염, 번개, 맹독, 산성)과 5대 스탯에 따른 3D 스킬(`🌋 초고온 마그마 일격`, `⚡ 고전압 스파크 반격` 등)이 화려하게 폭발.
+    - **KO 넉다운 연출**: 승리 괴수가 3D 클로즈업 포효를 내지르고, 패배 괴수는 넉다운되며 슬로우 모션 승리 엠블럼 표출.
+
+---
+
+### 2. 고화질 이미지 & 3D 동영상 영구 보존 DB (Monster Vault IndexedDB)
 - **신규 파일**: `src/services/monsterVaultService.ts`
-- **배경**: `localStorage`는 5MB 용량 한계로 비디오/이미지 저장이 불가능함. 브라우저 대용량 저장소인 `IndexedDB`를 구축하여 수백 MB의 비디오/이미지 바이너리 Blob을 영구 보존.
+- **배경**: `localStorage`는 5MB 한계로 비디오 저장이 불가능함. 브라우저 대용량 저장소인 `IndexedDB`를 구축하여 수백 MB의 3D 비디오/이미지 바이너리 Blob을 영구 보존.
 - **기능 요구사항**:
   1. `IndexedDB` (DB명: `KiroweenMonsterVault`, Store명: `custom_monsters`) 구현.
   2. `saveMonster(monster)`:
-     - 이름, 부위 프롬프트, 5대 스탯, 테마 색상 저장.
-     - 고해상도 이미지 DataURL 및 생성된 비디오를 바이너리 `Blob`으로 추출하여 영구 저장.
+     - 괴수 메타데이터(이름, 부위 프롬프트, 5대 스탯, 테마 색상) 저장.
+     - 고해상도 이미지 및 3~5초 3D 비디오를 바이너리 `Blob`으로 추출하여 영구 저장.
   3. `getAllMonsters()`:
-     - 앱 시작 시 또는 결투장 열람 시 저장된 모든 커스텀 괴수를 불러옴.
-     - 저장된 비디오 Blob을 `URL.createObjectURL(blob)`로 즉시 재생 가능한 URL로 복구하여 반환.
+     - 앱 시작 시 및 결투장 열람 시 저장된 모든 커스텀 괴수를 불러옴.
+     - 저장된 비디오 Blob을 `URL.createObjectURL(blob)`로 즉시 재생 가능한 URL로 복원하여 반환.
   4. `deleteMonster(id)` 및 `clearVault()` 제공.
 - **연동**:
   - `CustomMonsterStudio.tsx`: 이미지/영상 생성 완료 시 및 배양기/결투장 전송 시 `saveMonster` 호출.
-  - `BioStitchLabView.tsx`: 마운트 시 `getAllMonsters()`로 `customArenaRoster` 자동 복원 (브라우저를 껐다 켜도 내가 만든 괴수들과 영상들이 영구 보존됨).
+  - `BioStitchLabView.tsx`: 마운트 시 `getAllMonsters()`로 `customArenaRoster` 자동 복원 (브라우저를 껐다 켜도 내가 만든 괴수들과 3D 영상들이 영구 보존됨).
 
 ---
 
@@ -56,7 +59,7 @@
 
 ## 🛠️ 작업 및 배포 절차
 1. `src/services/monsterVaultService.ts` 및 단위 테스트 `monsterVaultService.test.ts` 작성.
-2. `BioStitchLabView.tsx` 및 `BattleMatrix.ts`의 3D 격돌 링 UI 및 Vault 연동.
+2. `BioStitchLabView.tsx` 및 `BattleMatrix.ts`의 게임앱 수준 3D 격돌 연출 및 Vault 연동.
 3. `referenceVideoSelector.ts`의 배양기 영상 정리.
 4. 검증 실행:
    - `npx tsc --noEmit` 타입 검사 오류 0건 확인.
