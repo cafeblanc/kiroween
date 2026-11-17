@@ -55,7 +55,7 @@ type LangMode = "KO" | "EN";
 const LOCAL_CONFOCAL_FALLBACK = "/images/chimera_microscopy_quad.jpg";
 
 // Synapse chat overlay: messages stay on the video this long after the last one, then slide up and vanish.
-const SYNAPSE_CHAT_ABSORB_MS = 5000;
+const SYNAPSE_CHAT_ABSORB_MS = 3000;
 const SYNAPSE_CHAT_EXIT_ANIM_MS = 550;
 
 interface LabManualPoint {
@@ -83,8 +83,8 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
   },
   {
     icon: "💬",
-    ko: { title: "4. 논문·백과사전 채팅", body: "맨 아래 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 영상 위에 답변을 보여주고, 약 5초 뒤 위로 사라집니다. 하단 사진 목록에서 7개 실험을 고를 수 있습니다." },
-    en: { title: "4. Paper & encyclopedia chat", body: "Ask in the input line at the very bottom. The lab searches PubMed and Wikipedia live, shows the answer over the video, and it slides away after about 5 seconds. Pick one of the 7 experiments from the photo strip at the bottom." },
+    ko: { title: "4. 논문·백과사전 채팅", body: "맨 아래 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 영상 위에 답변을 보여주고, 약 3초 뒤 위로 사라집니다. 하단 사진 목록에서 7개 실험을 고를 수 있습니다." },
+    en: { title: "4. Paper & encyclopedia chat", body: "Ask in the input line at the very bottom. The lab searches PubMed and Wikipedia live, shows the answer over the video, and it slides away after about 3 seconds. Pick one of the 7 experiments from the photo strip at the bottom." },
   },
   {
     icon: "⚡",
@@ -353,13 +353,13 @@ export const BioStitchLabView: React.FC = () => {
     } catch {}
   }, []);
 
-  // Block 3: 5-Second Auto-Absorbing Synapse Chat (with dismissed cursor fix)
+  // Block 3: 3-Second Auto-Absorbing Synapse Chat (with dismissed cursor fix)
   const [messages, setMessages] = useState<SynapseChatMessage[]>([
     {
       id: "init-1",
       sender: "ai",
-      textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 실제 실험을 내레이터와 함께 살펴보거나, [🧬 전설의 괴수 배양 & 전투] 버튼을 눌러 새로운 생명체를 배양·대결해 보세요!",
-      textEn: "🧬 PROMETHEUS-iPSC Lab Online. Explore the 6 real-world stem-cell experiments with the narrator, or open [🧬 Mythic Chimera Assembler] to stitch and resurrect a custom creature!",
+      textKo: "🧬 프로메테우스 만능줄기세포(iPSC) 실험실에 접속되었습니다. 하단의 실제 실험을 내레이터와 함께 살펴보거나, [괴수 설계 & 전투] 버튼을 눌러 나만의 괴수를 설계하고 대결해 보세요!",
+      textEn: "🧬 PROMETHEUS-iPSC Lab Online. Explore the 7 real-world stem-cell experiments in the photo strip with the narrator, or press [Monster Design & Battle] to design your own monster and fight!",
       subTextKo: "질문을 입력하면 실시간으로 PubMed 논문과 백과사전을 검색해 답변합니다.",
       subTextEn: "Type any question to query live PubMed papers and Wikipedia archives.",
       pmidBadge: "PMID: 36224417 (Nature)",
@@ -2085,9 +2085,9 @@ export const BioStitchLabView: React.FC = () => {
         id: (Date.now() + 1).toString() + "-ai",
         sender: "ai",
         textKo:
-          "하단 사진 목록에서 7개 실제 줄기세포 실험을 전환하고, 같은 줄의 [전설의 괴수 배양 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
+          "하단 사진 목록에서 7개 실제 줄기세포 실험을 전환하고, 같은 줄의 [괴수 설계 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
         textEn:
-          "Switch between 7 real stem-cell cases in the photo strip at the bottom, or open the Mythic Beast Revival & Battle button in the same strip to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
+          "Switch between 7 real stem-cell cases in the photo strip at the bottom, or open the Monster Design & Battle button in the same strip to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
         pmidBadge: "LAB GUIDE",
         timestamp: new Date().toLocaleTimeString()
       };
@@ -2394,35 +2394,17 @@ export const BioStitchLabView: React.FC = () => {
                 <span className="hidden md:inline text-emerald-300 font-mono font-normal"> · {activeExp.journalCitation}</span>
               </p>
 
-              {/* 2. Experiment photo strip + Mythic Beast Revival & Battle button */}
-              <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5 pointer-events-auto items-stretch">
-                <button
-                  type="button"
-                  onClick={() => setIsStitchModalOpen((prev) => !prev)}
-                  className={`shrink-0 w-24 md:w-28 h-16 md:h-[72px] rounded-lg text-[11px] font-black cursor-pointer shadow-lg transition flex flex-col items-center justify-center gap-0.5 border px-1 text-center leading-tight ${
-                    isStitchModalOpen
-                      ? "bg-slate-800 text-slate-200 border-slate-600"
-                      : "bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-slate-950 border-emerald-300 active:scale-95"
-                  }`}
-                >
-                  <span className="text-base">⚡</span>
-                  <span>
-                    {isStitchModalOpen
-                      ? isKo
-                        ? "조립 실험실 닫기"
-                        : "Close Lab"
-                      : isKo
-                      ? "전설의 괴수 배양 & 전투"
-                      : "Mythic Beast Revival & Battle"}
-                  </span>
-                </button>
+              {/* 2. Experiment photo strip (all samples always fit: equal shares of the width, no scrolling)
+                     + Monster Design & Battle button last, fixed width so it never leaves the screen */}
+              <div className="flex gap-1.5 md:gap-2 w-full py-0.5 pointer-events-auto items-stretch">
                 {experiments.map((exp) => (
                   <button
                     key={exp.id}
                     type="button"
                     onClick={() => handleSelectExperiment(exp)}
                     title={`${isKo ? exp.koreanHeadline : exp.headline} (${exp.journalCitation})`}
-                    className={`relative shrink-0 w-24 md:w-28 h-16 md:h-[72px] rounded-lg overflow-hidden cursor-pointer shadow-lg border-2 transition active:scale-95 ${
+                    aria-label={isKo ? exp.koreanShortTitle : exp.shortTitle}
+                    className={`relative flex-1 basis-0 min-w-0 max-w-[160px] h-14 sm:h-16 md:h-[72px] rounded-lg overflow-hidden cursor-pointer shadow-lg border-2 transition active:scale-95 ${
                       activeExp.id === exp.id
                         ? "border-emerald-400 ring-2 ring-emerald-400/60"
                         : "border-slate-700 opacity-80 hover:opacity-100 hover:border-emerald-500/60"
@@ -2440,12 +2422,33 @@ export const BioStitchLabView: React.FC = () => {
                       }}
                       className="absolute inset-0 w-full h-full object-cover"
                     />
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1 pt-3 pb-0.5 text-[9px] md:text-[10px] font-bold text-white leading-tight flex items-center gap-0.5">
+                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1 pt-3 pb-0.5 text-[9px] md:text-[10px] font-bold text-white leading-tight flex items-center justify-center sm:justify-start gap-0.5">
                       <span>{exp.badgeIcon}</span>
-                      <span className="truncate">{isKo ? exp.koreanShortTitle : exp.shortTitle}</span>
+                      {/* 좁은 화면에서는 아이콘만, 넓으면 짧은 제목까지 */}
+                      <span className="truncate hidden sm:inline">{isKo ? exp.koreanShortTitle : exp.shortTitle}</span>
                     </span>
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setIsStitchModalOpen((prev) => !prev)}
+                  className={`shrink-0 w-[72px] sm:w-24 md:w-28 h-14 sm:h-16 md:h-[72px] rounded-lg text-[10px] sm:text-[11px] font-black cursor-pointer shadow-lg transition flex flex-col items-center justify-center gap-0.5 border px-1 text-center leading-tight ${
+                    isStitchModalOpen
+                      ? "bg-slate-800 text-slate-200 border-slate-600"
+                      : "bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-slate-950 border-emerald-300 active:scale-95"
+                  }`}
+                >
+                  <span className="text-sm sm:text-base">⚡</span>
+                  <span>
+                    {isStitchModalOpen
+                      ? isKo
+                        ? "조립 실험실 닫기"
+                        : "Close Lab"
+                      : isKo
+                      ? "괴수 설계 & 전투"
+                      : "Monster Design & Battle"}
+                  </span>
+                </button>
               </div>
 
               {/* 3. Bottom line: chat input + Send */}

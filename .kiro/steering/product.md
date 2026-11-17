@@ -16,5 +16,5 @@
 ## 3. Core Architectural Blocks (The 4 Stitched Modules)
 - **Block 1: Bio-Microscopy & Archival Video Viewport**: Full-screen loop of real scientific/microscopy footage and authentic experimental photography with a concise 6-card `[❓ Lab Manual]` modal.
 - **Block 2: WebAudio Neural Bio-Narrator**: `<video>` remains strictly muted to prevent browser caption intrusion, while the WebAudio API synthesizes Dr. Victor Kiro's 60s Chief Bioengineer voice narration and lab bio-monitor acoustics.
-- **Block 3: 5-Second Auto-Absorbing Synapse Chat**: Floating neural telemetry chat that slides up over the full-screen video viewport on mobile/desktop and automatically absorbs (slides upward and vanishes) about 5 seconds after the last message.
+- **Block 3: 3-Second Auto-Absorbing Synapse Chat**: Floating neural telemetry chat that slides up over the full-screen video viewport on mobile/desktop and automatically absorbs (slides upward and vanishes) 3 seconds after the last message.
 - **Block 4: iPSC Stem-Cell Bio-Stitcher & Live PubMed/Wikipedia Cross-Verifier**: Interactive surgical overlay that lets users inject pluripotent stem cells between incompatible tissues and query live peer-reviewed papers (EuropePMC/PubMed REST API) and encyclopedic records (Wikipedia REST API) in real time.
