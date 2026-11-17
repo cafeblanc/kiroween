@@ -1,35 +1,32 @@
-# Implementation Tasks: Video, Arena, Bioreactor & Monster Vault Overhaul
+# Implementation Tasks: Story Generation, 3D Combat, and Vault DB
 
-- [ ] 1. Build Monster Vault IndexedDB Persistence (`monsterVaultService.ts`) <!-- id: 1 -->
-  - [ ] 1.1 Create `src/services/monsterVaultService.ts` using native `indexedDB`:
-    - Database name: `KiroweenMonsterVault`, store: `custom_monsters`.
-    - Methods: `saveMonster`, `getAllMonsters`, `deleteMonster`, `clearVault`.
-    - Automatically convert and store raw `Blob` for image and video.
-    - On load, regenerate active `blob:` URLs via `URL.createObjectURL(blob)`.
-  - [ ] 1.2 In `CustomMonsterStudio.tsx`, whenever a custom monster is generated or awakened (`handleStartCustomBioreactor` / `handleSendCustomToArena`), save it directly to `monsterVaultService`.
-  - [ ] 1.3 In `BioStitchLabView.tsx`, load all stored monsters on mount via `monsterVaultService.getAllMonsters()` and initialize `customArenaRoster`.
-  - [ ] 1.4 Write unit tests in `src/services/monsterVaultService.test.ts` verifying saving, retrieval, Blob reconstitution, and deletion.
+- [ ] 1. Implement Concise Battle Story Generator (`battleStoryService.ts`) <!-- id: 1 -->
+  - [ ] 1.1 Create `src/services/battleStoryService.ts`:
+    - Pure generator function accepting `f1`, `f2`, and `battleResult` from `arenaBattle.ts`.
+    - Produces structured 3-act narrative (`act1_intro`, `act2_clash`, `act3_finish`) in Korean and English.
+    - Accurately incorporates body parts, combat stats (ATK, DEF, SPD, REGEN, ENERGY), and specific triggered skills (`🌋 초고온 마그마 일격` etc.).
+  - [ ] 1.2 Write comprehensive unit tests in `src/services/battleStoryService.test.ts`.
 
-- [x] 2. Overhaul Arena Clash Selection to Feature Custom Monsters <!-- id: 2 -->
-  - [x] 2.1 In `BattleMatrix.ts` and `BioStitchLabView.tsx`, rewrite `selectPrebuiltBattleVideo`:
-    - Return `null` whenever either fighter is a custom monster (`id.startsWith("custom_")`).
-    - Return a pre-built video ONLY for the 3 exact mock battle pairs (Dragon vs Kraken, Cerberus vs Hydra, Xeno vs Frankenstein).
-    - For all other combinations, return `null` (never fall back to dragon vs kraken).
-  - [x] 2.2 When `selectPrebuiltBattleVideo` returns `null`, ensure `activeClashVideoUrl` is `null`, forcing the Dual Confrontation Stage to render.
-  - [x] 2.3 Enhance the Dual Confrontation Stage JSX in `BioStitchLabView.tsx`:
-    - Fighter 1 (Left) and Fighter 2 (Right) must display their own `videoSrc` or living portrait canvas.
-    - Lunges, recoil shakes, damage numbers, and skill popups must visually animate both fighters.
-    - On KO, zoom the winning monster with victory roar and display the combat stats comparison.
-  - [x] 2.4 Add unit and property tests in `src/components/bioreactor/arena/BattleMatrix.test.ts`.
+- [ ] 2. Build Monster Vault IndexedDB Persistence with Story Chronicles (`monsterVaultService.ts`) <!-- id: 2 -->
+  - [ ] 2.1 Implement `src/services/monsterVaultService.ts`:
+    - Database `KiroweenMonsterVault` with stores: `custom_monsters` and `battle_chronicles`.
+    - Methods: `saveMonster`, `getAllMonsters`, `saveBattleChronicle`, `getLatestBattleStory`, `deleteMonster`, `clearVault`.
+    - Handles raw `Blob` storage for images and videos with automatic `URL.createObjectURL(blob)` recovery.
+  - [ ] 2.2 Write unit tests in `src/services/monsterVaultService.test.ts`.
 
-- [ ] 3. Remove Wrong Battle Videos from Bioreactor and Curate Growth Footage <!-- id: 3 -->
-  - [-] 3.1 In `src/services/referenceVideoSelector.ts` and `src/data/comicMonsters.ts`, replace all incubator references to `battle_*.mp4` with appropriate biological growth sequences.
-  - [ ] 3.2 Ensure `myth_frankenstein`, `alien_xenomorph`, and `myth_cerberus` use appropriate growth videos instead of battle clips.
-  - [ ] 3.3 Verify `BioreactorScreen.tsx` plays custom monster videos seamlessly through all 6 growth stages.
-  - [ ] 3.4 Update tests in `src/services/videoConcatenationService.test.ts` and `src/components/bioreactor/__tests__/growth-sequence.integration.test.tsx`.
+- [ ] 3. Wire Battle Story & Dynamic 3D Combat Arena into `BioStitchLabView.tsx` <!-- id: 3 -->
+  - [ ] 3.1 In `selectPrebuiltBattleVideo`, return `null` for custom monsters and non-sample pairs (never fallback to dragon vs kraken).
+  - [ ] 3.2 Display the generated battle story (`act1`, `act2`, `act3`) in the Arena HUD during and after the battle.
+  - [ ] 3.3 When generating the AI 3D battle clip via LTX / Luma, inject the generated English story into the prompt:
+    `"AAA mobile game cinematic battle cutscene, 3D bio-engineered creature clash between {f1.nameEn} and {f2.nameEn}: {storyEn.act2_clash}, {storyEn.act3_finish}, dynamic camera angle, neon shockwaves, 4k game trailer, no text"`
+  - [ ] 3.4 Ensure the Dual Confrontation Stage visibly lunges, shakes, flashes, and displays the battle story in sync.
 
-- [ ] 4. Verification, Build, and Vercel Deployment <!-- id: 4 -->
-  - [ ] 4.1 Run `npx tsc --noEmit` and ensure 0 TypeScript errors.
-  - [ ] 4.2 Run `npm test -- --run` and verify all tests pass.
-  - [ ] 4.3 Run `npm run build` and ensure production build completes.
-  - [ ] 4.4 Commit, push to `origin/main`, and verify successful deployment on `https://asura.cafeblanc.kr`.
+- [ ] 4. Clean Bioreactor Video Mappings <!-- id: 4 -->
+  - [ ] 4.1 Remove all battle video references from `src/services/referenceVideoSelector.ts` and `src/data/comicMonsters.ts`.
+  - [ ] 4.2 Verify 6-stage growth functions cleanly for both curated 6 specimens and custom monsters.
+
+- [ ] 5. Verification, Build, and Vercel Deployment <!-- id: 5 -->
+  - [ ] 5.1 Run `npx tsc --noEmit` and ensure 0 TypeScript errors.
+  - [ ] 5.2 Run `npm test -- --run` and verify all tests pass.
+  - [ ] 5.3 Run `npm run build` and ensure production build succeeds.
+  - [ ] 5.4 Commit, push to `origin/main`, and verify deployment on `https://asura.cafeblanc.kr`.
