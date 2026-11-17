@@ -85,8 +85,11 @@ describe("3.1 Realtime happy path in useGptLiveVoice (static)", () => {
 describe("3.2 mobile synapse chat absorption (static)", () => {
   const src = read("src/components/BioStitchLabView.tsx");
 
-  it("moves to the exiting phase 3000 ms after the last message", () => {
-    expect(src).toMatch(/setTimeout\(\(\)\s*=>\s*{\s*setMobileChatPhase\("exiting"\);\s*},\s*3000\)/);
+  it("moves to the exiting phase 5000 ms (SYNAPSE_CHAT_ABSORB_MS) after the last message", () => {
+    expect(src).toMatch(/const SYNAPSE_CHAT_ABSORB_MS = 5000;/);
+    expect(src).toMatch(
+      /setTimeout\(\(\)\s*=>\s*{\s*setMobileChatPhase\("exiting"\);\s*},\s*SYNAPSE_CHAT_ABSORB_MS\)/,
+    );
   });
 
   it("applies -translate-y-full opacity-0 only in the exiting phase", () => {

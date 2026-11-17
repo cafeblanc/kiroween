@@ -53,6 +53,10 @@ type LangMode = "KO" | "EN";
 
 const LOCAL_CONFOCAL_FALLBACK = "/images/chimera_microscopy_quad.jpg";
 
+// Synapse chat overlay: messages stay on the video this long after the last one, then slide up and vanish.
+const SYNAPSE_CHAT_ABSORB_MS = 5000;
+const SYNAPSE_CHAT_EXIT_ANIM_MS = 550;
+
 interface LabManualPoint {
   icon: string;
   ko: { title: string; body: string };
@@ -78,8 +82,8 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
   },
   {
     icon: "💬",
-    ko: { title: "4. 논문·백과사전 채팅", body: "하단 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 간결한 답변을 제공합니다." },
-    en: { title: "4. Paper & encyclopedia chat", body: "Ask a question in the input box and the lab searches PubMed and Wikipedia live for a short answer." },
+    ko: { title: "4. 논문·백과사전 채팅", body: "맨 아래 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 영상 위에 답변을 보여주고, 약 5초 뒤 위로 사라집니다. 하단 사진 목록에서 7개 실험을 고를 수 있습니다." },
+    en: { title: "4. Paper & encyclopedia chat", body: "Ask in the input line at the very bottom. The lab searches PubMed and Wikipedia live, shows the answer over the video, and it slides away after about 5 seconds. Pick one of the 7 experiments from the photo strip at the bottom." },
   },
   {
     icon: "⚡",
@@ -342,7 +346,7 @@ export const BioStitchLabView: React.FC = () => {
     } catch {}
   }, []);
 
-  // Block 3: 3-Second Auto-Absorbing Synapse Chat (with dismissed cursor fix)
+  // Block 3: 5-Second Auto-Absorbing Synapse Chat (with dismissed cursor fix)
   const [messages, setMessages] = useState<SynapseChatMessage[]>([
     {
       id: "init-1",
@@ -361,8 +365,7 @@ export const BioStitchLabView: React.FC = () => {
   const [inputText, setInputText] = useState<string>("");
   const [isQueryingApi, setIsQueryingApi] = useState<boolean>(false);
 
-  const chatMessagesRef = useRef<HTMLDivElement | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [isChatOverlayHovered, setIsChatOverlayHovered] = useState<boolean>(false);
   const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileChatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -1902,15 +1905,8 @@ export const BioStitchLabView: React.FC = () => {
     };
   }, [isStitchModalOpen, activeModalTab, chimeraScreen, morphStage, isHeartbeatAudioOn, creatureBpm]);
 
-  // Desktop chat scroll
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    if (chatMessagesRef.current) {
-      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  // Mobile 3s auto-absorbing floating chat (only shows new messages since last dismissal)
+  // Auto-absorbing floating chat on all viewports (only shows new messages since last dismissal).
+  // The hide timer is paused while the pointer is over the overlay.
   useEffect(() => {
     if (messages.length === 0) return;
 
@@ -1927,23 +1923,25 @@ export const BioStitchLabView: React.FC = () => {
       }
     });
 
+    if (isChatOverlayHovered) return;
+
     const currentLength = messages.length;
 
     const exitTimer = setTimeout(() => {
       setMobileChatPhase("exiting");
-    }, 3000);
+    }, SYNAPSE_CHAT_ABSORB_MS);
 
     const clearTimer = setTimeout(() => {
       mobileDismissedIndexRef.current = currentLength;
       setMobileChatPhase("hidden");
       setMobileVisibleMessages([]);
-    }, 3550);
+    }, SYNAPSE_CHAT_ABSORB_MS + SYNAPSE_CHAT_EXIT_ANIM_MS);
 
     return () => {
       clearTimeout(exitTimer);
       clearTimeout(clearTimer);
     };
-  }, [messages]);
+  }, [messages, isChatOverlayHovered]);
 
   const handleSelectExperiment = (exp: BioExperimentCase) => {
     setActiveExp(exp);
@@ -2037,9 +2035,9 @@ export const BioStitchLabView: React.FC = () => {
         id: (Date.now() + 1).toString() + "-ai",
         sender: "ai",
         textKo:
-          "우측 하단에서 7개 실제 줄기세포 실험을 전환하고, 좌측 하단 [전설의 괴수 배양 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
+          "하단 사진 목록에서 7개 실제 줄기세포 실험을 전환하고, 같은 줄의 [전설의 괴수 배양 & 전투]에서 6종 표본을 15초 배양해 3D 각성·결투를 진행할 수 있습니다. 상단에서 다국가 언어와 내레이터 음성을 켜고 끌 수 있습니다.",
         textEn:
-          "Switch between 7 real stem-cell cases at the bottom-right, or open the Monster Resurrection Battle at the bottom-left to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
+          "Switch between 7 real stem-cell cases in the photo strip at the bottom, or open the Mythic Beast Revival & Battle button in the same strip to culture 6 specimens for 15s into 3D awakening and duel. Use the top bar for multi-language translation and narrator voice.",
         pmidBadge: "LAB GUIDE",
         timestamp: new Date().toLocaleTimeString()
       };
@@ -2218,14 +2216,14 @@ export const BioStitchLabView: React.FC = () => {
 
       {/* Main Split Grid */}
       <div
-        className="relative flex-1 flex flex-col md:grid md:grid-cols-12 gap-0 md:gap-3 p-0 md:p-3.5 w-full max-w-full box-border items-stretch overflow-hidden"
+        className="relative flex-1 flex flex-col p-0 w-full max-w-full box-border items-stretch overflow-hidden"
         style={{ height: "calc(100dvh - 48px)", maxHeight: "calc(100dvh - 48px)" }}
       >
         {/* SECTION 1: Bio-Microscopy & Real Photographic Evidence Viewport */}
-        <div className="h-full md:h-full md:col-span-7 relative bg-black md:bg-slate-900/60 border-0 md:border md:border-emerald-500/30 rounded-none md:rounded-2xl p-0 md:p-2.5 shadow-2xl flex flex-col justify-between w-full max-w-full overflow-hidden box-border">
+        <div className="h-full relative bg-black border-0 rounded-none p-0 flex flex-col justify-between w-full max-w-full overflow-hidden box-border">
           <div
             onClick={() => setIsSoundOn((prev) => !prev)}
-            className="relative w-full h-full bg-slate-950 rounded-none md:rounded-xl overflow-hidden md:border md:border-slate-800 shadow-inner cursor-pointer select-none flex-1 min-h-0"
+            className="relative w-full h-full bg-slate-950 rounded-none overflow-hidden cursor-pointer select-none flex-1 min-h-0"
           >
             {/* Background High-Res Real Confocal/Experiment Photo */}
             <img
@@ -2293,14 +2291,18 @@ export const BioStitchLabView: React.FC = () => {
               </button>
             </div>
 
-            {/* MOBILE FLOATING OVERLAY */}
+            {/* BOTTOM OVERLAY (all viewports): chat overlay, experiment photo strip, input line */}
             <div
-              className="md:hidden absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent px-2.5 pb-2 pt-6 pointer-events-none gap-1.5"
+              className="absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent px-2.5 md:px-4 pb-2 pt-8 pointer-events-none gap-1.5"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* 0. Mobile 3s Auto-Absorbing Synapse Chat */}
+              {/* 0. 5s Auto-Absorbing Synapse Chat (questions, answers, PubMed / Wikipedia cards) */}
               {mobileChatPhase !== "hidden" && mobileVisibleMessages.length > 0 && (
-                <div className="w-full max-h-[34dvh] overflow-hidden flex flex-col justify-end mb-1 pointer-events-none">
+                <div
+                  className="w-full max-w-3xl mx-auto max-h-[38dvh] overflow-hidden flex flex-col justify-end mb-1 pointer-events-auto"
+                  onMouseEnter={() => setIsChatOverlayHovered(true)}
+                  onMouseLeave={() => setIsChatOverlayHovered(false)}
+                >
                   <div
                     ref={mobileChatScrollRef}
                     className={`flex flex-col gap-1.5 overflow-y-auto no-scrollbar transition-all duration-500 ease-in-out ${
@@ -2320,9 +2322,14 @@ export const BioStitchLabView: React.FC = () => {
                           className={
                             msg.sender === "researcher"
                               ? "max-w-[82%] px-3 py-1.5 rounded-2xl rounded-br-xs text-xs bg-emerald-500 text-slate-950 font-bold shadow-lg break-words"
-                              : "max-w-[90%] px-3 py-1.5 rounded-2xl rounded-bl-xs text-xs bg-slate-950/90 backdrop-blur-md text-emerald-100 border border-emerald-500/40 shadow-lg break-words"
+                              : "max-w-[92%] px-3 py-1.5 rounded-2xl rounded-bl-xs text-xs bg-slate-950/90 backdrop-blur-md text-emerald-100 border border-emerald-500/40 shadow-lg break-words"
                           }
                         >
+                          {msg.sender === "ai" && msg.pmidBadge && (
+                            <span className="inline-block text-[9px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded mb-1">
+                              {msg.pmidBadge}
+                            </span>
+                          )}
                           <p
                             translate={msg.sender === "ai" && selectedLangCode !== "ko" ? "no" : undefined}
                             className="whitespace-pre-line"
@@ -2342,60 +2349,71 @@ export const BioStitchLabView: React.FC = () => {
                 </div>
               )}
 
-              {/* 1. Mobile Specimen Selection Chips */}
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5 pointer-events-auto">
+              {/* 1. Active experiment headline (compact; full text in title) */}
+              <p
+                className="pointer-events-auto self-start max-w-full truncate bg-black/60 border border-emerald-500/30 rounded px-2 py-0.5 text-[10px] md:text-[11px] font-bold text-white"
+                title={`${isKo ? activeExp.koreanHeadline : activeExp.headline} (${activeExp.journalCitation})`}
+              >
+                {activeExp.badgeIcon} {isKo ? activeExp.koreanHeadline : activeExp.headline}
+                <span className="hidden md:inline text-emerald-300 font-mono font-normal"> · {activeExp.journalCitation}</span>
+              </p>
+
+              {/* 2. Experiment photo strip + Mythic Beast Revival & Battle button */}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5 pointer-events-auto items-stretch">
+                <button
+                  type="button"
+                  onClick={() => setIsStitchModalOpen((prev) => !prev)}
+                  className={`shrink-0 w-24 md:w-28 h-16 md:h-[72px] rounded-lg text-[11px] font-black cursor-pointer shadow-lg transition flex flex-col items-center justify-center gap-0.5 border px-1 text-center leading-tight ${
+                    isStitchModalOpen
+                      ? "bg-slate-800 text-slate-200 border-slate-600"
+                      : "bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-slate-950 border-emerald-300 active:scale-95"
+                  }`}
+                >
+                  <span className="text-base">⚡</span>
+                  <span>
+                    {isStitchModalOpen
+                      ? isKo
+                        ? "조립 실험실 닫기"
+                        : "Close Lab"
+                      : isKo
+                      ? "전설의 괴수 배양 & 전투"
+                      : "Mythic Beast Revival & Battle"}
+                  </span>
+                </button>
                 {experiments.map((exp) => (
                   <button
                     key={exp.id}
                     type="button"
                     onClick={() => handleSelectExperiment(exp)}
-                    className={`text-[10px] px-2.5 py-1 rounded-full cursor-pointer shadow flex items-center gap-1 border shrink-0 transition ${
+                    title={`${isKo ? exp.koreanHeadline : exp.headline} (${exp.journalCitation})`}
+                    className={`relative shrink-0 w-24 md:w-28 h-16 md:h-[72px] rounded-lg overflow-hidden cursor-pointer shadow-lg border-2 transition active:scale-95 ${
                       activeExp.id === exp.id
-                        ? "bg-emerald-500 text-slate-950 border-emerald-300 font-black"
-                        : "bg-slate-900/85 backdrop-blur-xs text-slate-200 border-slate-700"
+                        ? "border-emerald-400 ring-2 ring-emerald-400/60"
+                        : "border-slate-700 opacity-80 hover:opacity-100 hover:border-emerald-500/60"
                     }`}
                   >
-                    <span>{exp.badgeIcon}</span>
-                    <span className="truncate max-w-[125px]">
-                      {isKo ? exp.koreanShortTitle : exp.shortTitle}
+                    <img
+                      src={exp.microscopyPhotoUrl}
+                      alt=""
+                      loading="lazy"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallback === "1") return;
+                        img.dataset.fallback = "1";
+                        img.src = LOCAL_CONFOCAL_FALLBACK;
+                      }}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1 pt-3 pb-0.5 text-[9px] md:text-[10px] font-bold text-white leading-tight flex items-center gap-0.5">
+                      <span>{exp.badgeIcon}</span>
+                      <span className="truncate">{isKo ? exp.koreanShortTitle : exp.shortTitle}</span>
                     </span>
                   </button>
                 ))}
               </div>
 
-              {/* 2. Mobile Active Specimen & [🧬 Mythic Chimera Assembler] Bar */}
-              <div className="bg-slate-900/95 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-500/40 flex items-center justify-between gap-2 shadow-2xl pointer-events-auto">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-xl shrink-0">{activeExp.badgeIcon}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-white truncate">
-                      {isKo ? activeExp.koreanShortTitle : activeExp.shortTitle}
-                    </p>
-                    <p className="text-[10px] text-emerald-400 font-mono truncate">
-                      {activeExp.stemCellBridge.factors.slice(0, 4).join(" · ")}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsStitchModalOpen((prev) => !prev)}
-                  className="bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-black shrink-0 cursor-pointer shadow-lg flex items-center gap-1"
-                >
-                  <span>⚡</span>
-                  <span>
-                    {isStitchModalOpen
-                      ? isKo
-                        ? "실험실 닫기"
-                        : "Close Lab"
-                      : isKo
-                      ? "키메라 조립·부활"
-                      : "Assemble Chimera"}
-                  </span>
-                </button>
-              </div>
-
-              {/* 3. Mobile Floating Chat Input */}
-              <form onSubmit={handleSendChat} className="flex gap-1.5 pointer-events-auto">
+              {/* 3. Bottom line: chat input + Send */}
+              <form onSubmit={handleSendChat} className="flex gap-1.5 pointer-events-auto w-full">
                 <input
                   type="text"
                   value={inputText}
@@ -2867,162 +2885,6 @@ export const BioStitchLabView: React.FC = () => {
             )}
           </div>
 
-          {/* Desktop Bottom Specimen & Chimera Assembler Action Card */}
-          <div className="hidden md:block mt-2 shrink-0 w-full box-border">
-            <div className="bg-slate-900/95 p-2.5 rounded-xl border border-emerald-500/30 flex items-center justify-between gap-3 shadow-xl w-full h-[74px] box-border overflow-hidden">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-2xl shrink-0">
-                  {activeExp.badgeIcon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold text-white truncate">
-                    {isKo ? activeExp.koreanHeadline : activeExp.headline}
-                  </p>
-                  <p className="text-[11px] text-emerald-300 font-mono truncate mt-0.5">
-                    🧬 {isKo ? activeExp.stemCellBridge.koreanLineage : activeExp.stemCellBridge.lineage} ({activeExp.journalCitation})
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsStitchModalOpen((prev) => !prev)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-black shrink-0 cursor-pointer shadow-lg transition flex items-center gap-1.5 border ${
-                  isStitchModalOpen
-                    ? "bg-slate-800 text-slate-200 border-slate-600"
-                    : "bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-slate-950 border-emerald-300 active:scale-95"
-                }`}
-              >
-                <span>⚡</span>
-                <span>
-                  {isStitchModalOpen
-                    ? isKo
-                      ? "조립 실험실 닫기"
-                      : "Close Lab"
-                    : isKo
-                    ? "전설의 괴수 배양 & 전투"
-                    : "Mythic Beast Revival & Battle"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 2: Desktop 5-Column AI Bio-Telemetry & Real-World Specimen Archive */}
-        <div className="hidden md:flex md:h-full md:col-span-5 bg-slate-900/85 border border-emerald-500/30 rounded-2xl flex-col shadow-2xl w-full max-w-full overflow-hidden box-border">
-          <div
-            ref={chatMessagesRef}
-            className="flex-1 min-h-0 p-3 overflow-y-auto no-scrollbar flex flex-col gap-2.5 w-full box-border"
-          >
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={
-                  msg.sender === "researcher"
-                    ? "flex flex-col items-end w-full"
-                    : "flex flex-col items-start w-full"
-                }
-              >
-                <div
-                  className={
-                    msg.sender === "researcher"
-                      ? "max-w-[85%] p-2.5 rounded-xl text-xs bg-emerald-500 text-slate-950 font-bold shadow"
-                      : "w-full p-3 rounded-xl text-xs bg-slate-950/90 text-slate-200 border border-slate-800 shadow-md flex flex-col gap-1.5"
-                  }
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                      {msg.sender === "researcher"
-                        ? isKo
-                          ? "🧑‍🔬 연구원 (YOU)"
-                          : "🧑‍🔬 RESEARCHER"
-                        : isKo
-                        ? "🧬 빅터 키로 박사 (AI 수석 생명공학자)"
-                        : "🧬 DR. VICTOR KIRO (iPSC AI)"}
-                    </span>
-                    {msg.pmidBadge && (
-                      <span className="text-[9px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                        {msg.pmidBadge}
-                      </span>
-                    )}
-                  </div>
-
-                  {langMode !== "EN" && (
-                    <p
-                      translate={selectedLangCode !== "ko" ? "no" : undefined}
-                      className="leading-relaxed font-semibold text-white whitespace-pre-line"
-                    >
-                      {msg.textKo}
-                    </p>
-                  )}
-                  {langMode !== "KO" && (
-                    <p className="leading-relaxed font-medium text-emerald-200">{msg.textEn}</p>
-                  )}
-
-                  {(isKo ? msg.subTextKo : msg.subTextEn) && (
-                    <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-900/90 p-2 rounded-lg border border-slate-800/80">
-                      <p>{isKo ? msg.subTextKo : msg.subTextEn}</p>
-                    </div>
-                  )}
-
-                  {msg.linkedCase && (
-                    <div className="mt-1 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-amber-300 font-mono truncate">
-                        iPSC: {msg.linkedCase.stemCellBridge.factors.join(", ")}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} className="h-0 w-0" />
-          </div>
-
-          {/* 6 Real-World Bio-Frankenstein Experiment Chips */}
-          <div className="px-2.5 pt-2 pb-2 flex gap-1.5 flex-wrap border-t border-slate-800 bg-slate-950/70 shrink-0 w-full box-border">
-            {experiments.map((exp) => (
-              <button
-                key={exp.id}
-                type="button"
-                onClick={() => handleSelectExperiment(exp)}
-                className={`text-[11px] px-2.5 py-1 rounded-full cursor-pointer shadow-sm flex items-center gap-1 border transition ${
-                  activeExp.id === exp.id
-                    ? "bg-emerald-500 text-slate-950 border-emerald-300 font-black"
-                    : "bg-slate-900 text-emerald-200 border-slate-700 hover:bg-slate-800"
-                }`}
-              >
-                <span>{exp.badgeIcon}</span>
-                <span className="truncate max-w-[135px]">
-                  {isKo ? exp.koreanShortTitle : exp.shortTitle}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Live Chat & PubMed Search Form */}
-          <form
-            onSubmit={handleSendChat}
-            className="p-2.5 border-t border-slate-800 flex gap-2 bg-slate-900 shrink-0 w-full box-border"
-          >
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder={
-                isKo
-                  ? "실험 질문 또는 생물학 키워드 검색 (예: 쥐 뇌, 유령 심장, organoid)..."
-                  : "Ask about any experiment or search PubMed..."
-              }
-              className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-400"
-            />
-            <button
-              type="submit"
-              disabled={isQueryingApi}
-              className="bg-emerald-500 hover:bg-emerald-400 px-3.5 py-1.5 rounded-lg text-xs font-black text-slate-950 shrink-0 cursor-pointer transition"
-            >
-              {isQueryingApi ? "..." : isKo ? "전송" : "Send"}
-            </button>
-          </form>
         </div>
       </div>
 
