@@ -11,6 +11,7 @@ function mockRes() {
   res.setHeader = (k: string, v: string) => ((res.headers[k] = v), res);
   res.status = (c: number) => ((res.statusCode = c), res);
   res.json = (b: unknown) => ((res.body = b), res);
+  res.send = (b: unknown) => ((res.body = b), res);
   return res;
 }
 
@@ -280,6 +281,99 @@ describe("GET poll", () => {
       last = res.statusCode;
     }
     expect(last).toBe(429);
+  });
+});
+
+describe("GET chunked result download", () => {
+  const RESULT = "https://storage.googleapis.com/ltxv-api-ephemeral-prd/model-serving/outputs/default/ABC/video.mp4?X-Goog-Signature=sig";
+  const dl = (q: any, ip?: string) => req("GET", { query: { provider: "ltx", action: "download", ...q }, ip });
+  const bytes = (n: number, status = 206, headers: Record<string, string> = {}) =>
+    new Response(new Uint8Array(n), { status, headers });
+
+  it("proxies a byte range with the total length and no LTX key", async () => {
+    const handler = await load();
+    const f = vi.fn(async () => bytes(3_000_000, 206, { "content-range": "bytes 0-2999999/5273017" }));
+    vi.stubGlobal("fetch", f);
+    const res = mockRes();
+    await handler(dl({ url: RESULT, start: "0", end: "2999999" }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["X-Total-Length"]).toBe("5273017");
+    expect(res.headers["Content-Type"]).toBe("application/octet-stream");
+    expect((res.body as Buffer).length).toBe(3_000_000);
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(RESULT);
+    expect((init.headers as any).Range).toBe("bytes=0-2999999");
+    expect((init.headers as any).Authorization).toBeUndefined();
+    expect(init.redirect).toBe("error");
+  });
+
+  it("uses the body length as total when the bucket ignores the range (200)", async () => {
+    const handler = await load();
+    vi.stubGlobal("fetch", vi.fn(async () => bytes(1234, 200)));
+    const res = mockRes();
+    await handler(dl({ url: RESULT, start: "0", end: "2999999" }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["X-Total-Length"]).toBe("1234");
+  });
+
+  it("rejects URLs outside the LTX result bucket without fetching", async () => {
+    const handler = await load();
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    for (const url of [
+      "https://storage.googleapis.com/other-bucket/x.mp4",
+      "https://storage.googleapis.com/ltxv-api-ephemeral-prd/../other/x.mp4",
+      "https://storage.googleapis.com/ltxv-api-ephemeral-prd%2F..%2Fother/x.mp4",
+      "https://storage.googleapis.com.evil.com/ltxv-api-ephemeral-prd/x.mp4",
+      "http://storage.googleapis.com/ltxv-api-ephemeral-prd/x.mp4",
+      "https://storage.googleapis.com:8443/ltxv-api-ephemeral-prd/x.mp4",
+      "https://169.254.169.254/latest/meta-data",
+      undefined,
+    ]) {
+      const res = mockRes();
+      await handler(dl({ url, start: "0", end: "10" }), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("rejects bad or oversized ranges", async () => {
+    const handler = await load();
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    for (const [start, end] of [["-1", "5"], ["10", "5"], ["0", "3000000"], ["a", "5"], [undefined, "5"]]) {
+      const res = mockRes();
+      await handler(dl({ url: RESULT, start, end }), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("maps an expired signed URL to 410 and a range past the end to 416", async () => {
+    const handler = await load();
+    vi.stubGlobal("fetch", vi.fn(async () => bytes(0, 403)));
+    let res = mockRes();
+    await handler(dl({ url: RESULT, start: "0", end: "10" }), res);
+    expect(res.statusCode).toBe(410);
+    vi.stubGlobal("fetch", vi.fn(async () => bytes(0, 416)));
+    res = mockRes();
+    await handler(dl({ url: RESULT, start: "9000000", end: "9000010" }), res);
+    expect(res.statusCode).toBe(416);
+  });
+
+  it("returns 502 when a 206 has no total length", async () => {
+    const handler = await load();
+    vi.stubGlobal("fetch", vi.fn(async () => bytes(10, 206)));
+    const res = mockRes();
+    await handler(dl({ url: RESULT, start: "0", end: "9" }), res);
+    expect(res.statusCode).toBe(502);
+  });
+
+  it("still returns 405 for a GET that is neither a poll nor a download", async () => {
+    const handler = await load();
+    const res = mockRes();
+    await handler(req("GET", { query: { provider: "ltx", action: "other" } }), res);
+    expect(res.statusCode).toBe(405);
   });
 });
 

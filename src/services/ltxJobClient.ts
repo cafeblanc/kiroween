@@ -1,5 +1,5 @@
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
-import { isTrustedLtxVideoUrl } from "../utils/ltxUrl";
+import { isLtxProxyDownloadUrl, isTrustedLtxVideoUrl } from "../utils/ltxUrl";
 
 /**
  * Browser client for the /api/generate-video LTX-2.5 job API
@@ -168,16 +168,20 @@ export async function generateLtxVideo(opts: LtxJobOptions): Promise<LtxJobResul
         onStatus?.("completed", Date.now() - started);
         if (toBlob) {
           try {
-            const dl = await fetch(safe, { signal });
-            if (dl.ok) {
-              const blob = await dl.blob();
-              if (blob.size > 0) {
-                return { success: true, videoUrl: URL.createObjectURL(blob), remoteUrl: safe, isBlob: true };
-              }
+            // The LTX bucket sends no CORS headers, so a direct fetch cannot be read; use the chunked proxy.
+            const blob = isLtxProxyDownloadUrl(safe)
+              ? await downloadLtxResultViaProxy(safe, signal)
+              : await (async () => {
+                  const dl = await fetch(safe, { signal });
+                  return dl.ok ? dl.blob() : null;
+                })();
+            if (blob && blob.size > 0) {
+              return { success: true, videoUrl: URL.createObjectURL(blob), remoteUrl: safe, isBlob: true };
             }
           } catch (e: any) {
             if (e?.name === "AbortError") throw e;
-            // CORS or expired URL: the remote URL still plays in a <video> element.
+            // Download failed: the remote URL still plays in a <video> element until it expires (~1 hour).
+            console.warn(`[ltxJobClient] result download failed, playing the remote URL: ${e?.message ?? e}`);
           }
         }
         return { success: true, videoUrl: safe, remoteUrl: safe, isBlob: false };
@@ -188,6 +192,49 @@ export async function generateLtxVideo(opts: LtxJobOptions): Promise<LtxJobResul
     if (e?.name === "AbortError") return { success: false, error: "aborted", code: "ABORTED" };
     return { success: false, error: e?.message || "NETWORK_ERROR", code: "FAILED" };
   }
+}
+
+/** Must match DOWNLOAD_CHUNK_BYTES in api/generate-video.ts (stays under Vercel's ~4.5 MB response limit). */
+export const LTX_DOWNLOAD_CHUNK_BYTES = 3_000_000;
+/** Refuse absurd sizes so a bad X-Total-Length can't loop forever (a 20 s 4K clip is far below this). */
+const LTX_MAX_DOWNLOAD_BYTES = 200_000_000;
+
+/**
+ * Downloads a finished LTX result through /api/generate-video in byte ranges and returns it as a video/mp4 Blob.
+ * Throws on any failed chunk so the caller can fall back to the remote URL.
+ */
+export async function downloadLtxResultViaProxy(
+  resultUrl: string,
+  signal?: AbortSignal,
+  chunkBytes: number = LTX_DOWNLOAD_CHUNK_BYTES,
+): Promise<Blob> {
+  const parts: ArrayBuffer[] = [];
+  let start = 0;
+  let total = Infinity;
+  while (start < total) {
+    const end = start + chunkBytes - 1;
+    const res = await fetch(
+      assertAllowedApiEndpoint(
+        `/api/generate-video?provider=ltx&action=download&start=${start}&end=${end}&url=${encodeURIComponent(resultUrl)}`,
+      ),
+      { method: "GET", signal },
+    );
+    if (!res.ok) {
+      const data = await readJson(res);
+      throw new Error(typeof data?.error === "string" ? data.error : `download chunk HTTP ${res.status}`);
+    }
+    const declared = Number(res.headers.get("x-total-length"));
+    if (!Number.isFinite(declared) || declared <= 0 || declared > LTX_MAX_DOWNLOAD_BYTES) {
+      throw new Error("download returned an invalid total length");
+    }
+    total = declared;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength === 0) throw new Error("download returned an empty chunk");
+    parts.push(buf);
+    start += buf.byteLength;
+  }
+  if (start !== total) throw new Error("downloaded size does not match the declared length");
+  return new Blob(parts, { type: "video/mp4" });
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {

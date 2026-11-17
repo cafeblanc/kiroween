@@ -1,5 +1,5 @@
 import { SlidingWindowRateLimiter } from "../src/utils/rateLimiter.js";
-import { isTrustedLtxVideoUrl, isValidLtxJobId } from "../src/utils/ltxUrl.js";
+import { isLtxProxyDownloadUrl, isTrustedLtxVideoUrl, isValidLtxJobId } from "../src/utils/ltxUrl.js";
 
 export const config = {
   maxDuration: 60,
@@ -18,6 +18,17 @@ export const config = {
  */
 const createLimiter = new SlidingWindowRateLimiter(); // 10 creates per minute per IP
 const pollLimiter = new SlidingWindowRateLimiter(60, 60_000); // polls are cheap; client polls every ~5 s
+const downloadLimiter = new SlidingWindowRateLimiter(40, 60_000); // a 1080p 6 s result is ~5.3 MB = 2 chunks
+
+/*
+ * Chunked download proxy for finished results. The LTX result bucket sends no CORS headers, so the browser
+ * cannot turn the video into a Blob itself, and a whole 1080p clip (~5.3 MB) exceeds Vercel's ~4.5 MB
+ * response limit. The client therefore requests byte ranges of at most DOWNLOAD_CHUNK_BYTES:
+ *   GET /api/generate-video?provider=ltx&action=download&url=<signed result url>&start=<n>&end=<m>
+ * Only https://storage.googleapis.com/ltxv-api-ephemeral-prd/... is allowed (see isLtxProxyDownloadUrl).
+ */
+export const DOWNLOAD_CHUNK_BYTES = 3_000_000;
+const DOWNLOAD_TIMEOUT_MS = 30_000;
 
 // Must stay below config.maxDuration so the handler can answer 504 itself.
 const UPSTREAM_TIMEOUT_MS = 50_000;
@@ -194,7 +205,77 @@ function queryParam(req: any, name: string): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+function parseByte(v: string | undefined): number | null {
+  if (v === undefined || !/^\d{1,10}$/.test(v)) return null;
+  return Number(v);
+}
+
+async function handleDownload(req: any, res: any): Promise<any> {
+  const url = queryParam(req, "url");
+  const start = parseByte(queryParam(req, "start"));
+  const end = parseByte(queryParam(req, "end"));
+  if (!isLtxProxyDownloadUrl(url)) {
+    return res.status(400).json({ error: "url must be an LTX result URL" });
+  }
+  if (start === null || end === null || end < start || end - start + 1 > DOWNLOAD_CHUNK_BYTES) {
+    return res.status(400).json({ error: `start/end must select at most ${DOWNLOAD_CHUNK_BYTES} bytes` });
+  }
+
+  const rl = downloadLimiter.check(clientIp(req));
+  if (!rl.allowed) {
+    res.setHeader("Retry-After", String(Math.ceil(rl.retryAfterMs / 1000)));
+    return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+  try {
+    // The signed URL carries its own credentials; no LTX key is sent. redirect: "error" keeps the fetch on the bucket.
+    const up = await fetch(new URL(url).toString(), {
+      method: "GET",
+      headers: { Range: `bytes=${start}-${end}` },
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (up.status === 416) {
+      await up.body?.cancel();
+      return res.status(416).json({ error: "Requested range is past the end of the video" });
+    }
+    if (up.status === 400 || up.status === 401 || up.status === 403 || up.status === 404) {
+      await up.body?.cancel();
+      return res.status(410).json({ error: "The LTX result URL has expired (it is valid for about 1 hour)." });
+    }
+    if (up.status !== 206 && up.status !== 200) {
+      await up.body?.cancel();
+      return res.status(502).json({ error: `Result download failed (${up.status})` });
+    }
+    const buf = await readCapped(up, DOWNLOAD_CHUNK_BYTES);
+    if (!buf) return res.status(502).json({ error: "Result chunk larger than expected" });
+
+    // Content-Range: bytes 0-2999999/5273017. A 200 means the range was ignored and the whole file fit in one chunk.
+    let total = buf.length;
+    const range = up.headers.get("content-range");
+    const m = range ? /\/(\d{1,12})$/.exec(range) : null;
+    if (up.status === 206) {
+      if (!m) return res.status(502).json({ error: "Result download returned no total length" });
+      total = Number(m[1]);
+    }
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Total-Length", String(total));
+    return res.status(200).send(buf);
+  } catch (err: any) {
+    if (err?.name === "AbortError") return res.status(504).json({ error: "Result download timed out" });
+    return res.status(502).json({ error: "Result download error" });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function handlePoll(req: any, res: any): Promise<any> {
+  if (queryParam(req, "provider") === "ltx" && queryParam(req, "action") === "download") {
+    return handleDownload(req, res);
+  }
   const id = queryParam(req, "id");
   if (queryParam(req, "provider") !== "ltx" || !isValidLtxJobId(id)) {
     return res.status(405).json({ error: "Method not allowed" });

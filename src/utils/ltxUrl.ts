@@ -30,3 +30,27 @@ export function isTrustedLtxVideoUrl(input: unknown): input is string {
   if (u.port && u.port !== "443") return false;
   return u.hostname.length > 0;
 }
+
+/**
+ * The only origin the chunked download proxy may fetch from: LTX's result bucket on Google Cloud Storage
+ * (observed in production: https://storage.googleapis.com/ltxv-api-ephemeral-prd/model-serving/outputs/...).
+ * The bucket sends no CORS headers, so the browser cannot download results directly. A strict prefix keeps the
+ * proxy from becoming an open relay.
+ */
+export const LTX_RESULT_HOST = "storage.googleapis.com";
+export const LTX_RESULT_BUCKET_PREFIX = "/ltxv-api-ephemeral-prd/";
+
+export function isLtxProxyDownloadUrl(input: unknown): input is string {
+  if (!isTrustedLtxVideoUrl(input)) return false;
+  let u: URL;
+  try {
+    u = new URL(input);
+  } catch {
+    return false;
+  }
+  if (u.port) return false;
+  if (u.hostname.toLowerCase() !== LTX_RESULT_HOST) return false;
+  // Reject dot segments and encoded slashes that could escape the bucket prefix.
+  if (/(^|\/)\.\.?(\/|$)|%2f|%5c/i.test(u.pathname)) return false;
+  return u.pathname.startsWith(LTX_RESULT_BUCKET_PREFIX) && u.pathname.length > LTX_RESULT_BUCKET_PREFIX.length;
+}

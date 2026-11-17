@@ -2,7 +2,7 @@
  * Unit: LTX job client (create -> poll -> download). fetch is mocked; no real API calls, no real waits.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { generateLtxVideo, pickAspect } from "./ltxJobClient";
+import { downloadLtxResultViaProxy, generateLtxVideo, pickAspect } from "./ltxJobClient";
 
 const noSleep = async () => {};
 const json = (body: unknown, status = 200) =>
@@ -12,6 +12,67 @@ const OK_URL = "https://storage.googleapis.com/ltx-out/job_00000001.mp4";
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("downloadLtxResultViaProxy (chunked, LTX bucket has no CORS)", () => {
+  const RESULT = "https://storage.googleapis.com/ltxv-api-ephemeral-prd/model-serving/outputs/default/ABC/video.mp4?X-Goog-Signature=s";
+  const chunk = (n: number, total: number, fill = 1) =>
+    new Response(new Uint8Array(n).fill(fill), { status: 200, headers: { "x-total-length": String(total) } });
+
+  it("requests consecutive ranges through the proxy and joins them into one video/mp4 Blob", async () => {
+    const f = vi.fn(async (u: string) => {
+      const start = Number(new URL(u, "http://x").searchParams.get("start"));
+      return chunk(Math.min(4, 10 - start), 10, start + 1);
+    });
+    vi.stubGlobal("fetch", f);
+    const blob = await downloadLtxResultViaProxy(RESULT, undefined, 4);
+    expect(blob.size).toBe(10);
+    expect(blob.type).toBe("video/mp4");
+    expect(f).toHaveBeenCalledTimes(3);
+    const urls = f.mock.calls.map((c) => new URL(String(c[0]), "http://x"));
+    expect(urls.map((u) => [u.searchParams.get("start"), u.searchParams.get("end")])).toEqual([
+      ["0", "3"],
+      ["4", "7"],
+      ["8", "11"],
+    ]);
+    expect(urls[0].pathname).toBe("/api/generate-video");
+    expect(urls[0].searchParams.get("url")).toBe(RESULT);
+    expect(urls[0].searchParams.get("action")).toBe("download");
+  });
+
+  it("throws on a failed chunk or an invalid total so the caller can fall back to the remote URL", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "expired" }), { status: 410 })));
+    await expect(downloadLtxResultViaProxy(RESULT)).rejects.toThrow(/expired/);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Uint8Array(3), { status: 200 })));
+    await expect(downloadLtxResultViaProxy(RESULT)).rejects.toThrow(/total length/);
+    vi.stubGlobal("fetch", vi.fn(async () => chunk(0, 10)));
+    await expect(downloadLtxResultViaProxy(RESULT)).rejects.toThrow(/empty chunk/);
+  });
+
+  it("generateLtxVideo returns a blob: URL for bucket results via the proxy", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test-1");
+    const f = vi.fn(async (u: string, init?: RequestInit) => {
+      if (init?.method === "POST") return json({ jobId: "job_00000009", kind: "text" });
+      if (String(u).includes("action=download")) return chunk(5, 5);
+      return json({ status: "completed", videoUrl: RESULT });
+    });
+    vi.stubGlobal("fetch", f);
+    const out = await generateLtxVideo({ prompt: "p", sleep: noSleep });
+    expect(out).toMatchObject({ success: true, videoUrl: "blob:test-1", remoteUrl: RESULT, isBlob: true });
+    expect(f.mock.calls.some((c) => String(c[0]) === RESULT)).toBe(false);
+  });
+
+  it("generateLtxVideo falls back to the remote URL when the proxy download fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const f = vi.fn(async (u: string, init?: RequestInit) => {
+      if (init?.method === "POST") return json({ jobId: "job_00000010", kind: "text" });
+      if (String(u).includes("action=download")) return new Response("{}", { status: 410 });
+      return json({ status: "completed", videoUrl: RESULT });
+    });
+    vi.stubGlobal("fetch", f);
+    const out = await generateLtxVideo({ prompt: "p", sleep: noSleep });
+    expect(out).toMatchObject({ success: true, videoUrl: RESULT, isBlob: false });
+  });
 });
 
 describe("generateLtxVideo", () => {
