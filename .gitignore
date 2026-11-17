@@ -9,3 +9,15 @@ build
 *.local
 *.log
 .DS_Store
+
+# Strategic planning, commercial architecture & private notes (Security & IP Protection)
+*BLUEPRINT*.md
+*ARCHITECTURE*.md
+*STRATEGY*.md
+*BUSINESS*.md
+*COMMERCIAL*.md
+*ROADMAP*.md
+docs/private/
+.kiro/specs/**/*BLUEPRINT*.md
+.kiro/specs/**/*ARCHITECTURE*.md
+
