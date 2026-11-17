@@ -2428,25 +2428,14 @@ export const BioStitchLabView: React.FC = () => {
                     </span>
                   </button>
                 ))}
+                {/* 맨 위 [괴수 설계실] 버튼과 같은 동작: 괴수 설계실을 연다 */}
                 <button
                   type="button"
-                  onClick={() => setIsStitchModalOpen((prev) => !prev)}
-                  className={`shrink-0 w-[72px] sm:w-24 md:w-28 h-14 sm:h-16 md:h-[72px] rounded-lg text-[10px] sm:text-[11px] font-black cursor-pointer shadow-lg transition flex flex-col items-center justify-center gap-0.5 border px-1 text-center leading-tight ${
-                    isStitchModalOpen
-                      ? "bg-slate-800 text-slate-200 border-slate-600"
-                      : "bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-slate-950 border-emerald-300 active:scale-95"
-                  }`}
+                  onClick={() => setIsCustomMonsterModalOpen(true)}
+                  className="shrink-0 w-[72px] sm:w-24 md:w-28 h-14 sm:h-16 md:h-[72px] rounded-lg text-[10px] sm:text-[11px] font-black cursor-pointer shadow-lg transition flex flex-col items-center justify-center gap-0.5 border px-1 text-center leading-tight bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-slate-950 border-emerald-300 active:scale-95"
                 >
                   <span className="text-sm sm:text-base">⚡</span>
-                  <span>
-                    {isStitchModalOpen
-                      ? isKo
-                        ? "조립 실험실 닫기"
-                        : "Close Lab"
-                      : isKo
-                      ? "괴수 설계 & 전투"
-                      : "Monster Design & Battle"}
-                  </span>
+                  <span>{isKo ? "괴수 설계 & 전투" : "Monster Design & Battle"}</span>
                 </button>
               </div>
 
