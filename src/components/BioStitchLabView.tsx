@@ -21,7 +21,7 @@ import { ArenaHalf } from "./bioreactor/ArenaHalf";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
-import { BATTLE_VIDEO_SECONDS, generateBattleVideo } from "../services/battleVideoService";
+import { BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
 import {
   EMPTY_SLOTS,
   canStartDesignedBattle,
@@ -2831,6 +2831,7 @@ export const BioStitchLabView: React.FC = () => {
                           monster={arenaRight}
                           angleDeg={faceOffAngleDeg("right", arenaHasTwoDesigns)}
                           isKo={isKo}
+                          mirror={MIRROR_RIGHT_FIGHTER}
                           tint="rose"
                           emptyLabel={isKo ? "오른쪽 자리: 괴수 설계실에서 두 번째 괴수를 만들어 출격시키세요." : "Right half: design a second monster in the Design Room and send it out."}
                         />

@@ -7,6 +7,7 @@ import {
   computeMonsterBioStats,
   generateCustomMonsterImage,
   generateVideoFromMonsterImage,
+  mirrorImageDataUrl,
 } from "../../services/customMonsterMediaService";
 import type { ComicMonster } from "../../data/comicMonsters";
 import { saveMonster } from "../../services/monsterVaultService";
@@ -353,6 +354,20 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     setImagePromptEn(undefined);
     setVideoSource(null);
   };
+  // ↔ 방향 바꾸기: 이미지 생성기가 "오른쪽을 본다"를 항상 따르지는 않는다. 결투장에서는 왼쪽 괴수가 오른쪽을,
+  // 오른쪽 괴수(좌우 반전해서 보여 줌)가 왼쪽을 보게 되므로, 사용자가 출격 전에 괴수가 오른쪽을 보도록 맞춘다.
+  // 동영상은 이 이미지로 만들어지므로 동영상이 생기기 전에만 쓸 수 있다.
+  const handleFlipImage = async () => {
+    if (!generatedImageUrl || generatedVideoUrl || isBusy) return;
+    const flipped = await mirrorImageDataUrl(generatedImageUrl);
+    if (!flipped) {
+      setStatusMessage(isKo ? "이미지 방향을 바꾸지 못했습니다." : "The image could not be flipped.");
+      return;
+    }
+    setGeneratedImageUrl(flipped);
+    persistToVault(buildCustomMonsterObject({ imageUrl: flipped }), flipped, null);
+  };
+
   const currentId = buildIdRef.current?.id ?? "";
   const opponents = opponentsFor(opponentRoster, currentId);
   const selectedOpponent = opponents.find((m) => m.id === opponentId) ?? opponents[0];
@@ -646,6 +661,16 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
                 alt={customName}
                 className="w-full h-56 object-cover rounded-lg border border-slate-800 bg-black"
               />
+              {!generatedVideoUrl && (
+                <button
+                  type="button"
+                  onClick={() => void handleFlipImage()}
+                  disabled={isBusy}
+                  className="w-full text-[11px] font-bold rounded-lg border border-cyan-500/40 bg-slate-900 text-cyan-200 py-1.5 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ↔ {isKo ? "방향 바꾸기 (괴수가 오른쪽을 보게)" : "Flip direction (make it face right)"}
+                </button>
+              )}
             </div>
           )}
 

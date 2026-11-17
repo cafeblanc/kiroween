@@ -30,15 +30,15 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameEn: "Pyroclastic Dragon",
     icon: "🐉",
     colorHex: "#f97316",
-    baseImageSrc: "/images/chimera_myth_basilisk.jpg",
+    baseImageSrc: "/images/samples/myth_dragon.jpg",
     defaultParts: {
-      head: "날카로운 송곳니와 용암처럼 빛나는 황금빛 파충류 눈을 가진 용의 머리",
-      hornsOrCrown: "뒤로 뻗은 검은 흑요석 쌍뿔과 목 주변의 붉은 화염 갈기",
-      torso: "초고온 케라틴 비늘 갑옷으로 덮인 거대한 흉곽과 맥동하는 용암 심장",
-      arms: "강철을 찢는 거대한 발톱과 박쥐 날개막이 연결된 앞다리",
-      legs: "지면을 부수는 두꺼운 파충류 뒷다리와 쇠사슬 같은 힘줄",
-      tail: "끝에 창날 모양의 화염 가시가 달린 길고 묵직한 비늘 꼬리",
-      auraAndSkin: "틈새마다 붉은 마그마 빛이 새어 나오는 숯검정 용린 피부와 불꽃 입자",
+      head: "날카로운 송곳니가 드러난 긴 주둥이와 용암처럼 빛나는 황금빛 눈을 가진 용의 머리",
+      hornsOrCrown: "머리 뒤로 휘어진 검은 흑요석 쌍뿔과 목을 따라 솟은 붉은 가시 갈기",
+      torso: "붉게 달아오른 틈이 갈라진 숯검정 비늘로 덮인 거대한 몸통",
+      arms: "등에서 펼쳐진 거대한 박쥐 날개 한 쌍과 굵은 발톱이 달린 앞발",
+      legs: "땅을 딛고 선 두꺼운 파충류 뒷다리와 날카로운 발톱",
+      tail: "끝에 창날 모양 가시가 달린 길고 묵직한 비늘 꼬리",
+      auraAndSkin: "비늘 틈새로 새어 나오는 붉은 마그마 빛과 주위를 떠도는 불티",
     },
   },
   {
@@ -47,15 +47,15 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameEn: "Abyssal Kraken",
     icon: "🐙",
     colorHex: "#8b5cf6",
-    baseImageSrc: "/images/chimera_alien_cthulhu.jpg",
+    baseImageSrc: "/images/samples/myth_kraken.jpg",
     defaultParts: {
-      head: "거대한 외투막 두부와 3개의 발광 심해안(Deep-sea Eyes)을 지닌 머리",
-      hornsOrCrown: "머리 위로 솟은 보라빛 생체 발광 지느러미 왕관",
-      torso: "반투명 심해 연골과 보랏빛 신경절이 비치는 거대 몸통",
-      arms: "흡반마다 날카로운 갈고리가 돋아난 8개의 거대 촉수 팔",
-      legs: "수압을 가르는 분사 추진 사이펀과 얽힌 하부 촉수 다리",
-      tail: "후방으로 길게 뻗어 전기 충격을 방출하는 채찍형 발광 촉수",
-      auraAndSkin: "어둠 속에서 네온 보라색과 청록색으로 맥동하는 점액질 생체발광 피부",
+      head: "크고 둥근 보라색 문어 머리와 노랗게 빛나는 커다란 눈 두 개",
+      hornsOrCrown: "머리 위에 솟은 보랏빛 발광 지느러미 볏",
+      torso: "머리 아래에서 촉수들이 모이는 짧고 두꺼운 보라색 몸통",
+      arms: "흡반마다 갈고리 가시가 돋은 굵고 긴 보라색 촉수 여덟 개",
+      legs: "다리 없이 바닥을 짚고 몸을 받치는 아래쪽 촉수들",
+      tail: "꼬리 없이 몸 뒤로 길게 늘어진 촉수 끝",
+      auraAndSkin: "흡반을 따라 청록색으로 빛나는 점액질 보라색 피부",
     },
   },
   {
@@ -64,15 +64,15 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameEn: "Xenomorph Bio-Titan",
     icon: "👽",
     colorHex: "#10b981",
-    baseImageSrc: "/images/chimera_alien_xenomorph.jpg",
+    baseImageSrc: "/images/samples/alien_xenomorph.jpg",
     defaultParts: {
-      head: "매끈하게 뒤로 길게 뻗은 검은 키틴질 두개골과 이중 턱(Inner Jaw)",
-      hornsOrCrown: "등과 머리를 따라 솟은 예리한 생체 방열 볏(Crest)",
-      torso: "갈비뼈 형태의 검은 외골격 장갑과 초강산 혈관 파이프가 드러난 몸통",
-      arms: "긴 면도날 같은 발톱이 달린 3관절 포식자 팔",
-      legs: "역관절 구조로 도약력이 극대화된 민첩한 외계 다리",
-      tail: "전갈처럼 등 위로 치켜든 칼날형 절지 꼬리",
-      auraAndSkin: "형광 연두빛 산성 체액이 흐르는 젖은 흑요석 키틴 외피",
+      head: "뒤로 길게 뻗은 매끈한 검은 두개골과 눈 없는 얼굴, 은빛 이빨 사이로 나오는 작은 안쪽 턱",
+      hornsOrCrown: "등을 따라 솟은 검은 관 모양 돌기 네 개",
+      torso: "갈비뼈 모양 외골격이 드러난 마르고 긴 검은 몸통",
+      arms: "긴 손가락 끝에 면도날 발톱이 달린 가늘고 긴 팔",
+      legs: "역관절로 꺾인 길고 날렵한 다리",
+      tail: "끝에 칼날이 달린 길고 마디진 검은 꼬리",
+      auraAndSkin: "형광 연두색 산성 침이 흐르는 젖은 흑요석 키틴 외피",
     },
   },
   {
@@ -81,15 +81,15 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameEn: "Void Abyss Leviathan",
     icon: "🛸",
     colorHex: "#06b6d4",
-    baseImageSrc: "/images/chimera_microscopy_quad.jpg",
+    baseImageSrc: "/images/samples/alien_void_slug.jpg",
     defaultParts: {
-      head: "눈 대신 우주 성운처럼 소용돌이치는 시안빛 감각 기관이 모인 머리",
-      hornsOrCrown: "머리 주변을 떠다니는 반투명 생체발광 촉모 왕관",
-      torso: "내부 장기와 별빛 같은 미토콘드리아가 투명하게 비치는 유체 몸통",
-      arms: "실처럼 뻗어 먹이를 포획하는 다중 발광 촉수 팔",
-      legs: "무중력 유영에 최적화된 물결치는 지느러미 하체",
-      tail: "공간을 가르는 듯한 긴 반투명 유령 꼬리",
-      auraAndSkin: "형광 시안·에메랄드 빛 포자가 흩날리는 반투명 우주 생물 피부",
+      head: "빛나는 시안색 눈 여섯 개와 바늘 이빨이 늘어선 큰 입을 가진 장어 같은 머리",
+      hornsOrCrown: "머리 주위에 떠 있는 반투명 발광 촉모 왕관",
+      torso: "속의 빛나는 장기가 비치는 길고 반투명한 뱀장어형 몸통",
+      arms: "몸 옆에서 물결치는 가늘고 긴 발광 촉수 네 개",
+      legs: "다리 없이 몸 아래에서 물결치는 넓은 지느러미",
+      tail: "끝이 희미하게 사라지는 길고 반투명한 꼬리지느러미",
+      auraAndSkin: "주위에 시안색과 에메랄드색 빛 입자가 떠도는 반투명한 푸른 피부",
     },
   },
   {
@@ -98,15 +98,15 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameEn: "Modern Bio-Frankenstein",
     icon: "🧟",
     colorHex: "#38bdf8",
-    baseImageSrc: "/images/frankenstein_chimera.jpg",
+    baseImageSrc: "/images/samples/myth_frankenstein.jpg",
     defaultParts: {
-      head: "사각형 이마에 수술 봉합선과 짙은 다크서클, 고뇌에 찬 눈빛의 머리",
-      hornsOrCrown: "목 양옆에 박힌 두 개의 고전압 금속 전극 볼트",
-      torso: "다종의 생체 근육이 외과 봉합선으로 정교하게 접합된 거구 몸통",
-      arms: "강철 같은 악력을 지닌 흉터투성이의 두꺼운 양팔",
-      legs: "묵직한 실험실 부츠를 딛고 서 있는 압도적 크기의 다리",
-      tail: "꼬리 없이 등 뒤로 이어진 생명유지 장치 케이블과 생체 튜브",
-      auraAndSkin: "창백한 푸른빛 피부 위로 푸른 전기 스파크가 튀는 소생 실험체",
+      head: "평평하고 각진 이마에 굵은 수술 봉합선이 있는 창백한 거인 괴물의 얼굴과 빛나는 주황색 눈",
+      hornsOrCrown: "목을 감싼 푸른빛 금속 전극 고리와 케이블",
+      torso: "흉터와 봉합선으로 이어 붙인 근육질 거구 상체",
+      arms: "봉합선과 금속 고리가 감긴 굵고 긴 팔과 큰 주먹",
+      legs: "검은 바지를 입은 굵은 다리",
+      tail: "꼬리 없음, 등에서 늘어진 굵은 전선 케이블",
+      auraAndSkin: "창백한 회녹색 피부 위로 흐르는 녹색 전기 줄기",
     },
   },
   {
@@ -115,15 +115,15 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameEn: "Homo Prometheus",
     icon: "🧬",
     colorHex: "#34d399",
-    baseImageSrc: "/images/yale_brainex_perfusion_lab.jpg",
+    baseImageSrc: "/images/samples/human_prometheus.jpg",
     defaultParts: {
-      head: "투명한 바이오 글래스 헬멧 안에서 뇌 오가노이드가 빛나는 인간형 두부",
-      hornsOrCrown: "관자놀이에 연결된 금빛 신경 인터페이스 센서",
-      torso: "인공 심장과 투명 혈관 네트워크가 비치는 강화 인간 흉부",
-      arms: "정밀 나노 근섬유로 재구성된 양팔",
-      legs: "인간과 동일한 비율의 고탄력 생체공학 다리",
-      tail: "꼬리 대신 척추를 따라 빛나는 에메랄드 신경 척수 라인",
-      auraAndSkin: "반투명 합성 피부 아래로 에메랄드 신경 펄스가 흐르는 차세대 인간",
+      head: "빛나는 에메랄드색 눈과 강철 같은 턱을 가진 민머리 강화 인간 전사의 머리",
+      hornsOrCrown: "관자놀이에서 뒤로 뻗은 금빛 금속 센서 돌기",
+      torso: "가슴 한가운데 빛나는 인공 심장이 비치는 투명 흉갑을 두른 근육질 상체",
+      arms: "주먹에 생체 강철 너클이 돋은 굵은 근육질 양팔",
+      legs: "무릎 장갑을 두른 탄탄한 근육질 두 다리",
+      tail: "꼬리 없음, 척추를 따라 빛나는 에메랄드색 줄",
+      auraAndSkin: "녹색 빛 혈관이 비치는 반투명한 합성 피부",
     },
   },
 ];
@@ -225,6 +225,27 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Left-right mirror of an image as a JPEG data URL; null when the image cannot be loaded or drawn. */
+export async function mirrorImageDataUrl(src: string): Promise<string | null> {
+  try {
+    const img = await loadImageElement(src);
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } catch {
+    return null;
+  }
+}
+
 function drawCoverImage(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -261,8 +282,6 @@ function hashString(str: string): number {
 
 export type MonsterCombatStats = Pick<MonsterBioStats, "atk" | "def" | "spd" | "regen" | "energy">;
 
-const MAX_TRANSLATED_DESCRIPTION_CHARS = 1100;
-
 function statTier(value: number, low: string, mid: string, high: string): string {
   return value >= 80 ? high : value >= 60 ? mid : low;
 }
@@ -279,21 +298,72 @@ export function describeStatsForPrompt(stats: MonsterCombatStats): string {
   return `${cues.join(", ")} (combat stats ATK ${stats.atk}, DEF ${stats.def}, SPD ${stats.spd}, REGEN ${stats.regen}, ENERGY ${stats.energy})`;
 }
 
+/** Pure: the visual cues of the stats, without the numbers (numbers in an image prompt tend to be drawn as text). */
+export function statCuesForImage(stats: MonsterCombatStats): string {
+  return describeStatsForPrompt(stats).replace(/\s*\(combat stats[^)]*\)\s*$/, "");
+}
+
+/** Max length of the design part of the image prompt (the model weighs the first part of a long prompt most). */
+export const MAX_IMAGE_DESIGN_CHARS = 700;
+
+/** Opening of every image prompt; also how the battle prompt recognises the current format. */
+export const IMAGE_PROMPT_HEAD = "Full-body shot of a single";
+
+// "[베이스 종족: …]" / "[Base species: …]" lines carry no look; "• 머리: …" / "• Head: …" labels name the field,
+// and their translation ("Arms, Tentacles, Wings") put tentacles on dragons.
+const BRACKET_LINE = /^\s*\[[^\]]*\]\s*$/;
+const PART_LABEL = /^\s*[•·\-*]\s*[^:：\n]{1,40}[:：]\s*/;
+
+/** Pure: removes the field labels and the base-species line, keeping one design phrase per line. */
+export function stripPartLabels(description: string): string {
+  return description
+    .split("\n")
+    .filter((line) => !BRACKET_LINE.test(line))
+    .map((line) => line.replace(PART_LABEL, "").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Cuts at a word boundary so the model never sees half a word. */
+function cutAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:]+$/, "");
+}
+
 /**
- * Pure: composes the final English image prompt from the already-translated per-part description
- * (head, horns/crown/electrodes, torso, arms/tentacles/wings, legs, tail, skin/aura) and the stats.
+ * Pure: the English image prompt from the translated per-part description and the stats.
+ * Three parts split by ";" (head / design / stat cues) then a fixed scene; the battle prompt reads the design part.
+ * Full body, side three-quarter view facing right: the battle first frame mirrors the right fighter so the two face
+ * each other, and a front-facing close-up makes the video model attack the camera.
  */
 export function composeEnglishMonsterPrompt(
   presetNameEn: string,
   translatedDescription: string,
   stats?: MonsterCombatStats,
 ): string {
-  const compact = translatedDescription
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, MAX_TRANSLATED_DESCRIPTION_CHARS);
-  const statClause = stats ? `, ${describeStatsForPrompt(stats)}` : "";
-  return `Photorealistic bio-engineered ${presetNameEn} monster inside a dark sci-fi laboratory bioreactor chamber, ${compact}${statClause}, cinematic studio lighting, ultra detailed creature anatomy, no text`;
+  const design = cutAtWord(
+    stripPartLabels(translatedDescription)
+      .split("\n")
+      .map((l) => l.replace(/[;]+/g, ",").replace(/[.\s]+$/, "").trim())
+      .filter(Boolean)
+      .join(", ")
+      .replace(/\s+/g, " ")
+      .trim(),
+    MAX_IMAGE_DESIGN_CHARS,
+  );
+  const name = presetNameEn.replace(/[;]+/g, " ").trim() || "bio-engineered";
+  const parts = [
+    `${IMAGE_PROMPT_HEAD} ${name} monster, its whole body visible from head to toe inside the frame, side three-quarter view facing right`,
+    design || "a hulking bio-engineered creature",
+  ];
+  if (stats) parts.push(statCuesForImage(stats));
+  parts.push(
+    // Bright key light: with only rim light on a dark set every creature came out as a black silhouette.
+    "bright cinematic key light showing its true colours and details clearly, dark sci-fi arena background, sharp focus, highly detailed fantasy creature concept art, no text, no letters",
+  );
+  return parts.join("; ");
 }
 
 export async function buildEnglishMonsterPrompt(
@@ -301,8 +371,19 @@ export async function buildEnglishMonsterPrompt(
   description: string,
   stats?: MonsterCombatStats,
 ): Promise<string> {
-  const translated = await translateTextToLanguage(description, "en", "ko");
+  // Labels are removed before translating, so the translator never sees them.
+  const translated = await translateTextToLanguage(stripPartLabels(description), "en", "ko");
   return composeEnglishMonsterPrompt(preset.nameEn, translated, stats);
+}
+
+export const POLLINATIONS_ATTEMPTS = 2;
+export const POLLINATIONS_TIMEOUT_MS = 45000;
+const POLLINATIONS_RETRY_DELAY_MS = 4000;
+export const IMAGE_SIZE_PX = 1024;
+
+/** Pure: the Pollinations FLUX request for a prompt and seed. */
+export function pollinationsImageUrl(prompt: string, seed: number): string {
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${IMAGE_SIZE_PX}&height=${IMAGE_SIZE_PX}&model=flux&nologo=true&seed=${seed}`;
 }
 
 let seedCounter = 0;
@@ -380,16 +461,19 @@ export async function generateCustomMonsterImage(params: {
     }
   }
 
-  // 2. Zero-key Real Generative AI Image (Pollinations.ai) driven by exact body-part prompt
-  try {
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      englishPrompt,
-    )}?width=768&height=768&nologo=true&seed=${seed}`;
-    const dataUrl = await fetchImageBlobAsDataUrl(pollinationsUrl, undefined, 16000);
-    return { imageUrl: dataUrl, themeHex: theme.primary, source: "pollinations", promptEn: englishPrompt, seed };
-  } catch {
-    // Fall through to procedural multi-part mutation canvas
+  // 2. Zero-key Real Generative AI Image (Pollinations.ai FLUX) driven by exact body-part prompt.
+  // Without model=flux Pollinations uses a weaker default model (dark, face-only results). It often answers 503
+  // when busy, so one retry with a short pause.
+  const pollinationsUrl = pollinationsImageUrl(englishPrompt, seed);
+  for (let attempt = 0; attempt < POLLINATIONS_ATTEMPTS; attempt++) {
+    try {
+      const dataUrl = await fetchImageBlobAsDataUrl(pollinationsUrl, undefined, POLLINATIONS_TIMEOUT_MS);
+      return { imageUrl: dataUrl, themeHex: theme.primary, source: "pollinations", promptEn: englishPrompt, seed };
+    } catch {
+      if (attempt + 1 < POLLINATIONS_ATTEMPTS) await new Promise((r) => window.setTimeout(r, POLLINATIONS_RETRY_DELAY_MS));
+    }
   }
+  // Fall through to procedural multi-part mutation canvas (built on the preset's own sample image)
 
   // 3. Offline / Fallback Procedural Multi-Part Mutation Canvas (visibly varies per prompt)
   const size = 768;

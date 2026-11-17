@@ -13,7 +13,9 @@ import {
   coverSourceRect,
   designFromImagePrompt,
   generateBattleVideo,
+  MIRROR_RIGHT_FIGHTER,
 } from "./battleVideoService";
+import { composeEnglishMonsterPrompt } from "./customMonsterMediaService";
 import * as videoGenService from "./videoGenService";
 
 const fire = { id: "custom_a", nameEn: "Flame Dragon Custom", promptEn: "a crimson dragon with magma scales and ember wings", colorHex: "#ef4444" };
@@ -29,10 +31,41 @@ describe("composeBattleVideoPrompt", () => {
   const p = composeBattleVideoPrompt(fire, xeno, story);
 
   it("makes every body part fight, with the mouth flame cannon, tail attacks and lasers", () => {
-    for (const word of ["head", "jaws", "clawed arms", "legs", "tail", "torso", "flame cannons from their mouths", "laser beams"]) {
+    for (const word of ["head", "jaws", "clawed arms", "legs", "tail", "torso", "flame cannon from its mouth", "laser beams"]) {
       expect(p).toContain(word);
     }
     expect(p).toMatch(/whips its spiked tail/);
+  });
+
+  it("aims every attack at the opponent, never at the camera (fighting, not dancing)", () => {
+    expect(p).toContain("a wide side-view shot");
+    expect(p).toContain("On the left, facing right toward its enemy:");
+    expect(p).toContain("On the right, facing left toward its enemy:");
+    expect(p).toContain("They never look at or attack toward the camera");
+    expect(p).toContain("travels sideways across the arena into the other creature's body");
+    // who -> direction -> body part hit -> reaction
+    expect(p).toContain("swings its clawed arms into the face and torso of the toxic green right creature, which is knocked back");
+    expect(p).toContain("whips its spiked tail into the head of the crimson red left creature, which reels backward");
+    expect(p).toContain("The crimson red left creature turns its head toward the toxic green right creature");
+    expect(p).toContain("hitting the toxic green right creature in the chest");
+    expect(p).toContain("laser beams into the body of the crimson red left creature");
+    expect(p).toContain("every hit visibly shoves its target backward");
+    // The edited story still fits in full with normal-length input
+    expect(p).toContain("slashes its claws across the titan's torso");
+    expect(p.length).toBeLessThanOrEqual(MAX_BATTLE_PROMPT_CHARS);
+  });
+
+  it("keeps the direction sentences even with the longest names, designs and story", () => {
+    const long = "x".repeat(900);
+    const out = composeBattleVideoPrompt(
+      { ...fire, nameEn: long, promptEn: long },
+      { ...xeno, nameEn: long, promptEn: long },
+      { act2_clash: long, act3_finish: long },
+    );
+    expect(out.length).toBeLessThanOrEqual(MAX_BATTLE_PROMPT_CHARS);
+    expect(out).toContain("never look at or attack toward the camera");
+    expect(out).toContain("every hit visibly shoves its target backward");
+    expect(out.endsWith("no text, no subtitles, no logos.")).toBe(true);
   });
 
   it("is one continuous take with no cuts (cuts let the model re-draw both fighters as the same creature)", () => {
@@ -49,8 +82,8 @@ describe("composeBattleVideoPrompt", () => {
   });
 
   it("puts both fighters, the edited exchange and the finish in the prompt", () => {
-    expect(p).toContain("On the left: Flame Dragon Custom, a crimson red creature: a crimson dragon");
-    expect(p).toContain("On the right: Xenomorph Bio-Titan, a toxic green creature");
+    expect(p).toContain("On the left, facing right toward its enemy: Flame Dragon Custom, a crimson red creature: a crimson dragon");
+    expect(p).toContain("On the right, facing left toward its enemy: Xenomorph Bio-Titan, a toxic green creature");
     expect(p).not.toContain("12.");
     expect(p).toContain("slashes its claws across the titan's torso");
     expect(p).toContain("slams it down");
@@ -89,9 +122,19 @@ describe("fighter descriptions stay distinct", () => {
       { id: "custom_2", nameEn: "Leviathan B", promptEn: boiler("a blue void demon with glowing eyes"), colorHex: "#3b82f6" },
       story,
     );
-    expect(a).toContain("On the left: Dragon A, a crimson red creature: obsidian scales and ember wings.");
-    expect(a).toContain("On the right: Leviathan B, a deep blue creature: a blue void demon with glowing eyes.");
+    expect(a).toContain("On the left, facing right toward its enemy: Dragon A, a crimson red creature: obsidian scales and ember wings.");
+    expect(a).toContain("On the right, facing left toward its enemy: Leviathan B, a deep blue creature: a blue void demon with glowing eyes.");
     expect(a).not.toContain("laboratory bioreactor chamber");
+  });
+
+  it("reads only the design from the current image prompt format", () => {
+    const img = composeEnglishMonsterPrompt("Pyroclastic Dragon", "a horned black dragon, bat wings", { atk: 90, def: 90, spd: 90, regen: 90, energy: 90 });
+    expect(designFromImagePrompt(img)).toBe("a horned black dragon, bat wings");
+    expect(designFromImagePrompt(`${img}\n[Combat Stats: ATK 90]`)).toBe("a horned black dragon, bat wings");
+  });
+
+  it("mirrors the right fighter so the two face each other", () => {
+    expect(MIRROR_RIGHT_FIGHTER).toBe(true);
   });
 
   it("names colours from the theme hex", () => {

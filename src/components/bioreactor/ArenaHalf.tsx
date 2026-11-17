@@ -27,13 +27,16 @@ interface ArenaHalfProps {
   isKo: boolean;
   emptyLabel: string;
   tint: "cyan" | "rose";
+  /** Mirror the image and video (right half): monster images face right, so the right one is flipped to face left. */
+  mirror?: boolean;
 }
 
 /**
  * One half of the arena: the monster's image, plus its entrance video which plays only the first
  * ENTRANCE_PLAY_SECONDS and then freezes on that frame. The half turns slowly toward the opponent (CSS 3D).
  */
-export const ArenaHalf: React.FC<ArenaHalfProps> = ({ monster, angleDeg, isKo, emptyLabel, tint }) => {
+export const ArenaHalf: React.FC<ArenaHalfProps> = ({ monster, angleDeg, isKo, emptyLabel, tint, mirror = false }) => {
+  const flip = mirror ? "-scale-x-100" : "";
   const reduced = usePrefersReducedMotion();
   // The still image stays under the video until the video's first frame is decoded, then the video fades in (no hard cut).
   const [videoShown, setVideoShown] = useState(false);
@@ -59,7 +62,7 @@ export const ArenaHalf: React.FC<ArenaHalfProps> = ({ monster, angleDeg, isKo, e
               onError={(e) => {
                 if (monster.avatarImg && e.currentTarget.src !== monster.avatarImg) e.currentTarget.src = monster.avatarImg;
               }}
-              className="absolute inset-0 w-full h-full object-cover"
+              className={`absolute inset-0 w-full h-full object-cover ${flip}`}
             />
             {hasOwnEntranceVideo(monster.videoSrc) && (
               <video
@@ -75,7 +78,7 @@ export const ArenaHalf: React.FC<ArenaHalfProps> = ({ monster, angleDeg, isKo, e
                   const v = e.currentTarget;
                   if (shouldFreezeEntrance(v.currentTime)) v.pause();
                 }}
-                className="absolute inset-0 w-full h-full object-cover"
+                className={`absolute inset-0 w-full h-full object-cover ${flip}`}
               />
             )}
             {/* No name caption on the battle stage: the names are in the match list above */}

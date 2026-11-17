@@ -8,6 +8,7 @@
  */
 import { detectArenaElement, type ArenaElement, type ElementSource } from "../utils/arenaBattle";
 import { plainStoryText } from "../components/bioreactor/arena/clashPrompt";
+import { IMAGE_PROMPT_HEAD } from "./customMonsterMediaService";
 import { generateMonsterVideo } from "./videoGenService";
 import type { LtxDuration, LtxJobStatus } from "./ltxJobClient";
 
@@ -29,7 +30,9 @@ export const BATTLE_VIDEO_SECONDS: LtxDuration = 12;
 /** Must stay under the server's MAX_PROMPT_CHARS (2000). */
 export const MAX_BATTLE_PROMPT_CHARS = 1900;
 const MAX_FIGHTER_CHARS = 200;
+const MIN_FIGHTER_CHARS = 60;
 const MAX_STORY_CHARS = 300;
+const MIN_FINISH_CHARS = 80;
 const MAX_EXCHANGE_CHARS = 360;
 
 /** Signature ranged attack per element; every battle also gets generic fire and laser fire. */
@@ -66,7 +69,13 @@ function cleanName(nameEn: string, fallback: string): string {
  * Only the design part in the middle is kept.
  */
 export function designFromImagePrompt(promptEn: string | undefined): string {
-  return (promptEn ?? "")
+  const raw = promptEn ?? "";
+  // Current format: "<head>; <design>; <stat cues>; <scene>" (composeEnglishMonsterPrompt). Only the design is kept.
+  if (raw.trimStart().startsWith(IMAGE_PROMPT_HEAD)) {
+    const sections = raw.split(";");
+    return sections.length >= 3 ? sections[1].replace(/\s+/g, " ").trim() : "";
+  }
+  return raw
     .replace(/\[[^\]]*\]/g, " ")
     .replace(/\s+/g, " ")
     .replace(/^\s*photorealistic bio-engineered .*? monster inside a dark sci-fi laboratory bioreactor chamber,?\s*/i, "")
@@ -105,10 +114,10 @@ export function colorWord(hex: string | undefined): string {
 }
 
 /** Appearance of one fighter for the prompt: colour + its own design text, or a generic line from the name. */
-export function describeBattleFighter(f: BattleVideoFighter, fallbackName: string): string {
+export function describeBattleFighter(f: BattleVideoFighter, fallbackName: string, maxChars = MAX_FIGHTER_CHARS): string {
   const name = cleanName(f.nameEn, fallbackName);
   const color = colorWord(f.colorHex);
-  const design = toPromptText(designFromImagePrompt(f.promptEn), MAX_FIGHTER_CHARS);
+  const design = toPromptText(designFromImagePrompt(f.promptEn), maxChars);
   const body = design || "a hulking bio-engineered monster";
   return `${name}, a ${color ? `${color} ` : ""}creature: ${body}`;
 }
@@ -129,18 +138,28 @@ export function composeBattleVideoPrompt(
   const atk1 = ELEMENT_ATTACK_EN[detectArenaElement(f1)];
   const atk2 = ELEMENT_ATTACK_EN[detectArenaElement(f2)];
   // Act 2 (the exchange, possibly edited by the user) and act 3 (the finish, which names the winner).
-  const finish = toPromptText(storyEn.act3_finish, MAX_STORY_CHARS);
-  const build = (exchangeChars: number) => {
+  const build = (exchangeChars: number, finishChars: number, fighterChars: number) => {
     const exchange = exchangeChars > 20 ? toPromptText(storyEn.act2_clash, exchangeChars) : "";
-    return composeParts(f1, f2, n1, n2, atk1, atk2, exchange, finish);
+    const finish = toPromptText(storyEn.act3_finish, finishChars);
+    return composeParts(f1, f2, n1, n2, atk1, atk2, exchange, finish, fighterChars);
   };
-  // The exchange is the flexible part: shrink it so the fixed motion and "no text" sentences always fit.
-  let prompt = build(MAX_EXCHANGE_CHARS);
-  if (prompt.length > MAX_BATTLE_PROMPT_CHARS) {
-    prompt = build(MAX_EXCHANGE_CHARS - (prompt.length - MAX_BATTLE_PROMPT_CHARS) - 10);
+  // The fixed direction and "no text" sentences must always fit. Shrink the flexible parts in this order:
+  // the exchange, then the finish, then the fighter designs (each step only as far as needed).
+  let ex = MAX_EXCHANGE_CHARS;
+  let fin = MAX_STORY_CHARS;
+  let fig = MAX_FIGHTER_CHARS;
+  let prompt = build(ex, fin, fig);
+  for (let i = 0; i < 6 && prompt.length > MAX_BATTLE_PROMPT_CHARS; i++) {
+    const over = prompt.length - MAX_BATTLE_PROMPT_CHARS + 10;
+    if (ex > 20) ex = Math.max(0, ex - over);
+    else if (fin > MIN_FINISH_CHARS) fin = Math.max(MIN_FINISH_CHARS, fin - over);
+    else fig = Math.max(MIN_FIGHTER_CHARS, fig - Math.ceil(over / 2));
+    prompt = build(ex, fin, fig);
   }
   return prompt.slice(0, MAX_BATTLE_PROMPT_CHARS);
 }
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function composeParts(
   f1: BattleVideoFighter,
@@ -151,6 +170,7 @@ function composeParts(
   atk2: string,
   exchange: string,
   finish: string,
+  fighterChars: number,
 ): string {
   const c1 = colorWord(f1.colorHex);
   const c2 = colorWord(f2.colorHex);
@@ -159,20 +179,25 @@ function composeParts(
   const tag2 = `the ${c2 && c2 !== c1 ? `${c2} ` : ""}right creature`;
   // One continuous take (no cuts): the LTX guide recommends it for image-to-video, and cuts let the model re-draw
   // both fighters from text, which turned two different designs into the same creature.
+  // Every attack names who attacks, the direction (across the arena), the body part it hits and the reaction:
+  // LTX has no negative prompt, and attacks without a target come out as creatures roaring and punching at the camera.
+  void n1;
+  void n2;
   const parts = [
-    "One continuous cinematic take, no cuts, starting exactly from the first frame: a dark sci-fi bio-lab arena lit by cold cyan and red rim light.",
-    "Two completely different creatures face each other.",
-    `On the left: ${describeBattleFighter(f1, "the left monster")}.`,
-    `On the right: ${describeBattleFighter(f2, "the right monster")}.`,
-    "Each creature keeps its own colours, body shape, head, horns, limbs and tail for the whole clip; they never merge, swap places or turn into each other.",
-    `They charge and collide: ${tag1} (${n1}) swings its clawed arms and slashes the torso of ${tag2} while its legs stomp the cracking floor,`,
-    `and ${tag2} (${n2}) whips its spiked tail like a scythe, smashing it into the head of ${tag1}; their bodies twist and grapple.`,
-    "The camera swoops low as both rear their heads, open their jaws wide and fire roaring flame cannons from their mouths at each other,",
-    `while bright laser beams cross in mid-air; ${tag1} unleashes ${atk1} and ${tag2} answers with ${atk2},`,
-    "exploding into sparks, shockwaves, smoke and flying debris.",
-    exchange ? `The exchange unfolds like this: ${exchange}.` : "",
-    `The camera pushes in for the finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
-    "Fast handheld action camera with motion blur, photorealistic creatures, Unreal Engine 5 quality, no text, no subtitles, no logos.",
+    "One continuous cinematic take, no cuts, from the first frame: a wide side-view shot of a dark sci-fi bio-lab arena.",
+    "Two completely different creatures face each other in profile.",
+    `On the left, facing right toward its enemy: ${describeBattleFighter(f1, "the left monster", fighterChars)}.`,
+    `On the right, facing left toward its enemy: ${describeBattleFighter(f2, "the right monster", fighterChars)}.`,
+    "Each keeps its own colours, body shape, head, horns, limbs and tail; they never merge, swap places or turn into each other.",
+    "They never look at or attack toward the camera; every strike and blast travels sideways across the arena into the other creature's body.",
+    `They charge and collide: ${tag1} swings its clawed arms into the face and torso of ${tag2}, which is knocked back;`,
+    `${tag2} whips its spiked tail into the head of ${tag1}, which reels backward; legs stomp the cracking floor.`,
+    `${cap(tag1)} turns its head toward ${tag2}, opens its jaws and fires a flame cannon from its mouth with ${atk1}, hitting ${tag2} in the chest;`,
+    `${tag2} fires back from its mouth with ${atk2} and laser beams into the body of ${tag1}.`,
+    "The blasts collide between them in sparks, smoke and debris, and every hit visibly shoves its target backward.",
+    exchange ? `The exchange: ${exchange}.` : "",
+    `The camera tracks sideways for the finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
+    "Fast handheld side-on action camera, motion blur, photorealistic creatures, no text, no subtitles, no logos.",
   ].filter(Boolean);
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
@@ -188,6 +213,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /** Share of the image height cut from the bottom of each monster image (removes the pollinations.ai watermark). */
 export const FIRST_FRAME_CROP_BOTTOM = 0.1;
+/** The right fighter is drawn mirrored (images face right), in the first frame and in the arena's right half. */
+export const MIRROR_RIGHT_FIGHTER = true;
 /** Half-width of the blended dark band between the two monsters in the first frame. */
 export const FIRST_FRAME_SEAM_PX = 70;
 
@@ -251,9 +278,19 @@ export async function composeBattleFirstFrame(img1: string, img2: string): Promi
     // cropped off (pollinations.ai stamps its watermark there). The video model then animates a single arena instead of
     // re-drawing the creatures from text.
     const half = W / 2;
-    for (const [img, x0] of [[a, 0], [b, half]] as const) {
+    // Monster images face right (composeEnglishMonsterPrompt), so the right fighter is mirrored: from the first frame
+    // the two face each other, and the video model attacks across the arena instead of toward the camera.
+    for (const [img, x0, mirror] of [[a, 0, false], [b, half, MIRROR_RIGHT_FIGHTER]] as const) {
       const s = coverSourceRect(img.naturalWidth || img.width, img.naturalHeight || img.height, half, H, FIRST_FRAME_CROP_BOTTOM);
-      ctx.drawImage(img, s.sx, s.sy, s.sw, s.sh, x0, 0, half, H);
+      if (mirror) {
+        ctx.save();
+        ctx.translate(x0 + half, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, s.sx, s.sy, s.sw, s.sh, 0, 0, half, H);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, s.sx, s.sy, s.sw, s.sh, x0, 0, half, H);
+      }
     }
     // Blend the seam: a dark band in the middle fades both halves into the same smoky arena.
     const seam = ctx.createLinearGradient(half - FIRST_FRAME_SEAM_PX, 0, half + FIRST_FRAME_SEAM_PX, 0);
