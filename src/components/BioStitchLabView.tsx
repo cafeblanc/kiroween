@@ -36,6 +36,7 @@ import {
   type IncubationPhase,
   MONSTER_REVEAL_MS,
   SUMMON_ROAR_INTERVAL_MS,
+  TANK_CAPTION_CROP_SCALE,
   TANK_HOLD_LOOP_START_FRACTION,
   faceOffAngleDeg,
   summonRoarVolume,
@@ -3053,14 +3054,16 @@ export const BioStitchLabView: React.FC = () => {
       {/* ⚡ 배양기 가동: 전체 화면 배양기 영상 → 이미지가 탱크 안에서 형성 → (reveal) 유리 파열 3D 연출이 위에 겹친다. 영상은 끝까지 마운트되어 검은 프레임이 없다 */}
       {incubating && (
         <div className="fixed inset-0 z-[66] bg-black overflow-hidden text-slate-100" role="status" aria-live="polite">
-          {/* No `loop`: the clip is steered by tankClipAction and paused at the hand-off point */}
+          {/* No `loop`: the clip is steered by tankClipAction and paused at the hand-off point.
+              Scaled up so the clip's own burned-in captions (top and bottom bands) fall outside the screen. */}
           <video
             src="/videos/chimera_growth_dragon_24s.mp4"
             autoPlay
             muted
             playsInline
             onTimeUpdate={(e) => onTankTimeUpdate(e.currentTarget)}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover origin-center"
+            style={{ transform: `scale(${TANK_CAPTION_CROP_SCALE})` }}
           />
           {incubating.phase === "reveal" && incubating.ready && (
             /* The image grows out of the tank centre in 3D and expands until it covers the whole screen; it ends

@@ -5,7 +5,9 @@ import {
   ENTRANCE_PLAY_SECONDS,
   SUMMON_ROAR_MAX_VOLUME,
   SUMMON_ROAR_MIN_VOLUME,
+  TANK_CAPTION_CROP_SCALE,
   TANK_EMBRYO_END_FRACTION,
+  TANK_GROWTH_STAGE_START_FRACTION,
   TANK_HANDOFF_FRACTION,
   TANK_HOLD_LOOP_START_FRACTION,
   faceOffAngleDeg,
@@ -16,13 +18,27 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ADULT_SEGMENT_START } from "./customMonsterFlow";
+import { GROWTH_STAGES } from "../components/bioreactor/growthStages";
 
 describe("tankClipAction (bioreactor hand-off waits for the embryo growth, never plays the stock creature)", () => {
   const D = 24;
-  it("orders the points: hold loop < embryo end < hand-off < stock adult footage", () => {
+  it("orders the points: hold loop < embryo end < hand-off < the GROWTH stage where species features appear", () => {
     expect(TANK_HOLD_LOOP_START_FRACTION).toBeLessThan(TANK_EMBRYO_END_FRACTION);
     expect(TANK_EMBRYO_END_FRACTION).toBeLessThanOrEqual(TANK_HANDOFF_FRACTION);
-    expect(TANK_HANDOFF_FRACTION).toBeLessThan(ADULT_SEGMENT_START);
+    expect(TANK_HANDOFF_FRACTION).toBeLessThan(TANK_GROWTH_STAGE_START_FRACTION);
+    expect(TANK_GROWTH_STAGE_START_FRACTION).toBeLessThan(ADULT_SEGMENT_START);
+    // The hold loop stays inside the EMBRYO stage (33-50%): the loop never shows a recognisable creature either.
+    expect(TANK_HOLD_LOOP_START_FRACTION).toBeGreaterThanOrEqual(2 / 6);
+  });
+  it("matches the clip's 6 equal growth stages: GROWTH (feature-protrusion) starts at stage 4", () => {
+    const growth = GROWTH_STAGES.find((s) => s.label === "GROWTH");
+    expect(growth?.stage).toBe(4);
+    expect(TANK_GROWTH_STAGE_START_FRACTION).toBeCloseTo((growth!.stage - 1) / GROWTH_STAGES.length);
+  });
+  it("crops the clip's burned-in caption bands off screen", () => {
+    const labSrc = readFileSync(resolve(__dirname, "../components/BioStitchLabView.tsx"), "utf8");
+    expect(TANK_CAPTION_CROP_SCALE).toBeGreaterThanOrEqual(1.4);
+    expect(labSrc).toMatch(/transform: `scale\(\$\{TANK_CAPTION_CROP_SCALE\}\)`/);
   });
   it("an early image still waits until the embryo growth is over", () => {
     expect(tankClipAction(2, D, true)).toBe("play");

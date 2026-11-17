@@ -70,12 +70,23 @@ export function tankEmbryoEndSec(durationSec: number): number {
  * The stock tank clip shows its own adult creature from ADULT_SEGMENT_START (0.68, customMonsterFlow); the hand-off to
  * the user's monster happens just before that, after the embryo-growth part, and the clip never plays past it.
  */
+/**
+ * The tank clip is cut into 6 equal growth stages (growthStages.ts): STEM CELL, CELL DIVISION, EMBRYO (33-50%),
+ * GROWTH "feature-protrusion" (50-67%: the stock creature's species becomes recognisable), JUVENILE, ADULT.
+ * The hand-off must happen at the end of the EMBRYO stage, before any species feature shows.
+ */
+export const TANK_GROWTH_STAGE_START_FRACTION = 3 / 6;
 /** Embryo growth is over: before this point the hand-off never starts, even if the image is already ready. */
-export const TANK_EMBRYO_END_FRACTION = 0.55;
-/** Hand-off point (just before a creature-like shape appears in the stock clip). The clip never plays past it. */
-export const TANK_HANDOFF_FRACTION = 0.6;
-/** While waiting for a slow image, the clip loops back to here (the late-embryo stretch before the hand-off). */
-export const TANK_HOLD_LOOP_START_FRACTION = 0.45;
+export const TANK_EMBRYO_END_FRACTION = 0.45;
+/** Hand-off point: just before the GROWTH stage, while the embryo is still an unrecognisable shape. Never played past. */
+export const TANK_HANDOFF_FRACTION = 0.47;
+/** While waiting for a slow image, the clip loops back to here (inside the EMBRYO stage). */
+export const TANK_HOLD_LOOP_START_FRACTION = 0.36;
+/**
+ * The stock tank clip has burned-in captions in its top and bottom bands (title, stage label and a disclaimer).
+ * Scaling the video up crops those bands off screen: at 1.5x, the top and bottom 1/6 of the frame fall outside.
+ */
+export const TANK_CAPTION_CROP_SCALE = 1.5;
 
 export type TankClipAction = "play" | "loop-back" | "handoff";
 
