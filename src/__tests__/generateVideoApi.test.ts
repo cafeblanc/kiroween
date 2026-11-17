@@ -81,6 +81,36 @@ describe("POST create", () => {
     expect(sent.resolution).toBe("1080x1920");
   });
 
+  it("sends lastImage as last_frame_uri so LTX interpolates between the two frames", async () => {
+    const handler = await load();
+    const f = vi.fn(async () => up({ id: "abcdef1234567890" }, 202));
+    vi.stubGlobal("fetch", f);
+    const res = mockRes();
+    const image = "data:image/jpeg;base64,/9j/AAAA";
+    const lastImage = "data:image/jpeg;base64,/9j/BBBB";
+    await handler(req("POST", { body: { prompt: "p", image, lastImage, duration: 6 } }), res);
+    expect(res.statusCode).toBe(200);
+    const sent = JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(sent).toMatchObject({ image_uri: image, last_frame_uri: lastImage, duration: 6 });
+  });
+
+  it("rejects a lastImage without image, a bad lastImage, or two images that are too large together", async () => {
+    const handler = await load();
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    const run = async (body: any) => {
+      const res = mockRes();
+      await handler(req("POST", { body }), res);
+      return res.statusCode;
+    };
+    const img = "data:image/jpeg;base64,/9j/AAAA";
+    expect(await run({ prompt: "p", lastImage: img })).toBe(400);
+    expect(await run({ prompt: "p", image: img, lastImage: "https://x/y.jpg" })).toBe(400);
+    const half = "data:image/jpeg;base64," + "A".repeat(1_800_000);
+    expect(await run({ prompt: "p", image: half, lastImage: half })).toBe(413);
+    expect(f).not.toHaveBeenCalled();
+  });
+
   it("rejects bad images, bad aspect, empty prompt, no key, and unsupported providers without calling upstream", async () => {
     const handler = await load();
     const f = vi.fn();
@@ -167,19 +197,26 @@ describe("POST create", () => {
     expect(last).toBe(429);
   });
 
-  it("caps creates at 5 per day per IP", async () => {
-    const handler = await load();
+  it("caps creates per day per IP (LTX_DAILY_CREATE_CAP)", async () => {
+    vi.resetModules();
+    const mod = await import("../../api/generate-video");
+    const handler = mod.default;
+    const cap: number = mod.LTX_DAILY_CREATE_CAP;
+    expect([5, 10]).toContain(cap); // 10 only while the static clips are generated
     vi.stubGlobal("fetch", vi.fn(async () => up({ id: "abcdef1234567890" }, 202)));
     const ip = "203.0.113.201";
     const codes: number[] = [];
     let msg = "";
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i <= cap; i++) {
+      // Spread the requests over minutes so only the daily cap can trip, not the per-minute limiter.
+      vi.setSystemTime(Date.UTC(2026, 0, 1, 0, i * 2));
       const res = mockRes();
       await handler(req("POST", { ip, body: { prompt: "p" } }), res);
       codes.push(res.statusCode);
       msg = res.body?.error ?? msg;
     }
-    expect(codes).toEqual([200, 200, 200, 200, 200, 429]);
+    vi.useRealTimers();
+    expect(codes).toEqual([...Array(cap).fill(200), 429]);
     expect(msg).toMatch(/daily/i);
   });
 });

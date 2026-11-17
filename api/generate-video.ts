@@ -56,7 +56,8 @@ const RESOLUTIONS: Readonly<Record<string, string>> = {
 };
 
 // Cost guard: LTX bills per generated second, so cap creates per IP per UTC day (per instance, in memory).
-export const LTX_DAILY_CREATE_CAP = 5;
+// Temporarily 10 (user-approved) while the static embryo and experiment clips are generated; back to 5 afterwards.
+export const LTX_DAILY_CREATE_CAP = 10;
 const dailyCreates = new Map<string, { day: string; count: number }>();
 
 const SUPPORTED_PROVIDERS: readonly string[] = ["ltx"];
@@ -370,7 +371,7 @@ export default async function handler(req: any, res: any): Promise<any> {
     return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
   }
 
-  const { prompt, provider = "ltx", aspect = "16:9", image, duration = LTX_DURATION_SEC } = req.body || {};
+  const { prompt, provider = "ltx", aspect = "16:9", image, lastImage, duration = LTX_DURATION_SEC } = req.body || {};
   if (typeof prompt !== "string" || !prompt.trim()) {
     return res.status(400).json({ error: "Prompt is required" });
   }
@@ -398,6 +399,23 @@ export default async function handler(req: any, res: any): Promise<any> {
     imageUri = image;
   }
 
+  // Optional last frame (image-to-video only): LTX interpolates from `image` to `lastImage`
+  // (docs.ltx.io submit-image-to-video: last_frame_uri; needs a fixed duration, which we always send).
+  let lastImageUri: string | undefined;
+  if (lastImage !== undefined && lastImage !== null && lastImage !== "") {
+    if (!imageUri) {
+      return res.status(400).json({ error: "lastImage needs image (the first frame)" });
+    }
+    if (typeof lastImage !== "string" || !IMAGE_DATA_URI.test(lastImage)) {
+      return res.status(400).json({ error: "lastImage must be a base64 data URI (image/jpeg, image/png or image/webp)" });
+    }
+    // Both images together must stay under the request body budget (Vercel ~4.5 MB).
+    if (imageUri.length + lastImage.length > MAX_IMAGE_DATA_URI_CHARS) {
+      return res.status(413).json({ error: "image + lastImage are too large; downscale them" });
+    }
+    lastImageUri = lastImage;
+  }
+
   const key = ltxKey();
   if (!key) {
     return res.status(400).json({ error: `No LTX API key configured (${KEY_HINT}).` });
@@ -418,6 +436,7 @@ export default async function handler(req: any, res: any): Promise<any> {
     generate_audio: false,
   };
   if (imageUri) payload.image_uri = imageUri;
+  if (lastImageUri) payload.last_frame_uri = lastImageUri;
   const kind = imageUri ? "image" : "text";
   const endpoint = imageUri ? "image-to-video" : "text-to-video";
 
