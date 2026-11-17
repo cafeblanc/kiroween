@@ -15,6 +15,8 @@ export const LTX_MAX_IMAGE_BYTES = 1_500_000;
 const MAX_CONSECUTIVE_POLL_ERRORS = 3;
 
 export type LtxAspect = "16:9" | "9:16" | "1:1";
+/** ltx-2-5-fast at 1080p / 24 fps allows 6..20 s in steps of 2; the server accepts up to 16 s (cost guard). */
+export type LtxDuration = 6 | 8 | 10 | 12 | 14 | 16;
 export type LtxJobStatus = "queued" | "processing" | "completed" | "failed";
 export type LtxErrorCode =
   | "NO_API_KEY"
@@ -30,6 +32,8 @@ export interface LtxJobOptions {
   /** Base64 data URI of the first frame; omitted -> text-to-video. */
   image?: string;
   aspect?: LtxAspect;
+  /** Omitted -> server default (6 s). */
+  duration?: LtxDuration;
   signal?: AbortSignal;
   onStatus?: (status: LtxJobStatus, elapsedMs: number) => void;
   /** Download the result into a blob: URL (presigned URLs expire). Falls back to the remote URL if the download fails. */
@@ -87,6 +91,7 @@ export async function generateLtxVideo(opts: LtxJobOptions): Promise<LtxJobResul
     prompt,
     image,
     aspect = "16:9",
+    duration,
     signal,
     onStatus,
     toBlob = true,
@@ -99,7 +104,7 @@ export async function generateLtxVideo(opts: LtxJobOptions): Promise<LtxJobResul
     const createRes = await fetch(assertAllowedApiEndpoint("/api/generate-video"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, provider: "ltx", aspect, ...(image ? { image } : {}) }),
+      body: JSON.stringify({ prompt, provider: "ltx", aspect, ...(duration ? { duration } : {}), ...(image ? { image } : {}) }),
       signal,
     });
     const created = await readJson(createRes);

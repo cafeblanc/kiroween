@@ -11,6 +11,7 @@ import {
 import type { ComicMonster } from "../../data/comicMonsters";
 import { saveMonster } from "../../services/monsterVaultService";
 import { monsterToVaultInput, urlToBlob } from "../../services/customMonsterVaultMapping";
+import { opponentsFor } from "../../utils/arenaRoster";
 
 interface CustomMonsterStudioProps {
   isKo: boolean;
@@ -18,6 +19,10 @@ interface CustomMonsterStudioProps {
   onSendToArena?: (monster: ComicMonster) => void;
   /** Optional HuggingFace token shared from the lab view; the local input below overrides it. */
   initialHfToken?: string;
+  /** Other designed monsters the new one can fight (sample monsters never fight). */
+  opponentRoster?: ComicMonster[];
+  /** Starts a story battle video between the monster just built here and the chosen opponent. */
+  onStartBattleVideo?: (me: ComicMonster, opponent: ComicMonster) => void;
 }
 
 const MUTATION_CHIPS: Array<{
@@ -38,7 +43,10 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   onAwakenCustomMonster,
   onSendToArena,
   initialHfToken,
+  opponentRoster = [],
+  onStartBattleVideo,
 }) => {
+  const [opponentId, setOpponentId] = useState<string>("");
   const [hfTokenInput, setHfTokenInput] = useState<string>("");
   const [imagePromptEn, setImagePromptEn] = useState<string | undefined>(undefined);
   const [videoSource, setVideoSource] = useState<"ltx" | "mediarecorder" | null>(null);
@@ -232,7 +240,9 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
       regen: bioStats.regen,
       energy: bioStats.energy,
     },
-    promptEn: `${longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
+    // English for the video model: the translated image prompt when available (longPrompt is the Korean design text)
+    promptEn: `${imagePromptEn || longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
+    bodyParts: { ...parts },
     promptKo: `${longPrompt}\n[전투 능력치: 공격력 ${bioStats.atk}, 방어력 ${bioStats.def}, 속도 ${bioStats.spd}, 재생력 ${bioStats.regen}, 에너지 ${bioStats.energy}]`,
     avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,
     jumpscareImg: generatedImageUrl || selectedPreset.baseImageSrc,
@@ -265,6 +275,18 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     const monster = buildCustomMonsterObject();
     persistToVault(monster, generatedImageUrl, generatedVideoUrl);
     onSendToArena?.(monster);
+  };
+
+  const currentId = buildIdRef.current?.id ?? "";
+  const opponents = opponentsFor(opponentRoster, currentId);
+  const selectedOpponent = opponents.find((m) => m.id === opponentId) ?? opponents[0];
+
+  const handleStartBattleVideo = () => {
+    if (!selectedOpponent || !onStartBattleVideo) return;
+    const monster = buildCustomMonsterObject();
+    if (monster.id === selectedOpponent.id) return;
+    persistToVault(monster, generatedImageUrl, generatedVideoUrl);
+    onStartBattleVideo(monster, selectedOpponent);
   };
 
   const applyMutationChip = (field: keyof MonsterBodyParts, appendKo: string) => {
@@ -608,6 +630,41 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
                 playsInline
                 className="w-full h-56 object-cover rounded-lg border border-slate-800 bg-black"
               />
+              {onStartBattleVideo && (
+                <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-2">
+                  <span className="text-[11px] font-bold text-rose-300">
+                    ⚔️ {isKo ? "전투 상대 선택 (직접 설계한 괴수만)" : "Pick an opponent (your designed monsters only)"}
+                  </span>
+                  {opponents.length === 0 ? (
+                    <p className="text-[10px] text-slate-400">
+                      {isKo
+                        ? "아직 상대가 없습니다. 괴수를 하나 더 설계해 배양기나 결투장으로 보내면 여기서 고를 수 있습니다."
+                        : "No opponents yet. Design another monster and send it to the bioreactor or arena to pick it here."}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={selectedOpponent?.id ?? ""}
+                        onChange={(e) => setOpponentId(e.target.value)}
+                        className="flex-1 min-w-[160px] bg-slate-900 border border-rose-500/60 text-rose-200 text-xs font-bold px-2 py-1.5 rounded-lg focus:outline-none"
+                      >
+                        {opponents.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            🔴 {isKo ? m.nameKo : m.nameEn}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleStartBattleVideo}
+                        className="bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-black text-xs px-3 py-1.5 rounded-lg cursor-pointer"
+                      >
+                        {isKo ? "⚔️ 결투장에서 스토리 확인 후 전투 영상 만들기" : "⚔️ Review the story and make the battle video"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

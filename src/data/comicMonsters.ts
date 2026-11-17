@@ -1,3 +1,6 @@
+/** Body-part slots of a designed monster (same keys as MonsterBodyParts in customMonsterMediaService). */
+export type MonsterPartKey = "head" | "hornsOrCrown" | "torso" | "arms" | "legs" | "tail" | "auraAndSkin";
+
 export interface ComicMonster {
   id: string;
   nameKo: string;
@@ -16,6 +19,11 @@ export interface ComicMonster {
   roarAudio: string;
   funFactKo: string;
   funFactEn: string;
+  /**
+   * Per-part design text from the Custom Monster Studio (Korean, as the user typed it). Battle stories
+   * and battle videos use it so the head, arms, legs, tail and torso each take part in the fight.
+   */
+  bodyParts?: Partial<Record<MonsterPartKey, string>>;
   /** Optional combat stats (custom monsters); curated monsters fall back to defaults in the arena. */
   customStats?: {
     atk: number;

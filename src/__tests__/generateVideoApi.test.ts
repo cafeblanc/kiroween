@@ -377,6 +377,32 @@ describe("GET chunked result download", () => {
   });
 });
 
+describe("POST duration", () => {
+  it("accepts 6 to 16 s in steps of 2 and sends it to LTX", async () => {
+    for (const duration of [6, 8, 10, 12, 14, 16]) {
+      const handler = await load();
+      const f = vi.fn(async () => up({ id: "abcdef1234567890", created_at: "now" }, 202));
+      vi.stubGlobal("fetch", f);
+      const res = mockRes();
+      await handler(req("POST", { body: { prompt: "battle", duration } }), res);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(String((f.mock.calls[0] as unknown as [string, RequestInit])[1].body)).duration).toBe(duration);
+    }
+  });
+
+  it("rejects other durations without calling LTX", async () => {
+    const handler = await load();
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    for (const duration of [5, 7, 18, 20, 0, -6, "12", null]) {
+      const res = mockRes();
+      await handler(req("POST", { body: { prompt: "battle", duration } }), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+});
+
 describe("other methods", () => {
   it.each(["PUT", "DELETE", "PATCH"])("returns 405 for %s", async (m) => {
     const handler = await load();

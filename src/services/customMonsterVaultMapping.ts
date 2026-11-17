@@ -2,7 +2,7 @@
  * Pure helpers that map a custom ComicMonster <-> a KiroweenMonsterVault record.
  * No React and no IndexedDB here, so everything is unit-testable.
  */
-import type { ComicMonster } from '../data/comicMonsters';
+import type { ComicMonster, MonsterPartKey } from '../data/comicMonsters';
 import type { VaultMonster, VaultMonsterInput } from './monsterVaultService';
 
 /** How many roster entries the arena dropdowns display. The vault itself is unbounded (source of truth). */
@@ -55,6 +55,19 @@ export function monsterToVaultInput(m: ComicMonster, image: Blob | null, video: 
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
+const PART_KEYS: readonly MonsterPartKey[] = ['head', 'hornsOrCrown', 'torso', 'arms', 'legs', 'tail', 'auraAndSkin'];
+
+/** Keeps only known part keys with non-empty string values (older records have none). */
+function readBodyParts(v: unknown): Partial<Record<MonsterPartKey, string>> | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const out: Partial<Record<MonsterPartKey, string>> = {};
+  for (const k of PART_KEYS) {
+    const val = (v as Record<string, unknown>)[k];
+    if (typeof val === 'string' && val.trim()) out[k] = val.trim().slice(0, 200);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Rebuilds a ComicMonster from a vault record. Returns null when the record is unusable. */
 export function vaultToComicMonster(v: VaultMonster): ComicMonster | null {
   const m = v.meta ?? {};
@@ -62,6 +75,7 @@ export function vaultToComicMonster(v: VaultMonster): ComicMonster | null {
   const image = v.imageUrl ?? str(m.avatarFallback) ?? '';
   const jump = v.imageUrl ?? str(m.jumpscareFallback) ?? image;
   const stats = m.customStats as Record<string, unknown> | undefined;
+  const bodyParts = readBodyParts(m.bodyParts);
   return {
     id: v.id,
     nameEn: str(m.nameEn, str(m.nameKo)),
@@ -80,6 +94,7 @@ export function vaultToComicMonster(v: VaultMonster): ComicMonster | null {
     roarAudio: str(m.roarAudio, FALLBACK_AUDIO),
     funFactKo: str(m.funFactKo),
     funFactEn: str(m.funFactEn),
+    ...(bodyParts ? { bodyParts } : {}),
     ...(stats
       ? {
           customStats: {

@@ -144,3 +144,18 @@ describe('urlToBlob', () => {
     expect(isEphemeralUrl('/a')).toBe(false);
   });
 });
+
+describe('body parts survive a vault round trip', () => {
+  it('keeps the designed parts so stories after a reload still use them', () => {
+    const parts = { head: 'horned head', arms: 'titanium claws', legs: 'lava legs', tail: 'scorpion tail', torso: 'obsidian chest', hornsOrCrown: '', auraAndSkin: 'ember aura' };
+    const meta = monsterToVaultMeta(mk('custom_parts', { bodyParts: parts }));
+    const back = vaultToComicMonster({ id: 'custom_parts', meta, imageUrl: 'blob:i', videoUrl: 'blob:v' } as never);
+    expect(back?.bodyParts).toEqual({ head: 'horned head', arms: 'titanium claws', legs: 'lava legs', tail: 'scorpion tail', torso: 'obsidian chest', auraAndSkin: 'ember aura' });
+  });
+
+  it('ignores missing, non-string or unknown parts (older records)', () => {
+    expect(vaultToComicMonster({ id: 'custom_old', meta: monsterToVaultMeta(mk('custom_old')) } as never)?.bodyParts).toBeUndefined();
+    const meta = { ...monsterToVaultMeta(mk('custom_bad')), bodyParts: { head: 42, wings: 'x', tail: '  ' } };
+    expect(vaultToComicMonster({ id: 'custom_bad', meta } as never)?.bodyParts).toBeUndefined();
+  });
+});

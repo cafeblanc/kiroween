@@ -73,6 +73,40 @@ describe('composeBattleStory (examples)', () => {
     expect(s.storyEn.act2_clash).toContain('dodges');
   });
 
+  it('uses the designed head, arms, legs, tail and torso, the mouth flame cannon and the tail attack', () => {
+    const designed: StoryFighter = {
+      ...f1,
+      bodyParts: {
+        head: '뿔 달린 용 머리',
+        arms: '티타늄 발톱 팔 + 추가 촉수',
+        legs: '용암 근육 다리',
+        tail: '전갈 독침 꼬리',
+        torso: '흑요석 비늘 흉곽',
+      },
+    };
+    const other: StoryFighter = { ...f2, bodyParts: { head: '심해 머리', tail: '흡반 촉수 꼬리', torso: '갑각 몸통', legs: '갈고리 다리', arms: '여덟 촉수 팔' } };
+    // Seeds where the attacker lands both strikes and the designed fighter wins cover every part line.
+    const all = Array.from({ length: 60 }, (_, seed) => story(designed, other, seed).s);
+    const ko = all.map((s) => s.textKo).join('\n');
+    for (const part of ['티타늄 발톱 팔', '전갈 독침 꼬리', '용암 근육 다리', '뿔 달린 용 머리', '흑요석 비늘 흉곽', '여덟 촉수 팔', '흡반 촉수 꼬리']) {
+      expect(ko).toContain(part);
+    }
+    expect(ko).not.toContain('추가 촉수'); // only the first "+" segment is used
+    for (const s of all) {
+      expect(s.storyKo.act2_clash).toContain('입을 벌려 화염포');
+      expect(s.storyEn.act2_clash).toContain('flame cannons');
+      expect(s.storyKo.act2_clash).toContain('꼬리');
+      expect(s.storyEn.act2_clash).toContain('tail');
+      expect(s.storyKo.act3_finish).toContain('화염포');
+    }
+  });
+
+  it('falls back to generic part names when a monster has no designed parts', () => {
+    const s = story(f1, f2, 3).s;
+    expect(s.storyKo.act2_clash).toMatch(/꼬리|팔/);
+    expect(s.storyKo.act3_finish).toContain('다리');
+  });
+
   it('maps battle phases to the act to highlight', () => {
     expect(actForPhase('idle')).toBe(1);
     expect(actForPhase('f1_strike')).toBe(2);

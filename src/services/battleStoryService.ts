@@ -18,7 +18,11 @@ export interface StoryFighter {
   partsEn?: string;
   /** Missing stats fall back to the arena default (70). */
   customStats?: Partial<CombatStats>;
+  /** Studio body-part text (Korean, as typed). Each part gets a role in the fight. */
+  bodyParts?: Partial<Record<StoryPartKey, string>>;
 }
+
+export type StoryPartKey = 'head' | 'hornsOrCrown' | 'torso' | 'arms' | 'legs' | 'tail' | 'auraAndSkin';
 
 export interface StoryActs {
   act1: string;
@@ -97,21 +101,45 @@ interface Side {
   partsKo: string;
   partsEn: string;
   top: StatKey;
+  /** Short Korean noun phrase per part ("용암 비늘 꼬리"), or the generic noun when the part was not designed. */
+  part: Record<'head' | 'arms' | 'legs' | 'tail' | 'torso', string>;
+}
+
+const GENERIC_PART_KO = { head: '머리', arms: '팔', legs: '다리', tail: '꼬리', torso: '몸통' } as const;
+
+/** First segment of a studio part text ("A + B" -> "A"), bounded so a sentence stays readable. */
+function partPhrase(raw: string | undefined, generic: string): string {
+  const first = (raw ?? '').split('+')[0].replace(/\s+/g, ' ').trim();
+  if (!first) return generic;
+  const short = first.length > 22 ? `${first.slice(0, 22).trim()}…` : first;
+  return `${short} ${generic}`;
 }
 
 function toSide(f: StoryFighter, fallbackNo: 1 | 2): Side {
+  const bp = f.bodyParts ?? {};
   return {
     ko: cleanStoryName(f.nameKo, `괴수 ${fallbackNo}`),
     en: cleanStoryName(f.nameEn, `Fighter ${fallbackNo}`),
     partsKo: cleanParts(f.partsKo),
     partsEn: cleanParts(f.partsEn),
     top: dominantStat(resolveCombatStats(f.customStats)),
+    part: {
+      head: partPhrase(bp.head, GENERIC_PART_KO.head),
+      arms: partPhrase(bp.arms, GENERIC_PART_KO.arms),
+      legs: partPhrase(bp.legs, GENERIC_PART_KO.legs),
+      tail: partPhrase(bp.tail, GENERIC_PART_KO.tail),
+      torso: partPhrase(bp.torso, GENERIC_PART_KO.torso),
+    },
   };
 }
 
 type Lang = 'ko' | 'en';
 const name = (s: Side, l: Lang) => (l === 'ko' ? s.ko : s.en);
 
+/**
+ * First strike = claws/arms, counter = tail. Every line names the body part that attacks and the one that is hit,
+ * so the story (and the video prompt built from it) is a full-body fight.
+ */
 function strikeLine(
   l: Lang,
   ev: BattleEvent | undefined,
@@ -121,28 +149,32 @@ function strikeLine(
 ): string {
   const A = name(att, l);
   const D = name(def, l);
+  const skill = ev?.skill ? ` — ${ev.skill}!` : '!';
   if (l === 'ko') {
     const head = kind === 'first' ? '⚡ 선공' : '↩️ 반격';
-    if (ev?.evaded) return `${head}: ${A}의 공격을 ${D}이(가) 간발의 차로 회피한다!`;
-    if (ev?.skill) return `${head}: ${A}의 ${ev.skill}! ${D}이(가) 크게 휘청인다.`;
-    return kind === 'first'
-      ? `${head}: ${A}이(가) 속도로 선수를 쳐 ${D}의 급소를 강타한다.`
-      : `${head}: ${A}이(가) 이를 악물고 ${D}에게 돌진 반격을 퍼붓는다.`;
+    if (kind === 'first') {
+      if (ev?.evaded) return `${head}: ${A}이(가) ${att.part.arms}을(를) 휘두르지만 ${D}이(가) ${def.part.legs}로 박차 올라 간발의 차로 회피한다!`;
+      return `${head}: ${A}이(가) ${att.part.arms}을(를) 휘둘러 ${D}의 ${def.part.torso}을(를) 찢어발긴다${skill}`;
+    }
+    if (ev?.evaded) return `${head}: ${A}이(가) ${att.part.tail}을(를) 채찍처럼 휘두르지만 ${D}이(가) 몸을 비틀어 회피한다!`;
+    return `${head}: ${A}이(가) ${att.part.tail}을(를) 채찍처럼 휘둘러 ${D}의 ${def.part.head}을(를) 내리친다${skill}`;
   }
   const head = kind === 'first' ? '⚡ First strike' : '↩️ Counter';
-  if (ev?.evaded) return `${head}: ${D} narrowly dodges ${A}'s attack!`;
-  if (ev?.skill) return `${head}: ${A} unleashes ${ev.skill}! ${D} reels from the blow.`;
-  return kind === 'first'
-    ? `${head}: ${A} wins the speed race and slams ${D}'s weak point.`
-    : `${head}: ${A} grits its teeth and charges back at ${D}.`;
+  if (kind === 'first') {
+    if (ev?.evaded) return `${head}: ${A} swings its claws, but ${D} leaps away on its legs and narrowly dodges!`;
+    return `${head}: ${A} slashes its claws across ${D}'s torso${skill}`;
+  }
+  if (ev?.evaded) return `${head}: ${A} whips its spiked tail, but ${D} twists aside and dodges!`;
+  return `${head}: ${A} whips its spiked tail and smashes it into ${D}'s head${skill}`;
 }
 
+/** Both monsters fire the mouth flame cannon at once; laser beams cross and a shockwave erupts. */
 function clashLine(l: Lang, ev: BattleEvent | undefined, s1: Side, s2: Side): string {
-  const skill = ev?.skill ?? null;
+  const skill = ev?.skill ? ` — ${ev.skill}!` : '!';
   if (l === 'ko') {
-    return `💥 정면 대충돌: ${s1.ko}와(과) ${s2.ko}의 힘이 부딪쳐 충격파가 터진다${skill ? ` — ${skill}!` : '.'}`;
+    return `💥 정면 대충돌: ${s1.ko}와(과) ${s2.ko}이(가) 동시에 입을 벌려 화염포를 쏘고, 교차하는 레이저 사이로 충격파가 터진다${skill}`;
   }
-  return `💥 Head-on clash: ${s1.en} and ${s2.en} collide and a shockwave tears through the arena${skill ? ` — ${skill}!` : '.'}`;
+  return `💥 Head-on clash: ${s1.en} and ${s2.en} open their jaws and fire flame cannons at each other as laser beams cross and a shockwave erupts${skill}`;
 }
 
 function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner' | 'firstAttacker' | 'events'>): StoryActs {
@@ -178,15 +210,16 @@ function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner
     clashLine(l, evClash, s1, s2),
   ];
 
+  // Finish: legs leap, tail coils and slams, then a mouth flame cannon into the sky as the victory roar
   const act3 =
     l === 'ko'
       ? [
-          `💀 ${winner.ko}의 필살 일격이 ${loser.ko}을(를) 쓰러뜨린다 — K.O.!`,
-          `🏆 ${winner.ko}의 승리의 포효가 아레나를 뒤흔든다!`,
+          `💀 ${winner.ko}이(가) ${winner.part.legs}로 도약해 ${winner.part.tail}로 ${loser.ko}의 ${loser.part.torso}을(를) 휘감아 바닥에 내리꽂는다 — K.O.!`,
+          `🏆 ${winner.ko}이(가) ${winner.part.head}을(를) 치켜들고 입에서 화염포를 하늘로 뿜으며 승리의 포효를 지른다!`,
         ]
       : [
-          `💀 ${winner.en} lands the finishing blow and ${loser.en} goes down — K.O.!`,
-          `🏆 ${winner.en}'s victory roar shakes the entire arena!`,
+          `💀 ${winner.en} leaps on its legs, coils its tail around ${loser.en}'s torso and slams it into the ground — K.O.!`,
+          `🏆 ${winner.en} raises its head and blasts a flame cannon into the sky with a victory roar!`,
         ];
 
   return { act1: act1.join('\n'), act2_clash: act2.join('\n'), act3_finish: act3.join('\n') };
@@ -216,6 +249,7 @@ export interface StoryMonsterSource {
   promptKo?: string;
   promptEn?: string;
   customStats?: Partial<CombatStats>;
+  bodyParts?: Partial<Record<StoryPartKey, string>>;
 }
 
 export function toStoryFighter(m: StoryMonsterSource): StoryFighter {
@@ -225,5 +259,6 @@ export function toStoryFighter(m: StoryMonsterSource): StoryFighter {
     partsKo: m.promptKo,
     partsEn: m.promptEn,
     customStats: m.customStats,
+    bodyParts: m.bodyParts,
   };
 }

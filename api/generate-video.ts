@@ -40,6 +40,9 @@ const LTX_API_BASE = "https://api.ltx.io/v2";
 const LTX_MODEL = "ltx-2-5-fast";
 // ltx-2-5-fast @ 1080p: 24/25 fps, 6..20 s (docs.ltx.io/models/ltx-2-5). 6 s is the minimum; null duration would hold 20 s of credits.
 const LTX_DURATION_SEC = 6;
+// Battle clips run longer so the 3-act story unfolds in one multi-shot generation (LTX-2.5 keeps characters
+// consistent across shots). ltx-2-5-fast @1080p/24fps allows 6..20 s; capped at 16 s to bound cost (~$2.08).
+const LTX_ALLOWED_DURATIONS: readonly number[] = [6, 8, 10, 12, 14, 16];
 const LTX_FPS = 24;
 const MAX_PROMPT_CHARS = 2000;
 // Vercel rejects request bodies above ~4.5 MB; the client downsizes to <= ~1.5 MB JPEG (~2 MB as base64).
@@ -367,7 +370,7 @@ export default async function handler(req: any, res: any): Promise<any> {
     return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
   }
 
-  const { prompt, provider = "ltx", aspect = "16:9", image } = req.body || {};
+  const { prompt, provider = "ltx", aspect = "16:9", image, duration = LTX_DURATION_SEC } = req.body || {};
   if (typeof prompt !== "string" || !prompt.trim()) {
     return res.status(400).json({ error: "Prompt is required" });
   }
@@ -379,6 +382,9 @@ export default async function handler(req: any, res: any): Promise<any> {
   const resolution = typeof aspect === "string" ? RESOLUTIONS[aspect] : undefined;
   if (!resolution) {
     return res.status(400).json({ error: "aspect must be one of 16:9, 9:16, 1:1" });
+  }
+  if (typeof duration !== "number" || !LTX_ALLOWED_DURATIONS.includes(duration)) {
+    return res.status(400).json({ error: `duration must be one of ${LTX_ALLOWED_DURATIONS.join(", ")}` });
   }
 
   let imageUri: string | undefined;
@@ -406,7 +412,7 @@ export default async function handler(req: any, res: any): Promise<any> {
   const payload: Record<string, unknown> = {
     prompt: prompt.trim().slice(0, MAX_PROMPT_CHARS),
     model: LTX_MODEL,
-    duration: LTX_DURATION_SEC,
+    duration,
     resolution,
     fps: LTX_FPS,
     generate_audio: false,

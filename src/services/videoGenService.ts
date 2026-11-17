@@ -1,4 +1,4 @@
-import { generateLtxVideo, type LtxAspect, type LtxJobStatus } from "./ltxJobClient";
+import { generateLtxVideo, type LtxAspect, type LtxDuration, type LtxJobStatus } from "./ltxJobClient";
 
 export interface VideoGenRequest {
   prompt: string;
@@ -6,6 +6,8 @@ export interface VideoGenRequest {
   /** Base64 data URI of the first frame (image-to-video). Omit for text-to-video. */
   image?: string;
   aspect?: LtxAspect;
+  /** Clip length in seconds: 6 (default) up to 16 in steps of 2 (ltx-2-5-fast at 1080p/24 fps). */
+  duration?: LtxDuration;
   /** Local-only: the caller owns (and revokes) any blob URL instead of the shared single-slot tracker. */
   keepBlobUrl?: boolean;
   /** Local-only: aborts job creation, polling and the result download. */
@@ -40,6 +42,7 @@ export async function generateMonsterVideo(fullReq: VideoGenRequest): Promise<Vi
     prompt: req.prompt,
     image: req.image,
     aspect: req.aspect,
+    duration: req.duration,
     signal,
     onStatus,
     toBlob: true,
