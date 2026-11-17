@@ -481,4 +481,25 @@ body {
   .incubate-expand-flash { display: none; }
 }
 @keyframes incubateFade { 0% { opacity: 0; } 100% { opacity: 1; } }
+
+/*
+ * Embryo development frames (EMBRYO_STAGE_MS = 2.5 s each). Anchored at the top-left and kept at >= 1.14x so the
+ * generator's bottom-right watermark (about the last 14% of the width and 4% of the height) never shows.
+ */
+.embryo-frame {
+  transform-origin: 0% 0%;
+  transform: scale(1.14);
+  transition-property: opacity;
+  transition-timing-function: ease-in-out;
+}
+.embryo-frame-active { animation: embryoDrift 2.5s ease-out forwards; }
+.embryo-frame-hold { animation: embryoHold 2.4s ease-in-out infinite; }
+@keyframes embryoDrift { 0% { transform: scale(1.14); } 100% { transform: scale(1.22); } }
+@keyframes embryoHold {
+  0%, 100% { transform: scale(1.22); filter: brightness(1); }
+  50% { transform: scale(1.25); filter: brightness(1.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .embryo-frame-active, .embryo-frame-hold { animation: none; }
+}
 @keyframes revealFadeOnly { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }

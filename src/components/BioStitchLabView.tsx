@@ -36,11 +36,12 @@ import {
   type IncubationPhase,
   MONSTER_REVEAL_MS,
   SUMMON_ROAR_INTERVAL_MS,
-  TANK_CAPTION_CROP_SCALE,
-  TANK_HOLD_LOOP_START_FRACTION,
+  EMBRYO_CROSSFADE_MS,
+  EMBRYO_FRAMES,
+  type EmbryoAction,
+  embryoSequence,
   faceOffAngleDeg,
   summonRoarVolume,
-  tankClipAction,
 } from "../utils/summonTiming";
 import { startBubbleSound } from "../utils/bubbleSound";
 import {
@@ -737,24 +738,29 @@ export const BioStitchLabView: React.FC = () => {
     })();
   };
 
-  // 배양기 영상: 배아 성장 구간이 다 지나 괴수 모습이 나오기 직전(TANK_HANDOFF_FRACTION)에서만 연결한다.
-  // 이미지가 빨리 끝나도 이 지점까지 기다리고, 늦으면 직전 구간을 되감아 반복한다. 영상은 이 지점을 넘어 재생되지 않는다.
-  const onTankTimeUpdate = (v: HTMLVideoElement) => {
-    const s = incubatingRef.current;
-    if (!s || s.phase !== "growing") return;
-    const action = tankClipAction(v.currentTime, v.duration, s.ready !== null);
-    if (action === "loop-back") {
-      v.currentTime = v.duration * TANK_HOLD_LOOP_START_FRACTION;
-      return;
-    }
-    if (action === "handoff" && s.ready) {
-      v.pause(); // the stock clip's later footage (its own creature) must never follow
-      setIncubating((cur) => (cur ? { ...cur, phase: "reveal" } : cur));
-    }
-  };
-
-  // 3D 급팽창: 이미지가 전체 화면을 덮은 채로 끝나고, 배양기 영상으로 되돌아가지 않고 바로 괴수 설계실로 복귀
+  // 3D 급팽창: 이미지가 전체 화면을 덮은 채로 끝나고, 배양기 화면으로 되돌아가지 않고 바로 괴수 설계실로 복귀
   const incubatePhase = incubating?.phase ?? null;
+
+  // 사실적인 배아 발생 시퀀스(FLUX 6장, 줄기세포 → 종을 알아보기 전의 후기 배아). 배아 발생이 끝까지 지나간 뒤에만 연결:
+  // 이미지가 빨리 끝나도 마지막 단계까지 보여 주고, 늦으면 마지막 배아가 맥동하며 기다린다 (embryoSequence).
+  const [embryo, setEmbryo] = useState<{ stage: number; action: EmbryoAction }>({ stage: 0, action: "play" });
+  const incubationKey = incubating?.monster.id ?? null;
+  useEffect(() => {
+    if (incubatePhase !== "growing") return;
+    const started = Date.now();
+    setEmbryo({ stage: 0, action: "play" });
+    const t = window.setInterval(() => {
+      const s = incubatingRef.current;
+      if (!s) return;
+      const next = embryoSequence(Date.now() - started, s.ready !== null);
+      setEmbryo((cur) => (cur.stage === next.stage && cur.action === next.action ? cur : next));
+      if (next.action === "handoff") {
+        window.clearInterval(t);
+        setIncubating((cur) => (cur && cur.phase === "growing" ? { ...cur, phase: "reveal" } : cur));
+      }
+    }, 100);
+    return () => window.clearInterval(t);
+  }, [incubatePhase, incubationKey]);
   useEffect(() => {
     if (incubatePhase !== "reveal") return;
     const ready = incubatingRef.current?.ready;
@@ -3054,16 +3060,24 @@ export const BioStitchLabView: React.FC = () => {
       {/* ⚡ 배양기 가동: 전체 화면 배양기 영상 → 이미지가 탱크 안에서 형성 → (reveal) 유리 파열 3D 연출이 위에 겹친다. 영상은 끝까지 마운트되어 검은 프레임이 없다 */}
       {incubating && (
         <div className="fixed inset-0 z-[66] bg-black overflow-hidden text-slate-100" role="status" aria-live="polite">
-          {/* No `loop`: the clip is steered by tankClipAction and paused at the hand-off point.
-              Scaled up so the clip's own burned-in captions (top and bottom bands) fall outside the screen. */}
-          <video
-            src="/videos/chimera_growth_dragon_24s.mp4"
-            autoPlay
-            muted
-            playsInline
-            onTimeUpdate={(e) => onTankTimeUpdate(e.currentTarget)}
-            className="absolute inset-0 w-full h-full object-cover origin-center"
-            style={{ transform: `scale(${TANK_CAPTION_CROP_SCALE})` }}
+          {/* Photorealistic embryo development: the six frames cross-fade with a slow zoom; the image is anchored at its
+              top-left and enlarged so the generator's bottom-right watermark stays off screen. Tinted with the monster colour. */}
+          {EMBRYO_FRAMES.map((src, i) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              aria-hidden="true"
+              className={`absolute inset-0 w-full h-full object-cover embryo-frame ${i === embryo.stage ? "embryo-frame-active" : ""} ${
+                i === embryo.stage && embryo.action === "hold" ? "embryo-frame-hold" : ""
+              }`}
+              style={{ opacity: i === embryo.stage ? 1 : 0, transitionDuration: `${EMBRYO_CROSSFADE_MS}ms` }}
+            />
+          ))}
+          <div
+            className="absolute inset-0 pointer-events-none mix-blend-color opacity-35"
+            style={{ backgroundColor: incubating.monster.colorHex }}
+            aria-hidden="true"
           />
           {incubating.phase === "reveal" && incubating.ready && (
             /* The image grows out of the tank centre in 3D and expands until it covers the whole screen; it ends

@@ -2,64 +2,51 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import {
   ARENA_FACE_OFF_DEG,
+  EMBRYO_FRAMES,
+  EMBRYO_STAGE_MS,
+  EMBRYO_TOTAL_MS,
   ENTRANCE_PLAY_SECONDS,
   SUMMON_ROAR_MAX_VOLUME,
   SUMMON_ROAR_MIN_VOLUME,
-  TANK_CAPTION_CROP_SCALE,
-  TANK_EMBRYO_END_FRACTION,
-  TANK_GROWTH_STAGE_START_FRACTION,
-  TANK_HANDOFF_FRACTION,
-  TANK_HOLD_LOOP_START_FRACTION,
+  embryoSequence,
   faceOffAngleDeg,
   shouldFreezeEntrance,
   summonRoarVolume,
-  tankClipAction,
 } from "./summonTiming";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ADULT_SEGMENT_START } from "./customMonsterFlow";
-import { GROWTH_STAGES } from "../components/bioreactor/growthStages";
 
-describe("tankClipAction (bioreactor hand-off waits for the embryo growth, never plays the stock creature)", () => {
-  const D = 24;
-  it("orders the points: hold loop < embryo end < hand-off < the GROWTH stage where species features appear", () => {
-    expect(TANK_HOLD_LOOP_START_FRACTION).toBeLessThan(TANK_EMBRYO_END_FRACTION);
-    expect(TANK_EMBRYO_END_FRACTION).toBeLessThanOrEqual(TANK_HANDOFF_FRACTION);
-    expect(TANK_HANDOFF_FRACTION).toBeLessThan(TANK_GROWTH_STAGE_START_FRACTION);
-    expect(TANK_GROWTH_STAGE_START_FRACTION).toBeLessThan(ADULT_SEGMENT_START);
-    // The hold loop stays inside the EMBRYO stage (33-50%): the loop never shows a recognisable creature either.
-    expect(TANK_HOLD_LOOP_START_FRACTION).toBeGreaterThanOrEqual(2 / 6);
+describe("embryoSequence (photorealistic embryo development, then the finished adult)", () => {
+  it("has six frames that exist in public/ and lasts as long as the 6 growth stages (15 s)", () => {
+    expect(EMBRYO_FRAMES).toHaveLength(6);
+    for (const f of EMBRYO_FRAMES) expect(existsSync(resolve(__dirname, "../../public" + f)), f).toBe(true);
+    expect(EMBRYO_TOTAL_MS).toBe(6 * EMBRYO_STAGE_MS);
+    expect(EMBRYO_TOTAL_MS).toBe(15000);
   });
-  it("matches the clip's 6 equal growth stages: GROWTH (feature-protrusion) starts at stage 4", () => {
-    const growth = GROWTH_STAGES.find((s) => s.label === "GROWTH");
-    expect(growth?.stage).toBe(4);
-    expect(TANK_GROWTH_STAGE_START_FRACTION).toBeCloseTo((growth!.stage - 1) / GROWTH_STAGES.length);
+  it("steps through the stages in order", () => {
+    expect(embryoSequence(0, false)).toEqual({ stage: 0, action: "play" });
+    expect(embryoSequence(EMBRYO_STAGE_MS - 1, false).stage).toBe(0);
+    expect(embryoSequence(EMBRYO_STAGE_MS, false).stage).toBe(1);
+    expect(embryoSequence(EMBRYO_TOTAL_MS - 1, false)).toEqual({ stage: 5, action: "play" });
   });
-  it("crops the clip's burned-in caption bands off screen", () => {
-    const labSrc = readFileSync(resolve(__dirname, "../components/BioStitchLabView.tsx"), "utf8");
-    expect(TANK_CAPTION_CROP_SCALE).toBeGreaterThanOrEqual(1.4);
-    expect(labSrc).toMatch(/transform: `scale\(\$\{TANK_CAPTION_CROP_SCALE\}\)`/);
+  it("an early image still waits for the whole embryo development", () => {
+    expect(embryoSequence(1000, true).action).toBe("play");
+    expect(embryoSequence(EMBRYO_TOTAL_MS - 1, true).action).toBe("play");
+    expect(embryoSequence(EMBRYO_TOTAL_MS, true)).toEqual({ stage: 5, action: "handoff" });
   });
-  it("an early image still waits until the embryo growth is over", () => {
-    expect(tankClipAction(2, D, true)).toBe("play");
-    expect(tankClipAction(D * TANK_EMBRYO_END_FRACTION, D, true)).toBe("play");
-    expect(tankClipAction(D * TANK_HANDOFF_FRACTION, D, true)).toBe("handoff");
+  it("a late image holds on the last embryo frame instead of showing anything else", () => {
+    expect(embryoSequence(EMBRYO_TOTAL_MS, false)).toEqual({ stage: 5, action: "hold" });
+    expect(embryoSequence(EMBRYO_TOTAL_MS * 10, false)).toEqual({ stage: 5, action: "hold" });
   });
-  it("a late image loops the clip back instead of playing past the hand-off point", () => {
-    expect(tankClipAction(D * TANK_HANDOFF_FRACTION, D, false)).toBe("loop-back");
-    expect(tankClipAction(D - 0.1, D, false)).toBe("loop-back");
-  });
-  it("keeps playing while the clip is still loading", () => {
-    expect(tankClipAction(0, Number.NaN, true)).toBe("play");
-    expect(tankClipAction(0, 0, true)).toBe("play");
-    expect(tankClipAction(Number.NaN, D, true)).toBe("play");
-  });
-  it("never hands off before the embryo growth ends, for any time and duration", () => {
+  it("is safe for bad input and never hands off early, for any time", () => {
+    expect(embryoSequence(Number.NaN, true)).toEqual({ stage: 0, action: "play" });
+    expect(embryoSequence(-500, true)).toEqual({ stage: 0, action: "play" });
     fc.assert(
-      fc.property(fc.double({ min: 0, max: 600, noNaN: true }), fc.double({ min: 1, max: 600, noNaN: true }), fc.boolean(), (t, d, ready) => {
-        const a = tankClipAction(t, d, ready);
-        if (t < d * TANK_EMBRYO_END_FRACTION) expect(a).toBe("play");
-        if (a === "handoff") expect(ready).toBe(true);
+      fc.property(fc.double({ min: 0, max: 120000, noNaN: true }), fc.boolean(), (t, ready) => {
+        const r = embryoSequence(t, ready);
+        expect(r.stage).toBeGreaterThanOrEqual(0);
+        expect(r.stage).toBeLessThan(EMBRYO_FRAMES.length);
+        if (r.action === "handoff") expect(ready && t >= EMBRYO_TOTAL_MS).toBe(true);
       }),
     );
   });
@@ -68,12 +55,16 @@ describe("tankClipAction (bioreactor hand-off waits for the embryo growth, never
 describe("bioreactor overlay wiring", () => {
   const lab = readFileSync(resolve(__dirname, "../components/BioStitchLabView.tsx"), "utf8");
   const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
-  it("the tank clip does not loop by itself and is paused at the hand-off", () => {
-    const tank = lab.slice(lab.indexOf('src="/videos/chimera_growth_dragon_24s.mp4"') - 120, lab.indexOf('src="/videos/chimera_growth_dragon_24s.mp4"') + 260);
-    // The JSX boolean attribute `loop` on its own line (comments may mention the word).
-    expect(tank).not.toMatch(/^\s*loop\s*$/m);
-    expect(tank).toMatch(/onTimeUpdate=\{\(e\) => onTankTimeUpdate\(e\.currentTarget\)\}/);
-    expect(lab).toMatch(/v\.pause\(\);/);
+  it("uses the embryo frames, not the stock tank clip that showed its own creature", () => {
+    const overlay = lab.slice(lab.indexOf("{incubating && ("), lab.indexOf("{revealMonster && ("));
+    expect(overlay).toMatch(/EMBRYO_FRAMES\.map/);
+    expect(overlay).not.toMatch(/chimera_growth_dragon_24s\.mp4/);
+  });
+  it("keeps the frames enlarged from the top-left so the generator watermark never shows", () => {
+    const rule = /\.embryo-frame\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toMatch(/transform-origin:\s*0% 0%/);
+    const scale = Number(/scale\(([\d.]+)\)/.exec(rule)?.[1]);
+    expect(scale).toBeGreaterThanOrEqual(1.14);
   });
   it("the expansion ends with the finished adult filling the screen (scale 1, no fade-out)", () => {
     const kf = /@keyframes incubateExpand\s*\{([\s\S]*?)\r?\n\}/.exec(css)?.[1] ?? "";
@@ -85,7 +76,6 @@ describe("bioreactor overlay wiring", () => {
     expect(lab).toMatch(/const isIncubationGrowing = incubatePhase === "growing";/);
   });
 });
-
 describe("summonRoarVolume (arena waiting screen: a quiet roar that grows louder)", () => {
   it("starts quiet and ends loud", () => {
     expect(summonRoarVolume(0)).toBe(SUMMON_ROAR_MIN_VOLUME);

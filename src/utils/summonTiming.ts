@@ -60,48 +60,40 @@ export function incubationPhase(elapsedSinceReadyMs: number | null | undefined):
   if (elapsedSinceReadyMs < INCUBATE_MATERIALISE_MS + MONSTER_REVEAL_MS) return "reveal";
   return "done";
 }
-/** Clip time (s) where the embryo-growth part ends; handy for logs and tests. */
-export function tankEmbryoEndSec(durationSec: number): number {
-  return Number.isFinite(durationSec) && durationSec > 0 ? durationSec * TANK_EMBRYO_END_FRACTION : 0;
-}
+/**
+ * Photorealistic embryo sequence for the bioreactor (replaces the stock tank clip, which showed its own creature):
+ * six FLUX frames from a single stem cell to a late embryo whose species is still unrecognisable.
+ */
+export const EMBRYO_FRAMES: readonly string[] = [
+  "/images/incubation/stage1_stem_cell.jpg",
+  "/images/incubation/stage2_division.jpg",
+  "/images/incubation/stage3_morula.jpg",
+  "/images/incubation/stage4_blastocyst.jpg",
+  "/images/incubation/stage5_early_embryo.jpg",
+  "/images/incubation/stage6_late_embryo.jpg",
+];
+/** Time per embryo frame; 6 x 2.5 s = 15 s, the same length as the bioreactor's 6 growth stages. */
+export const EMBRYO_STAGE_MS = 2500;
+export const EMBRYO_TOTAL_MS = EMBRYO_FRAMES.length * EMBRYO_STAGE_MS;
+/** Cross-fade between two embryo frames. */
+export const EMBRYO_CROSSFADE_MS = 900;
+
+export type EmbryoAction = "play" | "hold" | "handoff";
 
 /**
- * Bioreactor tank clip timing (fractions of the clip length, so they fit any clip).
- * The stock tank clip shows its own adult creature from ADULT_SEGMENT_START (0.68, customMonsterFlow); the hand-off to
- * the user's monster happens just before that, after the embryo-growth part, and the clip never plays past it.
+ * Embryo sequence state after `elapsedMs`:
+ *   stage   index of the frame to show (0..5)
+ *   action  play    the embryo is still developing
+ *           hold    all stages were shown but the monster image is not ready: stay on the last frame (pulsing)
+ *           handoff all stages were shown and the image is ready: expand the finished adult
+ * An early image therefore still waits for the whole embryo development.
  */
-/**
- * The tank clip is cut into 6 equal growth stages (growthStages.ts): STEM CELL, CELL DIVISION, EMBRYO (33-50%),
- * GROWTH "feature-protrusion" (50-67%: the stock creature's species becomes recognisable), JUVENILE, ADULT.
- * The hand-off must happen at the end of the EMBRYO stage, before any species feature shows.
- */
-export const TANK_GROWTH_STAGE_START_FRACTION = 3 / 6;
-/** Embryo growth is over: before this point the hand-off never starts, even if the image is already ready. */
-export const TANK_EMBRYO_END_FRACTION = 0.45;
-/** Hand-off point: just before the GROWTH stage, while the embryo is still an unrecognisable shape. Never played past. */
-export const TANK_HANDOFF_FRACTION = 0.47;
-/** While waiting for a slow image, the clip loops back to here (inside the EMBRYO stage). */
-export const TANK_HOLD_LOOP_START_FRACTION = 0.36;
-/**
- * The stock tank clip has burned-in captions in its top and bottom bands (title, stage label and a disclaimer).
- * Scaling the video up crops those bands off screen: at 1.5x, the top and bottom 1/6 of the frame fall outside.
- */
-export const TANK_CAPTION_CROP_SCALE = 1.5;
-
-export type TankClipAction = "play" | "loop-back" | "handoff";
-
-/**
- * What the tank clip should do at `currentTimeSec`:
- *   play      keep playing (embryo growth still running, or waiting before the hand-off point)
- *   loop-back the image is not ready yet at the hand-off point: seek back to the hold-loop start
- *   handoff   the hand-off point is reached and the image is ready: pause and expand the image
- * Unknown/invalid duration -> "play" (the clip is still loading).
- */
-export function tankClipAction(currentTimeSec: number, durationSec: number, imageReady: boolean): TankClipAction {
-  if (!Number.isFinite(durationSec) || durationSec <= 0 || !Number.isFinite(currentTimeSec)) return "play";
-  const handoffAt = durationSec * TANK_HANDOFF_FRACTION;
-  if (currentTimeSec < handoffAt) return "play";
-  return imageReady ? "handoff" : "loop-back";
+export function embryoSequence(elapsedMs: number, imageReady: boolean): { stage: number; action: EmbryoAction } {
+  const last = EMBRYO_FRAMES.length - 1;
+  const t = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
+  const stage = Math.min(last, Math.floor(t / EMBRYO_STAGE_MS));
+  if (t < EMBRYO_TOTAL_MS) return { stage, action: "play" };
+  return { stage: last, action: imageReady ? "handoff" : "hold" };
 }
 
 /** Reduced motion: a plain cross-fade of this length replaces the materialise effects. */
