@@ -477,33 +477,27 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
               ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
               : videoSource === "mediarecorder"
               ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
-              : hfToken
-              ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
               : "bg-slate-800 text-slate-300 border-slate-600"
           }`}
         >
           {videoSource === "ltx"
             ? isKo
-              ? "LTX 실사 생성됨"
-              : "LTX photoreal ready"
+              ? "LTX-2.5 fast · 1080p 생성됨"
+              : "LTX-2.5 fast · 1080p ready"
             : videoSource === "mediarecorder"
             ? isKo
               ? "LTX 미연결 · 로컬 폴백 사용"
               : "LTX offline · local fallback"
-            : hfToken
-            ? isKo
-              ? "LTX 연결 대기 (HF 토큰 입력됨)"
-              : "LTX ready (HF token set)"
             : isKo
-            ? "LTX 서버 프록시 시도 → 실패 시 로컬 폴백"
-            : "LTX via server proxy → local fallback"}
+            ? "LTX-2.5 fast · 1080p (서버 프록시) → 실패 시 로컬 폴백"
+            : "LTX-2.5 fast · 1080p (server proxy) → local fallback"}
         </span>
         <input
           type="password"
           value={hfTokenInput}
           onChange={(e) => setHfTokenInput(e.target.value)}
           autoComplete="off"
-          placeholder={isKo ? "HF/LTX 토큰(선택, 저장되지 않음)" : "HF/LTX token (optional, not stored)"}
+          placeholder={isKo ? "HF 토큰(이미지 생성 전용, 선택, 저장되지 않음)" : "HF token (image generation only, optional, not stored)"}
           className="flex-1 min-w-[160px] bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-lg px-2 py-1 text-[11px] text-slate-200 outline-none"
         />
       </div>

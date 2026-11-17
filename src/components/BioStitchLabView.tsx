@@ -18,6 +18,7 @@ import {
 import { BioSimCanvas } from "./BioSimCanvas";
 import { CustomMonsterStudio } from "./bioreactor/CustomMonsterStudio";
 import { generateMonsterVideo } from "../services/videoGenService";
+import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { composeStoryClashPrompt, shouldWrapClashPlayback, getBattleVideoForPair, isCustomFighterId } from "./bioreactor/arena";
 import {
@@ -566,11 +567,11 @@ export const BioStitchLabView: React.FC = () => {
     const controller = new AbortController();
     aiClashAbortRef.current = controller;
     let timedOut = false;
-    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 90_000);
+    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, LTX_MAX_WAIT_MS + 30_000);
     setIsGeneratingAiClash(true);
-    setAiClashStatus({ kind: "loading", text: isKo ? "⏳ LTX로 두 괴수의 격돌 영상을 생성 중... (최대 90초)" : "⏳ Generating the clash video with LTX... (up to 90s)" });
+    setAiClashStatus({ kind: "loading", text: isKo ? "⏳ LTX-2.5 fast · 1080p로 두 괴수의 격돌 영상을 생성 중... (보통 1~2분, 최대 4분)" : "⏳ Generating the clash video with LTX-2.5 fast · 1080p... (usually 1-2 min, up to 4)" });
     let ownedBlob: string | null = null;
-    // 서사(story)에서 영상 프롬프트를 만든다: 2막(격돌) + 3막(결말). LTX 경로에는 길이 파라미터가 없어 재생 시 3~5초로 제한
+    // 서사(story)에서 영상 프롬프트를 만든다: 2막(격돌) + 3막(결말). LTX-2.5 fast는 최소 6초라 3~5초 생성이 불가능하므로 재생 시 5초로 제한
     const planned = getOrCreatePlannedBattle(false);
     if (!planned.played) {
       setBattleStory(planned.story);
@@ -579,8 +580,7 @@ export const BioStitchLabView: React.FC = () => {
     try {
       const res = await generateMonsterVideo({
         prompt: composeStoryClashPrompt(cleanStoryName(f1.nameEn, "Fighter 1"), cleanStoryName(f2.nameEn, "Fighter 2"), planned.story.storyEn),
-        provider: "huggingface_wan2",
-        apiKey: hfTokenInput.trim() || undefined,
+        provider: "ltx",
         keepBlobUrl: true,
         signal: controller.signal,
       });
@@ -601,7 +601,8 @@ export const BioStitchLabView: React.FC = () => {
         setActiveClashVideoUrl(safe);
         setAiClashStatus({ kind: "ok", text: isKo ? "✅ LTX 격돌 영상 준비 완료" : "✅ LTX clash video ready" });
         // 영상 Blob을 연대기에 저장 (전투가 이미 시작됐다면 같은 레코드를 갱신, 아니면 전투 시작 시 함께 저장)
-        if (safe.startsWith("blob:")) {
+        {
+          // 결과가 원격 URL(사전서명, 만료 가능)로 남은 경우에도 Blob 변환을 시도한다 (CORS로 실패하면 건너뜀)
           try {
             planned.videoBlob = await (await fetch(safe)).blob();
             if (planned.played) persistChronicle(planned);
@@ -616,8 +617,8 @@ export const BioStitchLabView: React.FC = () => {
         setAiClashStatus({
           kind: "nokey",
           text: isKo
-            ? "⚠️ LTX 토큰 또는 프록시가 설정되지 않았습니다. 상단 HF 토큰을 입력하거나 서버(/api/generate-video)에 HF_TOKEN을 설정하세요. 듀얼 스테이지로 계속 대결할 수 있습니다."
-            : "⚠️ No LTX token or proxy configured. Enter your HF token above or set HF_TOKEN on the /api/generate-video proxy. The dual stage still works.",
+            ? "⚠️ LTX API 키가 서버에 설정되지 않았습니다. Vercel 환경변수 LTXV_API_KEY(또는 LTX_API_KEY)를 확인하세요. 듀얼 스테이지로 계속 대결할 수 있습니다."
+            : "⚠️ The LTX API key is not configured on the server. Set LTXV_API_KEY (or LTX_API_KEY) in the Vercel environment. The dual stage still works.",
         });
       } else {
         setAiClashStatus({
@@ -875,12 +876,14 @@ export const BioStitchLabView: React.FC = () => {
     const seek = (v: HTMLVideoElement) => adultSegmentStart(v.duration, me.id);
     return (
       <div className={`arena-fighter relative h-full overflow-hidden ${widthCls} ${motion}`}>
+        {/* Crisp, high-definition background image with breathing aura */}
         <img
           src={me.jumpscareImg || me.avatarImg}
           alt={me.nameKo}
           onError={(e) => { if (e.currentTarget.src !== me.avatarImg && me.avatarImg) e.currentTarget.src = me.avatarImg; }}
-          className={`arena-portrait-breath absolute inset-0 w-full h-full object-cover scale-[1.08]${mirror}`}
+          className={`arena-portrait-breath absolute inset-0 w-full h-full object-cover scale-[1.02]${mirror}`}
         />
+        {/* Full-clarity video without washed-out screen blend */}
         {me.videoSrc && (
           <video
             ref={vref}
@@ -900,20 +903,20 @@ export const BioStitchLabView: React.FC = () => {
               const t = seek(v);
               if (t !== null && v.currentTime < v.duration * 0.65) v.currentTime = t;
             }}
-            className={`relative w-full h-full object-cover scale-[1.12]${mirror} mix-blend-screen opacity-65`}
+            className={`absolute inset-0 w-full h-full object-cover scale-[1.04]${mirror} transition-opacity duration-300`}
           />
         )}
         <div className="arena-aura absolute inset-0 pointer-events-none" style={{ ["--aura" as string]: me.colorHex } as React.CSSProperties} />
-        <div className={`absolute inset-y-0 w-16 pointer-events-none ${side === 1 ? "right-0 bg-gradient-to-l" : "left-0 bg-gradient-to-r"} from-black/80 to-transparent`} />
         {gotHit && (
           <div key={`hit-${arenaStrike?.seq}`} className="absolute inset-0 pointer-events-none z-30">
-            <div className="arena-hit-flash absolute inset-0 bg-red-600/40" />
+            <div className="arena-hit-flash absolute inset-0 bg-red-600/35" />
             <div className="arena-slash absolute inset-0" />
           </div>
         )}
+        {/* Sleek Floating Combat Damage (placed gracefully at top-third, never obscuring monster face) */}
         {arenaDamagePopup?.target === side && arenaPhase !== "idle" && (
-          <div key={`dmg-${arenaStrike?.seq}-${arenaPhase}`} className="arena-damage-float absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-            <span className="text-3xl sm:text-5xl font-black text-amber-300 drop-shadow-[0_4px_12px_rgba(0,0,0,1)]">
+          <div key={`dmg-${arenaStrike?.seq}-${arenaPhase}`} className="arena-damage-float absolute top-12 inset-x-0 flex items-center justify-center pointer-events-none z-40">
+            <span className="px-3 py-1 rounded-xl bg-black/80 border border-rose-500/80 text-xl sm:text-2xl font-mono font-black text-rose-300 shadow-[0_0_20px_rgba(244,63,94,0.7)] drop-shadow-[0_2px_8px_rgba(0,0,0,1)]">
               {arenaDamagePopup.text}
             </span>
           </div>
@@ -932,8 +935,7 @@ export const BioStitchLabView: React.FC = () => {
 
     const res = await generateMonsterVideo({
       prompt,
-      provider: "huggingface_wan2",
-      apiKey: hfTokenInput.trim() || undefined,
+      provider: "ltx",
     });
 
     if (res.success && res.videoUrl) {
@@ -2663,8 +2665,8 @@ export const BioStitchLabView: React.FC = () => {
                           className="px-2.5 py-1 rounded-lg text-[11px] font-black border border-amber-400/70 bg-amber-500/15 text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-wait whitespace-nowrap"
                         >
                           {isGeneratingAiClash
-                            ? (isKo ? "⏳ LTX 생성 중..." : "⏳ LTX generating...")
-                            : (isKo ? "⚔️ 두 괴수의 AI 실사 3D 결투 동영상 생성" : "⚔️ Generate AI 3D duel video of both monsters (LTX)")}
+                            ? (isKo ? "⏳ LTX-2.5 Fast 1080p 생성 중..." : "⏳ Generating 1080p Fast LTX-2.5...")
+                            : (isKo ? "⚔️ 두 괴수의 AI 1080p Fast 3D 실사 결투 영상 생성" : "⚔️ Generate 1080p Fast 3D Clash Video (LTX-2.5)")}
                         </button>
                         <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">
                           {isKo ? "상단 [실시간 결투] 버튼으로 대결 시작" : "Click [Real-time Duel] above to start"}

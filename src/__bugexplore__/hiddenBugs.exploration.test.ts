@@ -163,7 +163,8 @@ describe('C8/C9 generate-video handler (1.8, 1.9)', () => {
   }
   async function loadHandler() {
     vi.resetModules();
-    for (const k of ['HF_TOKEN', 'HUGGINGFACE_TOKEN']) delete process.env[k];
+    for (const k of ['HF_TOKEN', 'HUGGINGFACE_TOKEN', 'LTX_API_KEY']) delete process.env[k];
+    process.env.LTXV_API_KEY = 'ltx_test_key'; // video now runs on the LTX API (server env key)
     return (await import('../../api/generate-video')).default;
   }
   const post = (body: any, headers: Record<string, string> = {}) => ({
@@ -186,17 +187,17 @@ describe('C8/C9 generate-video handler (1.8, 1.9)', () => {
       ),
     );
     const res = mockRes();
-    void handler(post({ prompt: 'p', apiKey: 'hf_x' }), res);
+    void handler(post({ prompt: 'p' }), res);
     await vi.advanceTimersByTimeAsync(55_000);
     expect(res.statusCode, 'no 504 within 55s; timeout equals maxDuration').toBe(504);
   });
 
-  it('C8: a 6 MB HuggingFace video is not buffered into the function response', async () => {
+  it('C8: a 6 MB upstream body is not buffered into the function response', async () => {
     const handler = await loadHandler();
     const big = new Uint8Array(6_000_000);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(big, { status: 200, headers: { 'content-type': 'video/mp4' } })));
     const res = mockRes();
-    await handler(post({ prompt: 'p', apiKey: 'hf_x' }), res);
+    await handler(post({ prompt: 'p' }), res);
     const size = Buffer.isBuffer(res.body) ? res.body.length : 0;
     expect(size, 'handler sent a >4.5MB Buffer via res.send').toBeLessThanOrEqual(4_500_000);
   });
@@ -220,6 +221,7 @@ describe('C8/C9 generate-video handler (1.8, 1.9)', () => {
     const res = mockRes();
     await handler(post({ prompt: 'p', provider: 'luma' }), res);
     delete process.env.HF_TOKEN;
+    expect(res.statusCode).toBe(400);
     const urls = f.mock.calls.map((c: any[]) => String(c[0]));
     expect(urls.some((u) => u.includes('huggingface'))).toBe(false);
   });

@@ -3,6 +3,7 @@
  * LTX-first / MediaRecorder-fallback video path (network stubbed, no real API calls).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import * as videoGenService from "./videoGenService";
 import {
   MONSTER_STUDIO_PRESETS,
   buildImageSeed,
@@ -57,7 +58,10 @@ describe("buildImageSeed", () => {
 });
 
 describe("generateVideoFromMonsterImage (LTX first)", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
   const base = {
     imageUrl: "data:image/png;base64,AAAA",
     description: "x",
@@ -66,37 +70,22 @@ describe("generateVideoFromMonsterImage (LTX first)", () => {
   };
 
   it("uses the server proxy video and reports source=ltx", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(new Blob(["v"], { type: "video/mp4" }), {
-      status: 200,
-      headers: { "content-type": "video/mp4" },
-    }));
-    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(videoGenService, "generateMonsterVideo").mockResolvedValueOnce({
+      success: true,
+      videoUrl: "blob:http://localhost/video123",
+      provider: "ltx",
+    });
     const out = await generateVideoFromMonsterImage(base);
     expect(out.source).toBe("ltx");
     expect(out.videoUrl.startsWith("blob:")).toBe(true);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/generate-video");
-    // local-only options must not leak into the proxy body
-    const body = JSON.parse((fetchMock.mock.calls[0][1]?.body as string) || "{}");
-    expect(body).not.toHaveProperty("keepBlobUrl");
-    expect(body).not.toHaveProperty("signal");
   });
 
-  it("on proxy 413 with a user token, calls HuggingFace LTX-Video directly", async () => {
-    const fetchMock = vi.fn(async (url: string) =>
-      url === "/api/generate-video"
-        ? new Response(JSON.stringify({ error: "too large" }), { status: 413 })
-        : new Response(new Blob(["v"], { type: "video/mp4" }), { status: 200 }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const out = await generateVideoFromMonsterImage({ ...base, hfToken: "hf_test_token" });
-    expect(out.source).toBe("ltx");
-    expect(String(fetchMock.mock.calls[1][0])).toContain("Lightricks/LTX-Video");
-  });
-
-  it("falls back to MediaRecorder when LTX is unconfigured (no MediaRecorder here, so it rejects after trying LTX)", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: "no token" }), { status: 400 }));
-    vi.stubGlobal("fetch", fetchMock);
+  it("falls back to MediaRecorder when LTX fails (no MediaRecorder in test env, so it rejects after trying LTX)", async () => {
+    vi.spyOn(videoGenService, "generateMonsterVideo").mockResolvedValueOnce({
+      success: false,
+      provider: "ltx",
+      error: "NO_API_KEY",
+    });
     await expect(generateVideoFromMonsterImage(base)).rejects.toThrow(/MediaRecorder/);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

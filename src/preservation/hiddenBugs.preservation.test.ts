@@ -309,10 +309,19 @@ describe("3.6 generate-video 405 / 400 / 400", () => {
     expect((await call("POST", undefined)).status).toBe(400);
   });
 
-  it("returns 400 when no provider token is configured", async () => {
-    const out = await call("POST", { prompt: "a cell", provider: "huggingface_wan2" });
-    expect(out.status).toBe(400);
-    expect(JSON.stringify(out.json)).toMatch(/token|HF_TOKEN/i);
+  it("returns 400 when no LTX API key is configured", async () => {
+    // Video moved from HuggingFace to the LTX API: the key is read from LTXV_API_KEY / LTX_API_KEY only.
+    const saved = { a: process.env.LTXV_API_KEY, b: process.env.LTX_API_KEY };
+    delete process.env.LTXV_API_KEY;
+    delete process.env.LTX_API_KEY;
+    try {
+      const out = await call("POST", { prompt: "a cell", provider: "ltx", apiKey: "browser-key-is-ignored" });
+      expect(out.status).toBe(400);
+      expect(JSON.stringify(out.json)).toMatch(/LTXV_API_KEY|LTX_API_KEY/);
+    } finally {
+      if (saved.a !== undefined) process.env.LTXV_API_KEY = saved.a;
+      if (saved.b !== undefined) process.env.LTX_API_KEY = saved.b;
+    }
   });
 });
 

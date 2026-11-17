@@ -1,5 +1,6 @@
 import { COMIC_MONSTERS } from "../data/comicMonsters";
-import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
+import { sanitizeVideoUrl } from "../utils/security";
+import { generateLtxVideo, LTX_MAX_WAIT_MS } from "./ltxJobClient";
 import { SlidingWindowRateLimiter } from "../utils/rateLimiter";
 import type {
   AIVideoGenerator,
@@ -15,7 +16,7 @@ export interface SixStageGenerationResponse extends VideoGenerationResponse {
 export const AI_VIDEO_CACHE_KEY = "kiroween_ai_video_cache_v1";
 export const AI_VIDEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 export const AI_VIDEO_CACHE_MAX_ENTRIES = 50;
-export const AI_VIDEO_TIMEOUT_MS = 60_000;
+export const AI_VIDEO_TIMEOUT_MS = LTX_MAX_WAIT_MS + 30_000;
 export const STAGE_SECONDS = 2.5;
 
 const videoRateLimiter = new SlidingWindowRateLimiter(10, 60_000);
@@ -24,7 +25,6 @@ export function resetVideoRateLimiter(): void {
   videoRateLimiter.reset();
 }
 
-const HF_LTX_URL = "https://api-inference.huggingface.co/models/Lightricks/LTX-Video";
 const LOG = "[AIVideoGenerator]";
 
 const STAGE_TEMPLATES: string[] = [
@@ -126,23 +126,17 @@ function splitIntoSixStages(prompt: string): string[] {
 // Last blob URL created per prompt; replaced blobs are revoked so they do not leak.
 const blobUrlByPrompt = new Map<string, string>();
 
-function createTrackedBlobUrl(prompt: string, blob: Blob): string {
+function trackBlobUrl(prompt: string, next: string): string {
   const prev = blobUrlByPrompt.get(prompt);
-  if (prev) URL.revokeObjectURL(prev);
-  const next = URL.createObjectURL(blob);
+  if (prev && prev !== next) URL.revokeObjectURL(prev);
   blobUrlByPrompt.set(prompt, next);
   return next;
 }
 
-function pickVideoUrl(data: any): string | null {
-  const url = data?.videoUrl ?? data?.assets?.video ?? data?.video?.url;
-  return sanitizeVideoUrl(url);
-}
-
 async function generateSingleStage(
   prompt: string,
-  provider: string,
-  apiKey?: string,
+  _provider: string,
+  _apiKey?: string,
 ): Promise<string | null> {
   const cached = await checkCache(prompt);
   if (cached) return cached;
@@ -158,44 +152,18 @@ async function generateSingleStage(
   const timer = setTimeout(() => controller.abort(), AI_VIDEO_TIMEOUT_MS);
 
   try {
+    // Official LTX-2.5 fast job API through the server proxy (create -> poll -> download).
+    // The browser key is ignored for video; the server reads LTXV_API_KEY / LTX_API_KEY.
+    const out = await generateLtxVideo({ prompt, signal: controller.signal, toBlob: true });
     let url: string | null = null;
-
-    // 1. Server proxy (uses server-side env keys when configured).
-    const res = await fetch(assertAllowedApiEndpoint("/api/generate-video"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, provider, apiKey }),
-      signal: controller.signal,
-    });
-
-    if (res.ok) {
-      if ((res.headers.get("content-type") || "").includes("video")) {
-        url = createTrackedBlobUrl(prompt, await res.blob());
-      } else {
-        const data = await res.json();
-        url = pickVideoUrl(data);
-      }
+    if (out.success && out.videoUrl) {
+      url = out.isBlob ? trackBlobUrl(prompt, out.videoUrl) : sanitizeVideoUrl(out.videoUrl);
     } else {
-      console.warn(`${LOG} proxy responded ${res.status}`);
-    }
-
-    // 2. Direct HuggingFace call with a user-supplied token.
-    if (!url && provider === "huggingface_wan2" && apiKey) {
-      const hf = await fetch(assertAllowedApiEndpoint(HF_LTX_URL), {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inputs: prompt }),
-        signal: controller.signal,
-      });
-      if (hf.ok) url = createTrackedBlobUrl(prompt, await hf.blob());
-      else console.warn(`${LOG} HuggingFace responded ${hf.status}`);
+      console.warn(`${LOG} LTX generation failed: ${out.code ?? "unknown"}`);
     }
 
     if (!url) {
-      console.error(`${LOG} no video produced (provider=${provider})`);
+      console.error(`${LOG} no video produced (provider=ltx)`);
       return null;
     }
     await cacheVideo(prompt, url);
@@ -214,7 +182,7 @@ async function generateSingleStage(
 
 async function generateSixStageSequence(
   monsterId: string,
-  provider: string = "huggingface_wan2",
+  provider: string = "ltx",
   apiKey?: string,
 ): Promise<SixStageGenerationResponse> {
   const monster = COMIC_MONSTERS.find((m) => m.id === monsterId);

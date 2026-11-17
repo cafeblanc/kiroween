@@ -38,9 +38,12 @@ function readKey(envName: string, storageKey: string): string {
   }
 }
 
-/** True if an HF (LTX) token is configured (Vite env or localStorage). */
+/**
+ * True only when the paid six-stage LTX pipeline is explicitly enabled (VITE_LTX_PIPELINE or
+ * localStorage kiroween_ltx_pipeline = "1"). Six 6 s 1080p jobs per monster are costly, so it is opt-in.
+ */
 export function isAIVideoAvailable(): boolean {
-  return Boolean(readKey('VITE_HF_TOKEN', 'kiroween_hf_token'));
+  return readKey('VITE_LTX_PIPELINE', 'kiroween_ltx_pipeline') === '1';
 }
 
 async function pickExport<T>(modPromise: Promise<any>, names: string[], label: string): Promise<T> {

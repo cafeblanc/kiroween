@@ -1,6 +1,7 @@
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { translateTextToLanguage } from "./scienceStitchService";
 import { generateMonsterVideo } from "./videoGenService";
+import { LTX_MAX_WAIT_MS, prepareImageForLtx } from "./ltxJobClient";
 
 export interface MonsterBodyParts {
   head: string;
@@ -512,34 +513,39 @@ export interface MonsterVideoResult {
   source: MonsterVideoSource;
 }
 
-// LTX-Video generation can take a while; abort and fall back after this long.
-const LTX_TIMEOUT_MS = 90_000;
+// LTX-2.5 jobs are polled for up to 4 minutes (ltxJobClient); abort the whole attempt a little after that.
+const LTX_TIMEOUT_MS = LTX_MAX_WAIT_MS + 30_000;
 const LTX_MOTION_SUFFIX =
   "the creature slowly breathes, flexes its limbs and roars, smooth cinematic motion, photorealistic CGI, 4k";
 
 /**
- * Tier 1: server proxy /api/generate-video, then direct HuggingFace Lightricks/LTX-Video when an hfToken exists
- * (reuses generateMonsterVideo: allowlist checks, 413 -> direct HF).
- * Returns null when unconfigured or failed so the caller can fall back to MediaRecorder.
+ * Tier 1: official LTX-2.5 fast (1080p) via the server proxy /api/generate-video, as image-to-video from the
+ * monster image (text-to-video when the image cannot be downscaled safely). The HuggingFace token is no longer
+ * used for video (images still use it). Returns null when unconfigured or failed so the caller can fall back to MediaRecorder.
  */
 async function tryGenerateLtxVideo(params: {
+  imageUrl: string;
   description: string;
   promptEn?: string;
-  hfToken?: string;
   imageKey: string;
   signal: AbortSignal;
+  onProgress?: (pct: number) => void;
 }): Promise<string | null> {
-  const { description, promptEn, hfToken, imageKey, signal } = params;
+  const { imageUrl, description, promptEn, imageKey, signal, onProgress } = params;
   try {
     const base =
       promptEn?.trim() ||
       (await translateTextToLanguage(description, "en", "ko")).replace(/\s+/g, " ").trim().slice(0, 600);
+    const prepared = await prepareImageForLtx(imageUrl);
     const res = await generateMonsterVideo({
       prompt: `${base}, ${LTX_MOTION_SUFFIX}`,
-      provider: "huggingface_wan2",
-      apiKey: hfToken?.trim() || undefined,
+      provider: "ltx",
+      image: prepared?.dataUri,
+      aspect: prepared?.aspect ?? "1:1",
       keepBlobUrl: true,
       signal,
+      // Typical jobs take about a minute: creep towards 95% and let completion jump to 100%.
+      onStatus: (_s, elapsedMs) => onProgress?.(Math.min(95, 5 + Math.round((elapsedMs / 90_000) * 90))),
     });
     if (!res.success || !res.videoUrl) return null;
     const safe = sanitizeVideoUrl(res.videoUrl);
@@ -564,25 +570,26 @@ export async function generateVideoFromMonsterImage(params: {
   hfToken?: string;
   promptEn?: string;
 }): Promise<MonsterVideoResult> {
-  const { imageUrl, description, hfToken, promptEn, onProgress } = params;
+  const { imageUrl, description, promptEn, onProgress } = params;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LTX_TIMEOUT_MS);
   onProgress?.(2);
   let ltxUrl: string | null = null;
   try {
     ltxUrl = await tryGenerateLtxVideo({
+      imageUrl,
       description,
       promptEn,
-      hfToken,
       imageKey: imageUrl,
       signal: controller.signal,
+      onProgress,
     });
   } finally {
     clearTimeout(timer);
   }
   if (ltxUrl) {
     onProgress?.(100);
-    return { videoUrl: ltxUrl, mimeType: "video/mp4", durationSec: 5, source: "ltx" };
+    return { videoUrl: ltxUrl, mimeType: "video/mp4", durationSec: 6, source: "ltx" };
   }
   const local = await generateMediaRecorderVideo(params);
   return { ...local, source: "mediarecorder" };

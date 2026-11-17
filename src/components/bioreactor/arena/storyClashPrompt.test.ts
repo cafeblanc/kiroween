@@ -9,11 +9,9 @@ describe('composeStoryClashPrompt', () => {
 
   it('follows the required template with the fighters and story acts', () => {
     const p = composeStoryClashPrompt('Pyroclastic Dragon', 'Kraken', story);
-    expect(p).toBe(
-      'AAA mobile game cinematic battle cutscene, 3D bio-engineered creature clash between Pyroclastic Dragon and Kraken: ' +
-        'First strike: A hits B. Head-on clash., K.O.!'.replace(', K.O.!', ', A lands the finishing blow — K.O.!') +
-        ', dynamic camera angle, neon shockwaves, 4k game trailer, no text',
-    );
+    expect(p).toContain('1080p Full HD 16:9, LTX-2.5 fast mode, AAA mobile game 3D cinematic battle cutscene');
+    expect(p).toContain('Pyroclastic Dragon and Kraken');
+    expect(p).toContain('1080p 60fps Unreal Engine 5 game trailer, photorealistic 3D, no text');
     expect(p).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
   });
 
@@ -21,8 +19,8 @@ describe('composeStoryClashPrompt', () => {
     fc.assert(
       fc.property(fc.string({ maxLength: 3000 }), fc.string({ maxLength: 3000 }), (a, b) => {
         const p = composeStoryClashPrompt('X', 'Y', { act2_clash: a, act3_finish: b });
-        expect(p.startsWith('AAA mobile game cinematic battle cutscene')).toBe(true);
-        expect(p.endsWith('4k game trailer, no text')).toBe(true);
+        expect(p.startsWith('1080p Full HD 16:9, LTX-2.5 fast mode')).toBe(true);
+        expect(p.endsWith('photorealistic 3D, no text')).toBe(true);
         expect(p.length).toBeLessThan(1300);
         expect(p).not.toContain('\n');
       }),

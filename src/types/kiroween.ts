@@ -69,7 +69,7 @@ export interface BattleMatrix {
 // Video pipeline
 // ---------------------------------------------------------------------------
 
-export type VideoProvider = 'huggingface_wan2';
+export type VideoProvider = 'ltx';
 
 export type VideoSourceKind = 'ai' | 'reference' | 'cache';
 

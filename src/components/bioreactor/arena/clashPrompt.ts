@@ -23,9 +23,9 @@ const MAX_CLASH_PROMPT_CHARS = 1400;
 
 /** Cinematic style suffix appended verbatim to every clash prompt. */
 export const CLASH_STYLE_SUFFIX =
-  'AAA mobile game cinematic battle cutscene, 3D bio-engineered creature clash, dynamic action camera angle, ' +
-  'motion blur, glowing bioluminescent energy particles, intense shockwave impact, dramatic rim lighting, ' +
-  'photorealistic creature rendering, 4k game trailer quality, no text';
+  '1080p Full HD 16:9 widescreen, LTX-2.5 fast mode, AAA mobile game 3D cinematic action battle, dynamic 3D orbiting camera angle, ' +
+  'intense motion blur, glowing bioluminescent energy particles, explosive shockwave impact, dramatic rim lighting, ' +
+  'photorealistic 3D creature rendering, Unreal Engine 5 render, fast action cutscene, no text';
 
 /** Requested clip length (seconds); always inside the 3-5 s cutscene window. */
 export const CLASH_MIN_SECONDS = 3;
@@ -88,8 +88,8 @@ export function plainStoryText(text: string): string {
     .trim();
 }
 
-const STORY_CLASH_PREFIX = 'AAA mobile game cinematic battle cutscene, 3D bio-engineered creature clash between ';
-const STORY_CLASH_SUFFIX = 'dynamic camera angle, neon shockwaves, 4k game trailer, no text';
+const STORY_CLASH_PREFIX = '1080p Full HD 16:9, LTX-2.5 fast mode, AAA mobile game 3D cinematic battle cutscene, dynamic 3D camera pan, bio-engineered creature clash between ';
+const STORY_CLASH_SUFFIX = 'fast action, intense neon shockwaves, 1080p 60fps Unreal Engine 5 game trailer, photorealistic 3D, no text';
 const STORY_BODY_BUDGET = 1000;
 
 /**
