@@ -374,7 +374,6 @@ export const BioStitchLabView: React.FC = () => {
 
   const [isChatOverlayHovered, setIsChatOverlayHovered] = useState<boolean>(false);
   const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
-  const mobileChatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Block 4A: Mythic Chimera 4-Part Assembler & Video-like Morphing Chamber
   const headOptions = CHIMERA_PART_OPTIONS.filter((p) => p.category === "head");
@@ -1966,8 +1965,9 @@ export const BioStitchLabView: React.FC = () => {
     setMobileVisibleMessages(activeBatch.slice(-5));
     setMobileChatPhase("visible");
 
+    // Scroll only the overlay's own box. Element.scrollIntoView also scrolled the full-screen overflow-hidden
+    // ancestors, which lifted the whole bottom strip off the screen edge after a few thumbnail clicks.
     requestAnimationFrame(() => {
-      mobileChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
       if (mobileChatScrollRef.current) {
         mobileChatScrollRef.current.scrollTop = mobileChatScrollRef.current.scrollHeight;
       }
@@ -2380,7 +2380,6 @@ export const BioStitchLabView: React.FC = () => {
                         </div>
                       </div>
                     ))}
-                    <div ref={mobileChatEndRef} className="h-0 w-0" />
                   </div>
                 </div>
               )}

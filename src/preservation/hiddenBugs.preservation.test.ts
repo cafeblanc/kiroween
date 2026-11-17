@@ -92,6 +92,9 @@ describe("3.2 mobile synapse chat absorption (static)", () => {
     );
   });
 
+  it("never uses scrollIntoView (it scrolled the full-screen layout and lifted the bottom strip after a few clicks)", () => {
+    expect(src).not.toMatch(/scrollIntoView\s*\(/);
+  });
   it("applies -translate-y-full opacity-0 only in the exiting phase", () => {
     expect(src).toMatch(
       /mobileChatPhase === "exiting"\s*\?\s*"-translate-y-full opacity-0"\s*:\s*"translate-y-0 opacity-100"/,
