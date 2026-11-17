@@ -2329,7 +2329,7 @@ export const BioStitchLabView: React.FC = () => {
 
             {/* BOTTOM OVERLAY (all viewports): chat overlay, experiment photo strip, input line */}
             <div
-              className="absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent px-2.5 md:px-4 pb-2 pt-8 pointer-events-none gap-1.5"
+              className="absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent px-2.5 md:px-4 pb-[max(2px,env(safe-area-inset-bottom))] pt-8 pointer-events-none gap-1.5"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 0. 5s Auto-Absorbing Synapse Chat (questions, answers, PubMed / Wikipedia cards) */}
