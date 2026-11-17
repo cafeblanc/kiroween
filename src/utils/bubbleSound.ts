@@ -34,6 +34,60 @@ export function bubbleParams(rng: () => number): BubbleParams {
   };
 }
 
+/**
+ * One explosion "boom" for the bioreactor finale: a low sine thump (90 -> 30 Hz) plus a noise blast whose low-pass
+ * closes from 1.6 kHz to 80 Hz. Uses its own AudioContext and closes it after ~2 s. No-op without WebAudio.
+ */
+export function playExplosionSound(rng: () => number = Math.random): void {
+  const Ctx: typeof AudioContext | undefined =
+    typeof window !== "undefined" ? window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext : undefined;
+  if (!Ctx) return;
+  let ctx: AudioContext;
+  try {
+    ctx = new Ctx();
+  } catch {
+    return;
+  }
+  try {
+    if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+    const t = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 0.9;
+    master.connect(ctx.destination);
+
+    const thump = ctx.createOscillator();
+    const thumpGain = ctx.createGain();
+    thump.type = "sine";
+    thump.frequency.setValueAtTime(90, t);
+    thump.frequency.exponentialRampToValueAtTime(30, t + 0.6);
+    thumpGain.gain.setValueAtTime(0.0001, t);
+    thumpGain.gain.exponentialRampToValueAtTime(0.9, t + 0.02);
+    thumpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    thump.connect(thumpGain).connect(master);
+    thump.start(t);
+    thump.stop(t + 1);
+
+    const buf = ctx.createBuffer(1, Math.round(ctx.sampleRate * 1.6), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = rng() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(1600, t);
+    lp.frequency.exponentialRampToValueAtTime(80, t + 1.4);
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.0001, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.7, t + 0.015);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+    noise.connect(lp).connect(noiseGain).connect(master);
+    noise.start(t);
+  } catch {
+    /* ignore */
+  }
+  window.setTimeout(() => void ctx.close().catch(() => {}), 2000);
+}
+
 /** Starts the bubbling loop. Returns a stop function (safe to call more than once). No-op without WebAudio. */
 export function startBubbleSound(rng: () => number = Math.random): () => void {
   const Ctx: typeof AudioContext | undefined =

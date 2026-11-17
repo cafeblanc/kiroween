@@ -35,6 +35,8 @@ import {
   ARENA_TURN_MS,
   type IncubationPhase,
   MONSTER_REVEAL_MS,
+  INCUBATE_BURST_MS,
+  BURST_EXPLODE_MS,
   SUMMON_ROAR_INTERVAL_MS,
   EMBRYO_CLIPS,
   EMBRYO_CLIP_RATE,
@@ -48,7 +50,8 @@ import {
   faceOffAngleDeg,
   summonRoarVolume,
 } from "../utils/summonTiming";
-import { startBubbleSound } from "../utils/bubbleSound";
+import { playExplosionSound, startBubbleSound } from "../utils/bubbleSound";
+import SmokeBurst from "./bioreactor/SmokeBurst";
 import {
   cleanStoryName,
   composeBattleStory,
@@ -328,6 +331,8 @@ export const BioStitchLabView: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoFailed, setVideoFailed] = useState<boolean>(false);
   const [photoDead, setPhotoDead] = useState<boolean>(false);
+  // The local LTX clip failed to load (not deployed yet, or unsupported): play the archival video instead.
+  const [clipFailed, setClipFailed] = useState<boolean>(false);
   const narrationIdRef = useRef<number>(0);
   const narrationAbortRef = useRef<AbortController | null>(null);
 
@@ -796,11 +801,16 @@ export const BioStitchLabView: React.FC = () => {
     if (incubatePhase !== "reveal") return;
     const ready = incubatingRef.current?.ready;
     if (ready) playChimeraRoar(ready.roarAudio);
+    // 포효하며 화면 밖으로 튀어나온 순간 연기와 함께 폭발한다
+    const boom = window.setTimeout(() => playExplosionSound(), BURST_EXPLODE_MS);
     const t = window.setTimeout(() => {
       setIncubating(null);
       setIsCustomMonsterModalOpen(true);
-    }, MONSTER_REVEAL_MS);
-    return () => window.clearTimeout(t);
+    }, INCUBATE_BURST_MS);
+    return () => {
+      window.clearTimeout(boom);
+      window.clearTimeout(t);
+    };
   }, [incubatePhase]);
 
   // 배양 중에는 뽀글거리는 소리 (WebAudio 합성). 완성된 모습이 드러나는 동안에도 계속되고, 팽창 연출이 시작되면 멈춘다
@@ -1584,14 +1594,20 @@ export const BioStitchLabView: React.FC = () => {
   useEffect(() => {
     setVideoFailed(false);
     setPhotoDead(false);
+    setClipFailed(false);
+  }, [activeExp.id]);
 
+  const activeVideoSrc = activeExp.clipUrl && !clipFailed ? activeExp.clipUrl : activeExp.videoUrl;
+  const playingClip = activeVideoSrc === activeExp.clipUrl;
+
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = true;
 
     // Browsers without Ogg Theora support cannot play Wikimedia .ogv clips; show photo + canvas instead.
     if (
-      /\.og[vg](\?|$)/i.test(activeExp.videoUrl) &&
+      /\.og[vg](\?|$)/i.test(activeVideoSrc) &&
       typeof video.canPlayType === "function" &&
       !video.canPlayType('video/ogg; codecs="theora"')
     ) {
@@ -1611,11 +1627,13 @@ export const BioStitchLabView: React.FC = () => {
           tryPlay(true);
           return;
         }
-        setVideoFailed(true);
+        if (playingClip) setClipFailed(true);
+        else setVideoFailed(true);
       });
     };
     tryPlay(false);
-  }, [activeExp.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeExp.id, activeVideoSrc]);
 
   // Fetch live PubMed & Wiki when dossier tab is opened
   // WebAudio Sound Effects
@@ -2321,14 +2339,18 @@ export const BioStitchLabView: React.FC = () => {
             {!videoFailed && (
               <video
                 ref={videoRef}
-                key={activeExp.id + "-" + activeExp.videoUrl}
-                src={activeExp.videoUrl}
+                key={activeExp.id + "-" + activeVideoSrc}
+                src={activeVideoSrc}
                 autoPlay
                 loop
                 muted
                 playsInline
-                onError={() => setVideoFailed(true)}
-                className="absolute inset-0 w-full h-full object-cover mix-blend-screen opacity-85"
+                onError={() => (playingClip ? setClipFailed(true) : setVideoFailed(true))}
+                className={
+                  playingClip
+                    ? "absolute inset-0 w-full h-full object-cover"
+                    : "absolute inset-0 w-full h-full object-cover mix-blend-screen opacity-85"
+                }
               />
             )}
 
@@ -3161,16 +3183,21 @@ export const BioStitchLabView: React.FC = () => {
             </div>
           )}
           {incubating.phase === "reveal" && incubating.ready && (
-            /* The image grows out of the tank centre in 3D and expands until it covers the whole screen; it ends
-               covering the screen, so the tank clip never shows again before the Design Room reopens. */
+            /* Finale (INCUBATE_BURST_MS): the adult lunges out of the screen with a roar, explodes into smoke, stays
+               hidden, then appears full screen as the smoke sinks. It ends covering the screen, so the tank clip
+               never shows again before the Design Room reopens. */
             <div className="absolute inset-0 overflow-hidden incubate-expand-stage pointer-events-none" aria-hidden="true">
               {/* Black backing appears with the image so the finished adult fills the screen on its own */}
               <div className="absolute inset-0 bg-black incubate-expand-backing" />
-              <div className="absolute inset-0 incubate-expand-flash" />
               <img
                 src={incubating.ready.jumpscareImg || incubating.ready.avatarImg}
                 alt=""
                 className="incubate-expand absolute inset-0 w-full h-full object-cover"
+                style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
+              />
+              <SmokeBurst />
+              <div
+                className="absolute inset-0 incubate-expand-flash"
                 style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
               />
             </div>

@@ -109,7 +109,7 @@ describe("3.2 mobile synapse chat absorption (static)", () => {
 describe("3.3 muted video layered over the confocal photo (static + data)", () => {
   const src = read("src/components/BioStitchLabView.tsx");
   const photoIdx = src.indexOf("src={activeExp.microscopyPhotoUrl}");
-  const videoSrcIdx = src.indexOf("src={activeExp.videoUrl}");
+  const videoSrcIdx = src.indexOf("src={activeVideoSrc}");
 
   it("renders the photo before the video so the video is layered on top", () => {
     expect(photoIdx).toBeGreaterThan(-1);
@@ -132,7 +132,13 @@ describe("3.3 muted video layered over the confocal photo (static + data)", () =
     for (const exp of VERIFIED_BIO_EXPERIMENTS) {
       expect(exp.videoUrl).toMatch(/^(https?:\/\/|\/)/);
       expect(exp.microscopyPhotoUrl).toMatch(/^(https?:\/\/|\/)/);
+      if (exp.clipUrl) expect(exp.clipUrl).toMatch(/^\/videos\/experiments\/[a-z0-9_]+\.mp4$/);
     }
+  });
+
+  it("falls back from the local LTX clip to the archival video when the clip fails", () => {
+    expect(src).toContain("activeExp.clipUrl && !clipFailed ? activeExp.clipUrl : activeExp.videoUrl");
+    expect(src).toContain("setClipFailed(true)");
   });
 });
 

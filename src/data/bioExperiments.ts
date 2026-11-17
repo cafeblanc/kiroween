@@ -13,6 +13,8 @@ export interface BioExperimentCase {
   pubMedSearchQuery: string;
   wikiTitle: string;
   videoUrl: string;
+  /** Local LTX-2.5 clip (public/videos/experiments); the viewport falls back to videoUrl when it fails. */
+  clipUrl?: string;
   fallbackVideoUrl: string;
   microscopyPhotoUrl: string;
   secondaryPhotoUrl: string;
@@ -202,6 +204,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 36224417 / DOI: 10.1038/s41586-022-05277-w",
     pubMedSearchQuery: "human cortical organoids transplanted rodent brain Pasca",
     wikiTitle: "Cerebral_organoid",
+    clipUrl: "/videos/experiments/xenocortication.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
     microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/61/Human_Cerebral_Organoids_%2853728295930%29.jpg",
@@ -247,6 +250,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 18193059 / DOI: 10.1038/nm1684",
     pubMedSearchQuery: "perfusion decellularized matrix heart stem cell recellularization",
     wikiTitle: "Decellularization",
+    clipUrl: "/videos/experiments/ghost_heart.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/04/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s001.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/4/4c/Proteolysis-regulates-cardiomyocyte-maturation-and-tissue-integration-ncomms14495-s3.ogv",
     microscopyPhotoUrl: "/images/ghost_heart_bioreactor.jpg",
@@ -292,6 +296,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 30996318 / DOI: 10.1038/s41586-019-1099-1",
     pubMedSearchQuery: "Restoration of brain circulation and cellular functions hours post-mortem Sestan",
     wikiTitle: "BrainEx",
+    clipUrl: "/videos/experiments/brainex.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
     microscopyPhotoUrl: "/images/yale_brainex_perfusion_lab.jpg",
@@ -337,6 +342,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 28129541 / DOI: 10.1016/j.cell.2016.12.036",
     pubMedSearchQuery: "Interspecies Chimerism with Mammalian Pluripotent Stem Cells Belmonte",
     wikiTitle: "Human%E2%80%93animal_hybrid",
+    clipUrl: "/videos/experiments/human_pig_chimera.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f2/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s003.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/3/3c/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s004.ogv",
     microscopyPhotoUrl: "/images/human_pig_chimera_embryo.jpg",
@@ -382,6 +388,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 37924814 / DOI: 10.1016/j.cell.2023.10.005",
     pubMedSearchQuery: "Live birth of chimeric monkey with high contribution from embryonic stem cells Liu",
     wikiTitle: "Chimera_(genetics)",
+    clipUrl: "/videos/experiments/chimeric_monkey.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
     microscopyPhotoUrl: "/images/fluorescent_chimeric_monkey.jpg",
@@ -427,6 +434,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 29371426 / DOI: 10.1038/nature25458",
     pubMedSearchQuery: "The axolotl genome and the evolution of key tissue formation Tanaka",
     wikiTitle: "Axolotl",
+    clipUrl: "/videos/experiments/axolotl.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/6e/Mitosis_drosophila_larva.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
     microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f6/AxolotlBE.jpg",

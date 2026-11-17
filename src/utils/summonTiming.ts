@@ -7,6 +7,17 @@
 /** How long the 3D reveal stays on screen (matches the monster-reveal-burst / incubate-expand CSS animations). */
 export const MONSTER_REVEAL_MS = 2000;
 
+/**
+ * Bioreactor finale (incubateExpand CSS, 5 s): the finished adult lunges out of the screen with a roar, explodes into
+ * smoke (BURST_EXPLODE_MS), stays hidden in the smoke, and appears full screen as the smoke sinks
+ * (from BURST_SMOKE_CLEAR_START_MS). The CSS keyframe percentages are these times / INCUBATE_BURST_MS.
+ */
+export const INCUBATE_BURST_MS = 5000;
+/** The lunge peaks and the smoke explodes (16% of the burst). */
+export const BURST_EXPLODE_MS = 800;
+/** The smoke starts to sink and clear (46% of the burst). */
+export const BURST_SMOKE_CLEAR_START_MS = 2300;
+
 /** Gap between roars on the arena waiting screen. */
 export const SUMMON_ROAR_INTERVAL_MS = 4000;
 
