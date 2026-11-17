@@ -16,6 +16,14 @@ export interface ComicMonster {
   roarAudio: string;
   funFactKo: string;
   funFactEn: string;
+  /** Optional combat stats (custom monsters); curated monsters fall back to defaults in the arena. */
+  customStats?: {
+    atk: number;
+    def: number;
+    spd: number;
+    regen: number;
+    energy: number;
+  };
 }
 
 export const COMIC_MONSTERS: ComicMonster[] = [

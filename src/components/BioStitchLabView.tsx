@@ -23,6 +23,8 @@ import { getBattleVideoForPair } from "./bioreactor/arena";
 import { GROWTH_STAGES } from "./bioreactor/growthStages";
 import { GoogleLanguageSelector, getBcp47ForLang } from "./GoogleLanguageSelector";
 import { assertAllowedApiEndpoint } from "../utils/security";
+import { resolveBattle } from "../utils/arenaBattle";
+import { adultSegmentStart } from "../utils/customMonsterFlow";
 
 const CURATED_6_MONSTERS: ComicMonster[] = REAL_STEM_CELL_PHOTOS.map(
   (photo) =>
@@ -397,6 +399,13 @@ export const BioStitchLabView: React.FC = () => {
     getBattleVideoForPair(f1.id, f2.id);
 
 
+  // 진행 중인 결투의 예약 이벤트(HP/KO/심박/포효음)를 모두 취소 (파이터 교체·탭 이탈 시 이전 결투가 새 상태를 덮어쓰지 않도록)
+  const cancelArenaBattle = () => {
+    arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
+    arenaTimersRef.current = [];
+    setIsArenaBattling(false);
+  };
+
   // 실시간 물리 격돌 아레나 전투 엔진 (두 괴수가 실제로 돌진·타격·HP 감소·KO 폭발)
   const handleStartArenaBattle = () => {
     arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
@@ -414,126 +423,38 @@ export const BioStitchLabView: React.FC = () => {
     ]);
 
     // 성체 전투 구간으로 두 비디오 점프
-    if (f1VideoRef.current && f1VideoRef.current.duration) {
-      f1VideoRef.current.currentTime = f1VideoRef.current.duration * 0.68;
+    // (blob: MediaRecorder clips report duration=Infinity; adultSegmentStart returns null for those and custom clips)
+    const f1Seek = f1VideoRef.current ? adultSegmentStart(f1VideoRef.current.duration, arenaFighter1.id) : null;
+    if (f1VideoRef.current && f1Seek !== null) {
+      f1VideoRef.current.currentTime = f1Seek;
       f1VideoRef.current.play().catch(() => {});
     }
-    if (f2VideoRef.current && f2VideoRef.current.duration) {
-      f2VideoRef.current.currentTime = f2VideoRef.current.duration * 0.68;
+    const f2Seek = f2VideoRef.current ? adultSegmentStart(f2VideoRef.current.duration, arenaFighter2.id) : null;
+    if (f2VideoRef.current && f2Seek !== null) {
+      f2VideoRef.current.currentTime = f2Seek;
       f2VideoRef.current.play().catch(() => {});
     }
 
-    // 매번 예측 불가능한 진짜 랜덤 전투 시뮬레이션 (선공, 치명타, 역전 KO 모두 랜덤!)
-    let hp1 = 100;
-    let hp2 = 100;
-    const firstAttacker = Math.random() < 0.5 ? 1 : 2;
-    const secondAttacker = firstAttacker === 1 ? 2 : 1;
+    // 능력치(ATK/DEF/SPD/REGEN/ENERGY) 기반 전투 해석: 순수 모듈(arenaBattle)이 이벤트 시퀀스를 계산하고 UI는 타이머로 재생
+    const battle = resolveBattle(arenaFighter1, arenaFighter2, Math.random);
+    const fighters = { 1: arenaFighter1, 2: arenaFighter2 } as const;
 
-    const rollDmg = (critBonus = 0) => {
-      const isCrit = Math.random() < 0.35 + critBonus;
-      const dmg = isCrit ? 36 + Math.floor(Math.random() * 20) : 18 + Math.floor(Math.random() * 17);
-      return { dmg, isCrit };
-    };
-
-    // 라운드 1 (0.35s): 랜덤 선공자의 첫 타격!
-    const r1 = rollDmg();
-    if (firstAttacker === 1) hp2 = Math.max(15, hp2 - r1.dmg);
-    else hp1 = Math.max(15, hp1 - r1.dmg);
-    const r1Hp1 = hp1;
-    const r1Hp2 = hp2;
-
-    arenaTimersRef.current.push(window.setTimeout(() => {
-      setArenaPhase(firstAttacker === 1 ? "f1_strike" : "f2_strike");
-      setArenaHp1(r1Hp1);
-      setArenaHp2(r1Hp2);
-      setArenaDamagePopup({
-        target: firstAttacker === 1 ? 2 : 1,
-        text: r1.isCrit ? `💥 -${r1.dmg * 12}! 치명타 선공!` : `-${r1.dmg * 10}! 선제 타격`,
-      });
-      setArenaCombatLog((prev) => [
-        ...prev.slice(-3),
-        `[R1] ${firstAttacker === 1 ? arenaFighter1.nameKo : arenaFighter2.nameKo}의 ${r1.isCrit ? "치명타 선공!" : "기습 타격"} (-${r1.dmg * 10} DMG)`,
-      ]);
-      playCardiacThump(180);
-      playChimeraRoar(firstAttacker === 1 ? arenaFighter1.roarAudio : arenaFighter2.roarAudio);
-    }, 350));
-
-    // 라운드 2 (1.5s): 반격자 돌진!
-    const r2 = rollDmg(0.1);
-    if (secondAttacker === 1) hp2 = Math.max(12, hp2 - r2.dmg);
-    else hp1 = Math.max(12, hp1 - r2.dmg);
-    const r2Hp1 = hp1;
-    const r2Hp2 = hp2;
-
-    arenaTimersRef.current.push(window.setTimeout(() => {
-      setArenaPhase(secondAttacker === 1 ? "f1_strike" : "f2_strike");
-      setArenaHp1(r2Hp1);
-      setArenaHp2(r2Hp2);
-      setArenaDamagePopup({
-        target: secondAttacker === 1 ? 2 : 1,
-        text: r2.isCrit ? `⚡ -${r2.dmg * 12}! 극대 반격!` : `-${r2.dmg * 10}! 반격`,
-      });
-      setArenaCombatLog((prev) => [
-        ...prev.slice(-3),
-        `[R2] ${secondAttacker === 1 ? arenaFighter1.nameKo : arenaFighter2.nameKo}의 ${r2.isCrit ? "극대 반격!" : "돌진 반격"} (-${r2.dmg * 10} DMG)`,
-      ]);
-      playCardiacThump(200);
-      playChimeraRoar(secondAttacker === 1 ? arenaFighter1.roarAudio : arenaFighter2.roarAudio);
-    }, 1500));
-
-    // 라운드 3 (2.75s): 정면 대충돌 (양측 난타전!)
-    const r3a = rollDmg();
-    const r3b = rollDmg();
-    hp1 = Math.max(8, hp1 - r3a.dmg);
-    hp2 = Math.max(8, hp2 - r3b.dmg);
-    const r3Hp1 = hp1;
-    const r3Hp2 = hp2;
-    const clashEdge = r3b.dmg >= r3a.dmg ? 2 : 1;
-
-    arenaTimersRef.current.push(window.setTimeout(() => {
-      setArenaPhase("clash");
-      setArenaHp1(r3Hp1);
-      setArenaHp2(r3Hp2);
-      setArenaDamagePopup({
-        target: clashEdge,
-        text: `💥 정면 대충돌! (-${Math.max(r3a.dmg, r3b.dmg) * 10})`,
-      });
-      setArenaCombatLog((prev) => [
-        ...prev.slice(-3),
-        `[R3] 양측 정면 대충돌! 충격파 발생 (-${Math.max(r3a.dmg, r3b.dmg) * 10} DMG)`,
-      ]);
-      playCardiacThump(240);
-    }, 2750));
-
-    // 라운드 4 (4.0s): 최종 결판! (남은 HP + 막판 랜덤 역전 변수로 승자 결정)
-    const f1FinalScore = hp1 + Math.floor(Math.random() * 45);
-    const f2FinalScore = hp2 + Math.floor(Math.random() * 45);
-    const f1Wins = f1FinalScore >= f2FinalScore;
-
-    arenaTimersRef.current.push(window.setTimeout(() => {
-      setArenaPhase("ko");
-      if (f1Wins) {
-        setArenaHp2(0);
-        setArenaDamagePopup({ target: 2, text: "💀 K.O. 필살 일격!" });
-        setArenaWinner(arenaFighter1);
-        setArenaCombatLog((prev) => [
-          ...prev.slice(-3),
-          `🏆 [K.O.] ${arenaFighter1.nameKo} 최종 승리!`,
-        ]);
-        playChimeraRoar(arenaFighter1.roarAudio);
-      } else {
-        setArenaHp1(0);
-        setArenaDamagePopup({ target: 1, text: "💀 K.O. 필살 일격!" });
-        setArenaWinner(arenaFighter2);
-        setArenaCombatLog((prev) => [
-          ...prev.slice(-3),
-          `🏆 [K.O.] ${arenaFighter2.nameKo} 최종 승리!`,
-        ]);
-        playChimeraRoar(arenaFighter2.roarAudio);
-      }
-      setActiveClashVideoUrl(null);
-      setIsArenaBattling(false);
-    }, 5400));
+    battle.events.forEach((ev) => {
+      arenaTimersRef.current.push(window.setTimeout(() => {
+        setArenaPhase(ev.phase);
+        setArenaHp1(ev.hp1);
+        setArenaHp2(ev.hp2);
+        setArenaDamagePopup({ target: ev.popupTarget, text: ev.popupText });
+        setArenaCombatLog((prev) => [...prev.slice(-3), ev.logLine]);
+        if (ev.thumpMs > 0) playCardiacThump(ev.thumpMs);
+        if (ev.roarOf) playChimeraRoar(fighters[ev.roarOf].roarAudio);
+        if (ev.phase === "ko") {
+          setArenaWinner(fighters[battle.winner]);
+          setActiveClashVideoUrl(null);
+          setIsArenaBattling(false);
+        }
+      }, ev.atMs));
+    });
   };
 
   // 3D 각성 괴수 실사 동영상 API 생성 (고정된 프레임 내부에서 살아 움직이며 포효하는 괴수 AI 비디오 생성)
@@ -1395,6 +1316,17 @@ export const BioStitchLabView: React.FC = () => {
     };
   }, []);
 
+  // Leaving the arena tab (or closing the modal) mid-battle must stop its scheduled thumps/roars/KO events.
+  useEffect(() => {
+    if (isStitchModalOpen && activeModalTab === "monster_arena") return;
+    if (arenaTimersRef.current.length === 0) return;
+    arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
+    arenaTimersRef.current = [];
+    setIsArenaBattling(false);
+    setActiveClashVideoUrl(null);
+    setArenaPhase("idle");
+  }, [isStitchModalOpen, activeModalTab]);
+
   // Release the shared AudioContext on unmount.
   useEffect(() => {
     return () => {
@@ -2233,7 +2165,7 @@ export const BioStitchLabView: React.FC = () => {
                           onChange={(e) => {
                             const roster = [...customArenaRoster, ...CURATED_6_MONSTERS];
                             const found = roster.find((m) => m.id === e.target.value);
-                            if (found) { setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
+                            if (found) { cancelArenaBattle(); setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
                           }}
                           className="bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
@@ -2247,7 +2179,7 @@ export const BioStitchLabView: React.FC = () => {
                           onChange={(e) => {
                             const roster = [...customArenaRoster, ...CURATED_6_MONSTERS];
                             const found = roster.find((m) => m.id === e.target.value);
-                            if (found) { setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
+                            if (found) { cancelArenaBattle(); setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
                           }}
                           className="bg-slate-950 border border-rose-500/60 text-rose-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
@@ -2377,18 +2309,14 @@ export const BioStitchLabView: React.FC = () => {
                                 playsInline
                                 onLoadedMetadata={(e) => {
                                   const v = e.currentTarget;
-                                  if (v.duration && !arenaFighter1.id.startsWith("custom_")) {
-                                    v.currentTime = v.duration * 0.68;
-                                  }
+                                  const seek = adultSegmentStart(v.duration, arenaFighter1.id);
+                                  if (seek !== null) v.currentTime = seek;
                                 }}
                                 onTimeUpdate={(e) => {
                                   const v = e.currentTarget;
-                                  if (
-                                    v.duration &&
-                                    !arenaFighter1.id.startsWith("custom_") &&
-                                    v.currentTime < v.duration * 0.65
-                                  ) {
-                                    v.currentTime = v.duration * 0.68;
+                                  const seek = adultSegmentStart(v.duration, arenaFighter1.id);
+                                  if (seek !== null && v.currentTime < v.duration * 0.65) {
+                                    v.currentTime = seek;
                                   }
                                 }}
                                 className="relative w-full h-full object-cover scale-[1.12] mix-blend-screen opacity-65"
@@ -2432,18 +2360,14 @@ export const BioStitchLabView: React.FC = () => {
                                 playsInline
                                 onLoadedMetadata={(e) => {
                                   const v = e.currentTarget;
-                                  if (v.duration && !arenaFighter2.id.startsWith("custom_")) {
-                                    v.currentTime = v.duration * 0.68;
-                                  }
+                                  const seek = adultSegmentStart(v.duration, arenaFighter2.id);
+                                  if (seek !== null) v.currentTime = seek;
                                 }}
                                 onTimeUpdate={(e) => {
                                   const v = e.currentTarget;
-                                  if (
-                                    v.duration &&
-                                    !arenaFighter2.id.startsWith("custom_") &&
-                                    v.currentTime < v.duration * 0.65
-                                  ) {
-                                    v.currentTime = v.duration * 0.68;
+                                  const seek = adultSegmentStart(v.duration, arenaFighter2.id);
+                                  if (seek !== null && v.currentTime < v.duration * 0.65) {
+                                    v.currentTime = seek;
                                   }
                                 }}
                                 className="relative w-full h-full object-cover scale-[1.12] scale-x-[-1] mix-blend-screen opacity-65"
@@ -2787,6 +2711,7 @@ export const BioStitchLabView: React.FC = () => {
                 }}
                 onSendToArena={(customMonster) => {
                   setCustomArenaRoster((prev) => [customMonster, ...prev.slice(0, 5)]);
+                  cancelArenaBattle();
                   setArenaFighter1(customMonster);
                   setAiBattleVideoUrl(null);
                   setActiveClashVideoUrl(null);

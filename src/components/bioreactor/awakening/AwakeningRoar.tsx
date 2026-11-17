@@ -73,10 +73,13 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
   const ctxRef = useRef<AudioContext | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef<number>(0);
+  /** Incremented on every effect start/cleanup so async audio setup from a dead run aborts. */
+  const runRef = useRef(0);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  const playHtmlFallback = useCallback((src: string) => {
+  const playHtmlFallback = useCallback((src: string, runId: number) => {
+    if (runRef.current !== runId) return;
     try {
       const audio = new Audio(src);
       audio.volume = FALLBACK_VOLUME;
@@ -87,19 +90,24 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
     }
   }, []);
 
-  const playRoar = useCallback(async () => {
+  const playRoar = useCallback(async (runId: number) => {
     const src = monster.roarAudio || DEFAULT_ROAR;
     const Ctor = getAudioContextCtor();
-    if (!Ctor) return playHtmlFallback(src);
+    if (!Ctor) return playHtmlFallback(src, runId);
 
     try {
       const ctx = new Ctor();
       ctxRef.current = ctx;
       if (ctx.state === 'suspended') await ctx.resume().catch(() => undefined);
+      // Unmounted (or restarted) while resuming: stay silent and release this context.
+      if (runRef.current !== runId) {
+        void ctx.close().catch(() => undefined);
+        return;
+      }
       if (ctx.state !== 'running') {
         void ctx.close().catch(() => undefined);
         ctxRef.current = null;
-        return playHtmlFallback(src);
+        return playHtmlFallback(src, runId);
       }
 
       const now = ctx.currentTime;
@@ -127,6 +135,7 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
       try {
         const res = await fetch(src);
         const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+        if (runRef.current !== runId) return;
         const sample = ctx.createBufferSource();
         sample.buffer = buf;
         sample.connect(master);
@@ -135,14 +144,15 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
         /* synthesized layer alone is sufficient */
       }
     } catch {
-      playHtmlFallback(src);
+      playHtmlFallback(src, runId);
     }
   }, [monster, playHtmlFallback]);
 
   useEffect(() => {
     setState({ isRoaring: true, glassCrackProgress: 0, roarVolume: BASE_VOLUME });
     setVideoFailed(false);
-    void playRoar();
+    const runId = ++runRef.current;
+    void playRoar(runId);
 
     const start = performance.now();
     const tick = (t: number) => {
@@ -157,8 +167,10 @@ export const AwakeningRoar: React.FC<AwakeningRoarProps> = ({ monster, fullscree
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
+      runRef.current++;
       cancelAnimationFrame(rafRef.current);
       htmlAudioRef.current?.pause();
+      htmlAudioRef.current = null;
       void ctxRef.current?.close().catch(() => undefined);
       ctxRef.current = null;
     };

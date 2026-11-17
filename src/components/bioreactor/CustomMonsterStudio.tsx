@@ -213,6 +213,13 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     bpm: Math.round(95 + (bioStats.spd + bioStats.energy) * 0.4),
     colorHex: themeHex,
     badge: "CUSTOM AI",
+    customStats: {
+      atk: bioStats.atk,
+      def: bioStats.def,
+      spd: bioStats.spd,
+      regen: bioStats.regen,
+      energy: bioStats.energy,
+    },
     promptEn: `${longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
     promptKo: `${longPrompt}\n[전투 능력치: 공격력 ${bioStats.atk}, 방어력 ${bioStats.def}, 속도 ${bioStats.spd}, 재생력 ${bioStats.regen}, 에너지 ${bioStats.energy}]`,
     avatarImg: generatedImageUrl || selectedPreset.baseImageSrc,

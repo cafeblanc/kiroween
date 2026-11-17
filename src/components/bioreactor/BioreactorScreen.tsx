@@ -7,6 +7,7 @@ import { GROWTH_STAGES, STAGE_COUNT, STAGE_DURATION_SEC } from './growthStages';
 import { StageProgressHUD } from './StageProgressHUD';
 import { AwakeningRoar } from './awakening';
 import { createVideoPipeline } from '../../services/videoPipeline';
+import { shouldResolveViaPipeline } from '../../utils/customMonsterFlow';
 
 /** Minimal monster shape the screen needs (ComicMonster satisfies this). */
 export interface BioreactorMonsterInput {
@@ -110,6 +111,8 @@ export const BioreactorScreen: React.FC<BioreactorScreenProps> = ({
     let cancelled = false;
     setVideoUrl(monster.videoSrc);
     setNotice(undefined);
+    // Custom monsters keep their own generated (blob:) clip; the AI/reference pipeline must not replace it.
+    if (!shouldResolveViaPipeline({ id: monster.id, videoSrc: monster.videoSrc })) return undefined;
     const pipeline = createVideoPipeline({ onUserMessage: (m) => !cancelled && setNotice(m) });
     pipeline
       .getVideoSource(monster.id)
