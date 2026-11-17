@@ -11,9 +11,10 @@ export function isValidLtxJobId(id: unknown): id is string {
 }
 
 /**
- * Hosts a finished LTX job may point `result.video_url` at.
- * The docs' example result is https://storage.googleapis.com/... (Google Cloud Storage presigned URL);
- * *.ltx.io is allowed in case LTX serves results from its own domain.
+ * Accepts a finished LTX job's `result.video_url`.
+ * The URL comes from the authenticated LTX API response (fetched server-side with our key), and the docs only show
+ * an example host (https://docs.ltx.io/async-jobs.md "Result format"). A fixed host allowlist rejected real results,
+ * so any plain https URL is accepted; credentials, non-default ports and control characters are still rejected.
  */
 export function isTrustedLtxVideoUrl(input: unknown): input is string {
   if (typeof input !== "string") return false;
@@ -27,11 +28,5 @@ export function isTrustedLtxVideoUrl(input: unknown): input is string {
   }
   if (u.protocol !== "https:" || u.username || u.password) return false;
   if (u.port && u.port !== "443") return false;
-  const host = u.hostname.toLowerCase();
-  return (
-    host === "storage.googleapis.com" ||
-    host.endsWith(".storage.googleapis.com") ||
-    host === "ltx.io" ||
-    host.endsWith(".ltx.io")
-  );
+  return u.hostname.length > 0;
 }

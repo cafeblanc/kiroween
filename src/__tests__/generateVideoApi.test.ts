@@ -228,16 +228,16 @@ describe("GET poll", () => {
     expect(res.body.error).toMatch(/content filter/i);
   });
 
-  it("refuses result URLs outside the allowlist", async () => {
+  it("refuses non-https or credentialed result URLs but accepts any https host", async () => {
     const handler = await load();
-    for (const url of ["https://evil.example/v.mp4", "http://storage.googleapis.com/v.mp4", "https://storage.googleapis.com.evil.com/v.mp4", undefined]) {
+    for (const url of ["http://storage.googleapis.com/v.mp4", "https://user:pw@cdn.example/v.mp4", "https://cdn.example:8443/v.mp4", "javascript:alert(1)", undefined]) {
       vi.stubGlobal("fetch", vi.fn(async () => up({ status: "completed", result: { video_url: url } })));
       const res = mockRes();
       await handler(poll({ provider: "ltx", id: "abcdef1234567890" }), res);
       expect(res.body.status).toBe("failed");
       expect(res.body.videoUrl).toBeNull();
     }
-    for (const url of ["https://foo.storage.googleapis.com/v.mp4", "https://cdn.ltx.io/v.mp4"]) {
+    for (const url of ["https://foo.storage.googleapis.com/v.mp4", "https://cdn.ltx.io/v.mp4", "https://d1abc.cloudfront.net/out/v.mp4"]) {
       vi.stubGlobal("fetch", vi.fn(async () => up({ status: "completed", result: { video_url: url } })));
       const res = mockRes();
       await handler(poll({ provider: "ltx", id: "abcdef1234567890" }), res);

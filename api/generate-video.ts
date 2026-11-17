@@ -176,6 +176,7 @@ function mapStatus(upstream: unknown): "queued" | "processing" | "completed" | "
 
 function sendUpstreamError(res: any, httpStatus: number, upstreamHeaders: Headers, data: any, key: string): any {
   const mapped = mapLtxHttpError(httpStatus, safeMessage(data, key));
+  console.warn(`[generate-video] ltx upstream HTTP ${httpStatus}: ${safeMessage(data, key)}`);
   const retry = upstreamHeaders.get("retry-after");
   if (retry && /^\d{1,6}$/.test(retry)) res.setHeader("Retry-After", retry);
   return res.status(mapped.status).json({ error: mapped.error });
@@ -230,6 +231,13 @@ async function handlePoll(req: any, res: any): Promise<any> {
 
     if (status === "completed") {
       const url = data?.result?.video_url;
+      let resultHost = "missing";
+      try {
+        resultHost = new URL(String(url)).hostname.slice(0, 80);
+      } catch {
+        /* keep "missing" */
+      }
+      console.info(`[generate-video] ltx ${kindParam} job completed, result host: ${resultHost}`);
       if (!isTrustedLtxVideoUrl(url)) {
         let host = "unknown";
         try {
@@ -248,6 +256,7 @@ async function handlePoll(req: any, res: any): Promise<any> {
     }
     if (status === "failed") {
       const type = typeof data?.error?.type === "string" ? data.error.type : undefined;
+      console.warn(`[generate-video] ltx ${kindParam} job failed: ${type ?? "unknown"} ${safeMessage(data, key)}`);
       return res.status(200).json({
         jobId: id,
         status,

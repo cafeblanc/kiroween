@@ -189,8 +189,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
             ? "LTX-Video 실사 동영상 생성 완료! 재생, 다운로드 또는 15초 배양기에 바로 투입할 수 있습니다."
             : "LTX-Video photoreal clip ready! Play, download, or start the 15s bioreactor."
           : isKo
-          ? `LTX 미연결 또는 실패로 로컬 애니메이션 동영상(${result.durationSec}초)을 생성했습니다. 재생, 다운로드 또는 15초 배양기에 투입할 수 있습니다.`
-          : `LTX unavailable, so a local animated video (${result.durationSec}s) was rendered. Play, download, or start the 15s bioreactor.`,
+          ? `⚠️ LTX 실사 동영상 생성 실패: ${result.ltxError ?? "원인 불명"}. 대신 이미지를 움직이는 로컬 애니메이션(${result.durationSec}초)을 만들었습니다.`
+          : `⚠️ LTX video failed: ${result.ltxError ?? "unknown reason"}. A local animation of the image (${result.durationSec}s) was rendered instead.`,
       );
     } catch (err) {
       setStatusMessage(
@@ -486,8 +486,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
               : "LTX-2.5 fast · 1080p ready"
             : videoSource === "mediarecorder"
             ? isKo
-              ? "LTX 미연결 · 로컬 폴백 사용"
-              : "LTX offline · local fallback"
+              ? "LTX 실패 · 로컬 애니메이션(실사 영상 아님)"
+              : "LTX failed · local animation (not a real video)"
             : isKo
             ? "LTX-2.5 fast · 1080p (서버 프록시) → 실패 시 로컬 폴백"
             : "LTX-2.5 fast · 1080p (server proxy) → local fallback"}

@@ -511,6 +511,8 @@ export interface MonsterVideoResult {
   mimeType: string;
   durationSec: number;
   source: MonsterVideoSource;
+  /** Why LTX failed when `source` is "mediarecorder" (shown to the user instead of silently falling back). */
+  ltxError?: string;
 }
 
 // LTX-2.5 jobs are polled for up to 4 minutes (ltxJobClient); abort the whole attempt a little after that.
@@ -530,7 +532,7 @@ async function tryGenerateLtxVideo(params: {
   imageKey: string;
   signal: AbortSignal;
   onProgress?: (pct: number) => void;
-}): Promise<string | null> {
+}): Promise<{ url: string | null; error?: string }> {
   const { imageUrl, description, promptEn, imageKey, signal, onProgress } = params;
   try {
     const base =
@@ -547,17 +549,23 @@ async function tryGenerateLtxVideo(params: {
       // Typical jobs take about a minute: creep towards 95% and let completion jump to 100%.
       onStatus: (_s, elapsedMs) => onProgress?.(Math.min(95, 5 + Math.round((elapsedMs / 90_000) * 90))),
     });
-    if (!res.success || !res.videoUrl) return null;
+    if (!res.success || !res.videoUrl) {
+      const error = res.error || "LTX video generation failed";
+      console.warn(`[customMonsterMedia] LTX failed: ${error}`);
+      return { url: null, error };
+    }
     const safe = sanitizeVideoUrl(res.videoUrl);
-    if (!safe) return null;
+    if (!safe) return { url: null, error: "LTX returned an invalid video URL" };
     if (safe.startsWith("blob:")) {
       const prev = blobUrlByImage.get(imageKey);
       if (prev && prev !== safe) URL.revokeObjectURL(prev);
       blobUrlByImage.set(imageKey, safe);
     }
-    return safe;
-  } catch {
-    return null;
+    return { url: safe };
+  } catch (e: any) {
+    const error = e?.message || "LTX video generation error";
+    console.warn(`[customMonsterMedia] LTX error: ${error}`);
+    return { url: null, error };
   }
 }
 
@@ -574,9 +582,9 @@ export async function generateVideoFromMonsterImage(params: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LTX_TIMEOUT_MS);
   onProgress?.(2);
-  let ltxUrl: string | null = null;
+  let ltx: { url: string | null; error?: string } = { url: null };
   try {
-    ltxUrl = await tryGenerateLtxVideo({
+    ltx = await tryGenerateLtxVideo({
       imageUrl,
       description,
       promptEn,
@@ -587,12 +595,12 @@ export async function generateVideoFromMonsterImage(params: {
   } finally {
     clearTimeout(timer);
   }
-  if (ltxUrl) {
+  if (ltx.url) {
     onProgress?.(100);
-    return { videoUrl: ltxUrl, mimeType: "video/mp4", durationSec: 6, source: "ltx" };
+    return { videoUrl: ltx.url, mimeType: "video/mp4", durationSec: 6, source: "ltx" };
   }
   const local = await generateMediaRecorderVideo(params);
-  return { ...local, source: "mediarecorder" };
+  return { ...local, source: "mediarecorder", ltxError: ltx.error };
 }
 
 async function generateMediaRecorderVideo(params: {

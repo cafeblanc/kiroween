@@ -70,8 +70,8 @@ describe("generateLtxVideo", () => {
     expect(out).toMatchObject({ success: true, videoUrl: OK_URL, isBlob: false });
   });
 
-  it("rejects untrusted result URLs", async () => {
-    for (const bad of ["http://storage.googleapis.com/x.mp4", "https://evil.example/x.mp4", "javascript:alert(1)", null]) {
+  it("rejects non-https or credentialed result URLs", async () => {
+    for (const bad of ["http://storage.googleapis.com/x.mp4", "https://user:pw@evil.example/x.mp4", "javascript:alert(1)", null]) {
       vi.stubGlobal(
         "fetch",
         vi.fn(async (_u: string, init?: RequestInit) =>

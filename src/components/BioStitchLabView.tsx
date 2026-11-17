@@ -943,10 +943,11 @@ export const BioStitchLabView: React.FC = () => {
       setAi3DStatus(isKo ? "✅ AI 3D 괴수 동영상 생성 완료!" : "✅ AI Creature Video Ready!");
       playChimeraRoar(selectedComicMonster.roarAudio);
     } else {
+      const reason = (res.error ?? "").slice(0, 120) || (isKo ? "원인 불명" : "unknown reason");
       setAi3DStatus(
         isKo
-          ? "⚠️ 상단 결투장 또는 설정에 무료 HF 토큰을 입력하시면 실시간 신규 AI 영상이 생성됩니다. (현재 내장 성체 영상 재생)"
-          : "⚠️ Enter HF Token to generate custom AI video (playing built-in adult video)."
+          ? `⚠️ LTX 동영상 생성 실패: ${reason} (현재 내장 성체 영상 재생)`
+          : `⚠️ LTX video failed: ${reason} (playing built-in adult video)`
       );
     }
     setIsGeneratingAi3D(false);
