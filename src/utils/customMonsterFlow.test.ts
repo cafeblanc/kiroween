@@ -86,10 +86,16 @@ describe('structural: cleanup and stale-state guards', () => {
     expect(screen).toMatch(/shouldResolveViaPipeline/);
   });
 
-  it('lab view stops the incubator heartbeat once awakened and cancels arena timers on fighter change / tab leave', () => {
+  it('lab view stops the incubator heartbeat once awakened; arena generation is aborted on fighter change / unmount; the roar and incubation timers are cleared', () => {
     expect(lab).toMatch(/morphStage === "awakened"/);
     expect(lab).toMatch(/chimeraCardiacIntervalRef\.current\);/);
-    expect(lab.match(/cancelArenaBattle\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // old real-time duel engine is gone
+    expect(lab).not.toMatch(/cancelArenaBattle|arenaTimersRef|handleStartArenaBattle/);
+    // the battle-video generation is aborted when the pair changes (and on unmount)
+    expect(lab.match(/aiClashAbortRef\.current\?\.abort\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // the arena entrance roar interval and the incubation phase tick are cleared by their effect cleanups
+    expect(lab).toMatch(/return \(\) => window\.clearInterval\(t\);/);
+    expect(lab).toMatch(/return \(\) => window\.clearInterval\(timer\);/);
     expect(lab).toMatch(/activeModalTab === "monster_arena"\) return;/);
   });
 

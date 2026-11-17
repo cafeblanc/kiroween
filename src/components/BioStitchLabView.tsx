@@ -17,14 +17,31 @@ import {
 } from "../services/scienceStitchService";
 import { BioSimCanvas } from "./BioSimCanvas";
 import { CustomMonsterStudio } from "./bioreactor/CustomMonsterStudio";
+import { ArenaHalf } from "./bioreactor/ArenaHalf";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { BATTLE_VIDEO_SECONDS, generateBattleVideo } from "../services/battleVideoService";
-import { canStartDesignedBattle, pickArenaFighters } from "../utils/arenaRoster";
-import { MONSTER_REVEAL_MS, SUMMON_ROAR_INTERVAL_MS, summonRoarVolume } from "../utils/summonTiming";
 import {
-  actForEvent,
+  EMPTY_SLOTS,
+  canStartDesignedBattle,
+  isDesignedMonster,
+  placeEntrant,
+  pruneSlots,
+  selectSlot,
+  type ArenaSlots,
+} from "../utils/arenaRoster";
+import {
+  ARENA_TURN_MS,
+  INCUBATE_REDUCED_FADE_MS,
+  incubationPhase,
+  type IncubationPhase,
+  MONSTER_REVEAL_MS,
+  SUMMON_ROAR_INTERVAL_MS,
+  faceOffAngleDeg,
+  summonRoarVolume,
+} from "../utils/summonTiming";
+import {
   cleanStoryName,
   composeBattleStory,
   joinActs,
@@ -45,9 +62,7 @@ import {
 import { GROWTH_STAGES } from "./bioreactor/growthStages";
 import { GoogleLanguageSelector, getBcp47ForLang } from "./GoogleLanguageSelector";
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
-import { detectArenaElement, resolveBattle, resolveEventSkill, type BattleResult } from "../utils/arenaBattle";
-import { adultSegmentStart } from "../utils/customMonsterFlow";
-import { fighterMotionClasses, isFighterHit, stageShakeClass } from "../utils/arenaMotion";
+import { resolveBattle, type BattleResult } from "../utils/arenaBattle";
 import { addToRoster, mergeRoster, ownedBlobUrls, vaultToComicMonster } from "../services/customMonsterVaultMapping";
 
 type LangMode = "KO" | "EN";
@@ -238,29 +253,30 @@ export const BioStitchLabView: React.FC = () => {
   // 괴수 설계실 → 결투장 출격: 동영상이 완성될 때까지 이미지 + 점점 커지는 포효
   const [summon, setSummon] = useState<{ monster: ComicMonster; progress: number; error: string | null } | null>(null);
   // 초기 화면을 벗어난 상태: 내레이터를 즉시 멈춘다
-  const isAwayFromHome = isStitchModalOpen || isCustomMonsterModalOpen || summon !== null;
+  // ⚡ 배양기 가동 중: 화면 전체에 배양기 영상을 틀어 두고 이미지는 백그라운드에서 생성
+  const [incubating, setIncubating] = useState<{ monster: ComicMonster; ready: ComicMonster | null; readyAt: number | null; phase: IncubationPhase } | null>(null);
+  const incubatingRef = useRef<typeof incubating>(null);
+  incubatingRef.current = incubating;
+  const isAwayFromHome =
+    isStitchModalOpen || isCustomMonsterModalOpen || summon !== null || incubating !== null || revealMonster !== null;
 
-  // Monster Clash Arena State (Real-Time Visual Combat Engine)
-  const [arenaFighter1, setArenaFighter1] = useState<ComicMonster>(COMIC_MONSTERS[0]);
-  const [arenaFighter2, setArenaFighter2] = useState<ComicMonster>(COMIC_MONSTERS[1]);
-  const [isArenaBattling, setIsArenaBattling] = useState<boolean>(false);
-  const [arenaWinner, setArenaWinner] = useState<ComicMonster | null>(null);
-  const [arenaHp1, setArenaHp1] = useState<number>(100);
-  const [arenaHp2, setArenaHp2] = useState<number>(100);
-  const [arenaPhase, setArenaPhase] = useState<"idle" | "f1_strike" | "f2_strike" | "clash" | "ko">("idle");
-  // 전투 장면에는 글자를 띄우지 않으므로 대미지 팝업·전투 로그는 화면에 표시하지 않는다 (값은 기존 흐름 유지용)
-  const [, setArenaDamagePopup] = useState<{ target: 1 | 2; text: string } | null>(null);
-  const [, setArenaCombatLog] = useState<string[]>([]);
+  // Monster Clash Arena: 설계한 괴수만 서는 두 개의 절반 화면 (왼쪽 / 오른쪽)
+  const [arenaSlots, setArenaSlots] = useState<ArenaSlots>(EMPTY_SLOTS);
   const [customArenaRoster, setCustomArenaRoster] = useState<ComicMonster[]>([]);
-  // 스튜디오에서 고른 대전: 파이터 state가 이 쌍으로 바뀐 직후 스토리 편집 창을 연다
+  // 결투 영상 단계: 두 괴수 화면 → (생성 중) → 영상 재생 → 결과 표시
+  const [battlePhase, setBattlePhase] = useState<"stage" | "playing" | "outcome">("stage");
+  const [duelWinnerSide, setDuelWinnerSide] = useState<1 | 2 | null>(null);
+  const arenaLeft = arenaSlots.left ? customArenaRoster.find((m) => m.id === arenaSlots.left) ?? null : null;
+  const arenaRight = arenaSlots.right ? customArenaRoster.find((m) => m.id === arenaSlots.right) ?? null : null;
+  // 슬롯이 비어 있으면 샘플 괴수(설계 괴수가 아님 → 결투 불가)로 자리만 채운다
+  const arenaFighter1: ComicMonster = arenaLeft ?? COMIC_MONSTERS[0];
+  const arenaFighter2: ComicMonster = arenaRight ?? COMIC_MONSTERS[1];
+  // 스튜디오에서 고른 대전: 슬롯이 이 쌍으로 바뀐 직후 스토리 편집 창을 연다
   const pendingBattleVideoRef = useRef<{ f1: string; f2: string } | null>(null);
-  const [aiBattleVideoUrl, setAiBattleVideoUrl] = useState<string | null>(null);
-  const [activeClashVideoUrl, setActiveClashVideoUrl] = useState<string | null>(null);
   const [ai3DBurstVideoUrl, setAi3DBurstVideoUrl] = useState<string | null>(null);
   const [isGeneratingAi3D, setIsGeneratingAi3D] = useState<boolean>(false);
   const [ai3DStatus, setAi3DStatus] = useState<string>("");
   const [hfTokenInput, setHfTokenInput] = useState<string>("");
-  const arenaTimersRef = useRef<number[]>([]);
   // 보관함에서 복원한 커스텀 괴수: 현재 로스터 스냅샷 + 이 컴포넌트가 만든 blob: URL(언마운트 시 해제)
   const customRosterRef = useRef<ComicMonster[]>([]);
   customRosterRef.current = customArenaRoster;
@@ -269,7 +285,6 @@ export const BioStitchLabView: React.FC = () => {
   const [aiClashUrl, setAiClashUrl] = useState<string | null>(null);
   const [isGeneratingAiClash, setIsGeneratingAiClash] = useState<boolean>(false);
   const [aiClashStatus, setAiClashStatus] = useState<{ kind: "loading" | "error" | "nokey" | "ok"; text: string } | null>(null);
-  const [arenaStrike, setArenaStrike] = useState<{ attacker: 1 | 2 | null; skill: string | null; evaded: boolean; seq: number } | null>(null);
   // AI 생체 배틀 서사 (스토리) + 연대기(IndexedDB) 상태
   const [battleStory, setBattleStory] = useState<BattleStory | null>(null);
   const [storyAct, setStoryAct] = useState<0 | 1 | 2 | 3>(0); // 0 = 모두 표시(대기/다시보기), 1~3 = 라이브 진행 중인 막
@@ -295,8 +310,6 @@ export const BioStitchLabView: React.FC = () => {
   } | null>(null);
   const aiClashBlobRef = useRef<string | null>(null);
   const aiClashAbortRef = useRef<AbortController | null>(null);
-  const f1VideoRef = useRef<HTMLVideoElement | null>(null);
-  const f2VideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Block 1: Video & Confocal Microscopy Photo
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -464,13 +477,6 @@ export const BioStitchLabView: React.FC = () => {
   };
 
 
-  // 진행 중인 결투의 예약 이벤트(HP/KO/심박/포효음)를 모두 취소 (파이터 교체·탭 이탈 시 이전 결투가 새 상태를 덮어쓰지 않도록)
-  const cancelArenaBattle = () => {
-    arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
-    arenaTimersRef.current = [];
-    setIsArenaBattling(false);
-  };
-
   // 현재 쌍의 전투 계획(결과 + 서사)을 얻거나 새로 만든다. 영상 프롬프트와 실제 결투가 같은 이야기를 공유
   const getOrCreatePlannedBattle = (forceNew: boolean) => {
     const key = `${arenaFighter1.id}|${arenaFighter2.id}`;
@@ -506,72 +512,6 @@ export const BioStitchLabView: React.FC = () => {
       actsEn: p.story.storyEn,
       aiBattleVideo: p.videoBlob,
       timestamp: p.timestamp,
-    });
-  };
-
-  // 실시간 물리 격돌 아레나 전투 엔진 (두 괴수가 실제로 돌진·타격·HP 감소·KO 폭발)
-  const handleStartArenaBattle = () => {
-    if (!canStartDesignedBattle(arenaFighter1, arenaFighter2)) return;
-    arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
-    arenaTimersRef.current = [];
-
-    // 결투장은 사용자가 설계한 괴수 전용: 샘플 괴수의 사전 제작 전투 영상은 쓰지 않는다 (AI 전투 영상이 없으면 듀얼 스테이지)
-    setActiveClashVideoUrl(aiClashUrl);
-    setArenaStrike(null);
-    setIsArenaBattling(true);
-    setArenaWinner(null);
-    setArenaHp1(100);
-    setArenaHp2(100);
-    setArenaPhase("idle");
-    setArenaDamagePopup(null);
-    setArenaCombatLog([
-      `⚡ ${arenaFighter1.nameKo} VS ${arenaFighter2.nameKo} — 결투 개시!`,
-    ]);
-
-    // 성체 전투 구간으로 두 비디오 점프
-    // (blob: MediaRecorder clips report duration=Infinity; adultSegmentStart returns null for those and custom clips)
-    const f1Seek = f1VideoRef.current ? adultSegmentStart(f1VideoRef.current.duration, arenaFighter1.id) : null;
-    if (f1VideoRef.current && f1Seek !== null) {
-      f1VideoRef.current.currentTime = f1Seek;
-      f1VideoRef.current.play().catch(() => {});
-    }
-    const f2Seek = f2VideoRef.current ? adultSegmentStart(f2VideoRef.current.duration, arenaFighter2.id) : null;
-    if (f2VideoRef.current && f2Seek !== null) {
-      f2VideoRef.current.currentTime = f2Seek;
-      f2VideoRef.current.play().catch(() => {});
-    }
-
-    // 능력치(ATK/DEF/SPD/REGEN/ENERGY) 기반 전투 해석: 순수 모듈(arenaBattle)이 이벤트 시퀀스를 계산하고 UI는 타이머로 재생
-    // 영상 생성 버튼이 미리 계획한 (아직 안 쓴) 전투가 있으면 그 결과/서사를 그대로 사용
-    const prior = plannedBattleRef.current;
-    const reuse = prior && prior.key === `${arenaFighter1.id}|${arenaFighter2.id}` && !prior.played;
-    const planned = getOrCreatePlannedBattle(!reuse);
-    planned.played = true;
-    const battle = planned.battle;
-    const fighters = { 1: arenaFighter1, 2: arenaFighter2 } as const;
-    setBattleStory(planned.story);
-    setStoryAct(1);
-    setShowChronicles(false);
-    persistChronicle(planned); // 전투 시작 시 자동 저장 (서사 + 두 괴수 id + 승자 + 시각)
-
-    battle.events.forEach((ev) => {
-      arenaTimersRef.current.push(window.setTimeout(() => {
-        setStoryAct(actForEvent(ev));
-        setArenaPhase(ev.phase);
-        setArenaHp1(ev.hp1);
-        setArenaHp2(ev.hp2);
-        setArenaDamagePopup({ target: ev.popupTarget, text: ev.popupText });
-        setArenaStrike({ attacker: ev.attacker, skill: resolveEventSkill(ev.attacker ? detectArenaElement(fighters[ev.attacker]) : "fire", ev), evaded: ev.evaded, seq: ev.round });
-        setArenaCombatLog((prev) => [...prev.slice(-3), ev.logLine]);
-        if (ev.thumpMs > 0) playCardiacThump(ev.thumpMs);
-        if (ev.roarOf) playChimeraRoar(fighters[ev.roarOf].roarAudio);
-        if (ev.phase === "ko") {
-          setArenaWinner(fighters[battle.winner]);
-          // AI 격돌 영상은 KO 후에도 메인 뷰에 유지 (자막으로 서사 표시); 사전 제작 영상만 듀얼 스테이지로 복귀
-          setActiveClashVideoUrl((cur) => (cur && cur === aiClashBlobRef.current ? cur : null));
-          setIsArenaBattling(false);
-        }
-      }, ev.atMs));
     });
   };
 
@@ -632,7 +572,7 @@ export const BioStitchLabView: React.FC = () => {
     let timedOut = false;
     const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, LTX_MAX_WAIT_MS + 30_000);
     setIsGeneratingAiClash(true);
-    setAiClashStatus({ kind: "loading", text: isKo ? `⏳ ${f1.nameKo} vs ${f2.nameKo} 서사 전투 영상(LTX-2.5 fast · 1080p · 10초) 생성 중... (보통 1~2분, 최대 4분)` : `⏳ Generating the ${f1.nameEn} vs ${f2.nameEn} story battle video (LTX-2.5 fast · 1080p · 10 s)... (usually 1-2 min, up to 4)` });
+    setAiClashStatus({ kind: "loading", text: isKo ? `⏳ ${f1.nameKo} vs ${f2.nameKo} 서사 전투 영상(LTX-2.5 fast · 1080p · ${BATTLE_VIDEO_SECONDS}초) 생성 중... (보통 1~2분, 최대 4분)` : `⏳ Generating the ${f1.nameEn} vs ${f2.nameEn} story battle video (LTX-2.5 fast · 1080p · ${BATTLE_VIDEO_SECONDS} s)... (usually 1-2 min, up to 4)` });
     let ownedBlob: string | null = null;
     // 서사(story)에서 영상 프롬프트를 만든다: 2막(격돌) + 3막(결말). LTX-2.5 fast는 최소 6초라 3~5초 생성이 불가능하므로 재생 시 5초로 제한
     const planned = getOrCreatePlannedBattle(false);
@@ -662,7 +602,9 @@ export const BioStitchLabView: React.FC = () => {
       }
       if (safe) {
         setAiClashUrlOwned(safe);
-        setActiveClashVideoUrl(safe);
+        planned.played = true;
+        setDuelWinnerSide(planned.battle.winner);
+        setBattlePhase("playing");
         setAiClashStatus({ kind: "ok", text: isKo ? "✅ LTX 격돌 영상 준비 완료" : "✅ LTX clash video ready" });
         // 영상 Blob을 연대기에 저장 (전투가 이미 시작됐다면 같은 레코드를 갱신, 아니면 전투 시작 시 함께 저장)
         {
@@ -671,7 +613,7 @@ export const BioStitchLabView: React.FC = () => {
             planned.videoBlob = await (await fetch(safe)).blob();
             if (planned.played) persistChronicle(planned);
           } catch {
-            /* Blob 저장 실패는 재생에 영향 없음 */
+            persistChronicle(planned); /* Blob 저장 실패는 재생에 영향 없음: 영상 없이 기록만 저장 */
           }
         }
         return;
@@ -709,21 +651,18 @@ export const BioStitchLabView: React.FC = () => {
     setIsGeneratingAiClash(false);
     setAiClashUrlOwned(null);
     setAiClashStatus(null);
-    setArenaStrike(null);
-    setActiveClashVideoUrl(null);
     plannedBattleRef.current = null;
     setBattleStory(null);
     setStoryAct(0);
+    setBattlePhase("stage");
+    setDuelWinnerSide(null);
   }, [arenaFighter1.id, arenaFighter2.id]);
 
-  // 결투장은 사용자가 설계한 괴수끼리만 싸운다: 샘플 괴수(배양기 전용)가 남아 있거나 두 파이터가 같으면 로스터에서 다시 고른다
+  // 로스터에서 사라진 괴수(삭제 등)는 슬롯에서도 내린다
   useEffect(() => {
-    const pick = pickArenaFighters(customArenaRoster, arenaFighter1.id, arenaFighter2.id);
-    if (pick.f1 && pick.f1.id !== arenaFighter1.id) setArenaFighter1(pick.f1);
-    if (pick.f2 && pick.f2.id !== arenaFighter2.id) setArenaFighter2(pick.f2);
-  }, [customArenaRoster, arenaFighter1.id, arenaFighter2.id]);
-
-  // 스튜디오에서 상대를 고르면 파이터를 설정한 뒤(위 효과가 이전 쌍을 정리한 다음) 스토리 편집 창을 연다
+    setArenaSlots((s) => pruneSlots(s, new Set(customArenaRoster.map((m) => m.id))));
+  }, [customArenaRoster]);
+  // 스튜디오에서 상대를 고르면 슬롯을 설정한 뒤(위 효과가 이전 쌍을 정리한 다음) 스토리 편집 창을 연다
   useEffect(() => {
     const pending = pendingBattleVideoRef.current;
     if (!pending || pending.f1 !== arenaFighter1.id || pending.f2 !== arenaFighter2.id) return;
@@ -732,19 +671,87 @@ export const BioStitchLabView: React.FC = () => {
   }, [arenaFighter1.id, arenaFighter2.id]);
 
   const arenaHasTwoDesigns = canStartDesignedBattle(arenaFighter1, arenaFighter2);
+  const arenaRosterList = customArenaRoster.filter(isDesignedMonster);
+
+  // 두 자리가 모두 차면 서로를 향해 천천히 돌아선다(ARENA_TURN_MS). 다 돌아선 뒤에 가운데 [결투] 버튼이 나타난다
+  const [duelReady, setDuelReady] = useState<boolean>(false);
+  const [duelReplayKey, setDuelReplayKey] = useState<number>(0);
+  useEffect(() => {
+    if (!arenaHasTwoDesigns) {
+      setDuelReady(false);
+      return;
+    }
+    const t = window.setTimeout(() => setDuelReady(true), ARENA_TURN_MS);
+    return () => window.clearTimeout(t);
+  }, [arenaHasTwoDesigns, arenaFighter1.id, arenaFighter2.id]);
+
+  const duelWinner = duelWinnerSide === 1 ? arenaFighter1 : duelWinnerSide === 2 ? arenaFighter2 : null;
+  const duelOutcomeLine = battleStory ? (isKo ? battleStory.storyKo.act3_finish : battleStory.storyEn.act3_finish) : "";
+
+  // [⚔️ 결투]: 이번 쌍의 전투 계획(결과+서사)을 만들거나 재사용하고, 기록을 저장한 뒤 12초 전투 영상을 생성 (이미 만든 영상이 있으면 다시 재생만)
+  const handleDuel = () => {
+    if (!arenaHasTwoDesigns || isGeneratingAiClash) return;
+    if (aiClashUrl) {
+      setDuelReplayKey((k) => k + 1);
+      setBattlePhase("playing");
+      return;
+    }
+    const planned = getOrCreatePlannedBattle(false);
+    planned.played = true;
+    setBattleStory(planned.story);
+    setDuelWinnerSide(planned.battle.winner);
+    persistChronicle(planned);
+    void handleGenerateAiClashVideo();
+  };
 
   // ── 괴수 설계실 백그라운드 작업 연동 ──
-  // 이미지 완성: 로스터·배양기·출격 대기 화면의 괴수를 갱신하고, 배양기를 보고 있으면 3D로 튀어나오는 연출
+  // 이미지 완성(⚡ 생성 또는 📁 업로드): 로스터를 갱신하고, 전체 화면 3D 등장 연출(2초) 후 설계실로 자동 복귀
   const handleMonsterImageReady = (m: ComicMonster) => {
     setCustomArenaRoster((prev) => addToRoster(prev, m));
     setSelectedComicMonster((cur) => (cur.id === m.id ? m : cur));
-    setSummon((s) => (s && s.monster.id === m.id ? { ...s, monster: m } : s));
-    if (!summonRef.current) setRevealMonster(m);
+    setIsCustomMonsterModalOpen(false);
+    if (!incubatingRef.current) {
+      // 업로드한 이미지: 생성 없이 바로 3D 등장 연출
+      setRevealMonster(m);
+      return;
+    }
+    // 배양기에서 만든 이미지: 먼저 디코딩해 반쯤 로드된 채로 튀어나오지 않게 한 뒤, 탱크 안에서 서서히 형성되는 단계를 시작한다
+    void (async () => {
+      try {
+        const img = new Image();
+        img.src = m.jumpscareImg || m.avatarImg;
+        await img.decode();
+      } catch {
+        /* 디코딩 실패해도 연출은 계속 (브라우저가 그리면서 로드) */
+      }
+      setIncubating((s) => (s ? { ...s, ready: m, readyAt: Date.now(), phase: "materialising" } : s));
+    })();
   };
+
+  // 배양기 영상 위에서 이미지가 형성(materialising) → 유리 파열 + 3D 튀어나옴(reveal). 경과 시간 → 단계는 순수 함수 incubationPhase
+  const incubateReadyAt = incubating?.readyAt ?? null;
+  useEffect(() => {
+    if (incubateReadyAt === null) return;
+    const tick = () => {
+      const phase = incubationPhase(Date.now() - incubateReadyAt);
+      const ready = incubatingRef.current?.ready ?? null;
+      if (phase === "reveal" || phase === "done") {
+        window.clearInterval(timer);
+        setIncubating((s) => (s ? { ...s, phase: "reveal" } : s));
+        if (ready) setRevealMonster(ready);
+        return;
+      }
+      setIncubating((s) => (s && s.phase !== phase ? { ...s, phase } : s));
+    };
+    const timer = window.setInterval(tick, 50);
+    tick();
+    return () => window.clearInterval(timer);
+  }, [incubateReadyAt]);
 
   const backToDesignRoom = () => {
     setRevealMonster(null);
     setSummon(null);
+    setIncubating(null);
     setIsStitchModalOpen(false);
     setIsCustomMonsterModalOpen(true);
   };
@@ -771,7 +778,11 @@ export const BioStitchLabView: React.FC = () => {
   useEffect(() => {
     if (!revealMonster) return;
     playChimeraRoar(revealMonster.roarAudio);
-    const t = window.setTimeout(() => setRevealMonster(null), MONSTER_REVEAL_MS);
+    const t = window.setTimeout(() => {
+      setRevealMonster(null);
+      setIncubating(null);
+      setIsCustomMonsterModalOpen(true); // 연출이 끝나면 괴수 설계실을 다시 연다
+    }, MONSTER_REVEAL_MS);
     return () => window.clearTimeout(t);
   }, [revealMonster?.id, revealMonster?.avatarImg]);
 
@@ -916,7 +927,7 @@ export const BioStitchLabView: React.FC = () => {
 
         {!showChronicles && acts && (
           <div role="status" aria-live="polite">
-            {renderStoryActs(acts, storyAct, activeClashVideoUrl !== null && activeClashVideoUrl === aiClashUrl)}
+            {renderStoryActs(acts, storyAct, false)}
           </div>
         )}
         {!showChronicles && !acts && (
@@ -977,63 +988,6 @@ export const BioStitchLabView: React.FC = () => {
           </div>
         )}
       </section>
-    );
-  };
-
-  // 듀얼 컨프런테이션 스테이지의 한쪽 파이터 (자신의 videoSrc 또는 colorHex 바이오 오라 애니메이션 포트레이트)
-  const renderArenaFighter = (side: 1 | 2) => {
-    const me = side === 1 ? arenaFighter1 : arenaFighter2;
-    const foe = side === 1 ? arenaFighter2 : arenaFighter1;
-    const vref = side === 1 ? f1VideoRef : f2VideoRef;
-    const isWinner = arenaWinner?.id === me.id;
-    const isLoser = !isWinner && arenaWinner?.id === foe.id;
-    // 공격자는 이벤트의 attacker 필드를 우선 사용 (순수 헬퍼: utils/arenaMotion)
-    const winnerSide: 1 | 2 | null = isWinner ? side : isLoser ? (side === 1 ? 2 : 1) : null;
-    const gotHit = isFighterHit(arenaPhase, arenaStrike, side);
-    const motion = fighterMotionClasses(arenaPhase, arenaStrike, side, winnerSide);
-    const widthCls = isWinner ? "w-full z-20" : isLoser ? "w-0 opacity-0" : "w-1/2";
-    const mirror = side === 2 ? " scale-x-[-1]" : "";
-    const seek = (v: HTMLVideoElement) => adultSegmentStart(v.duration, me.id);
-    return (
-      <div className={`arena-fighter relative h-full overflow-hidden ${widthCls} ${motion}`}>
-        {/* Crisp, high-definition background image with breathing aura */}
-        <img
-          src={me.jumpscareImg || me.avatarImg}
-          alt={me.nameKo}
-          onError={(e) => { if (e.currentTarget.src !== me.avatarImg && me.avatarImg) e.currentTarget.src = me.avatarImg; }}
-          className={`arena-portrait-breath absolute inset-0 w-full h-full object-cover scale-[1.02]${mirror}`}
-        />
-        {/* Full-clarity video without washed-out screen blend */}
-        {me.videoSrc && (
-          <video
-            ref={vref}
-            key={me.id + "-f" + side}
-            src={me.videoSrc}
-            autoPlay
-            loop
-            muted
-            playsInline
-            onLoadedMetadata={(e) => {
-              const v = e.currentTarget;
-              const t = seek(v);
-              if (t !== null) v.currentTime = t;
-            }}
-            onTimeUpdate={(e) => {
-              const v = e.currentTarget;
-              const t = seek(v);
-              if (t !== null && v.currentTime < v.duration * 0.65) v.currentTime = t;
-            }}
-            className={`absolute inset-0 w-full h-full object-cover scale-[1.04]${mirror} transition-opacity duration-300`}
-          />
-        )}
-        <div className="arena-aura absolute inset-0 pointer-events-none" style={{ ["--aura" as string]: me.colorHex } as React.CSSProperties} />
-        {gotHit && (
-          <div key={`hit-${arenaStrike?.seq}`} className="absolute inset-0 pointer-events-none z-30">
-            <div className="arena-hit-flash absolute inset-0 bg-red-600/35" />
-            <div className="arena-slash absolute inset-0" />
-          </div>
-        )}
-      </div>
     );
   };
 
@@ -1889,25 +1843,11 @@ export const BioStitchLabView: React.FC = () => {
     };
   }, [isSoundOn, activeExp.id, selectedLangCode, isAwayFromHome]);
 
-  // Clear every pending arena battle timer on unmount.
-  useEffect(() => {
-    return () => {
-      arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
-      arenaTimersRef.current = [];
-    };
-  }, []);
-
-  // Leaving the arena tab (or closing the modal) mid-battle must stop its scheduled thumps/roars/KO events.
+  // Leaving the arena (closing the modal or switching tabs) returns it to the two-halves view; a running generation continues.
   useEffect(() => {
     if (isStitchModalOpen && activeModalTab === "monster_arena") return;
-    if (arenaTimersRef.current.length === 0) return;
-    arenaTimersRef.current.forEach((t) => window.clearTimeout(t));
-    arenaTimersRef.current = [];
-    setIsArenaBattling(false);
-    setActiveClashVideoUrl(null);
-    setArenaPhase("idle");
+    setBattlePhase("stage");
   }, [isStitchModalOpen, activeModalTab]);
-
   // Release the shared AudioContext on unmount.
   useEffect(() => {
     return () => {
@@ -2490,14 +2430,7 @@ export const BioStitchLabView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        disabled={isArenaBattling}
-                        onClick={() => {
-                          if (activeModalTab !== "monster_arena") {
-                            setActiveModalTab("monster_arena");
-                          } else {
-                            handleStartArenaBattle();
-                          }
-                        }}
+                        onClick={() => setActiveModalTab("monster_arena")}
                         className={`px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer transition flex items-center gap-1 whitespace-nowrap ${
                           activeModalTab === "monster_arena"
                             ? "bg-rose-600 hover:bg-rose-500 text-white shadow shadow-rose-600/30"
@@ -2505,17 +2438,8 @@ export const BioStitchLabView: React.FC = () => {
                         }`}
                       >
                         <span>⚔️</span>
-                        <span>
-                          {isArenaBattling
-                            ? isKo
-                              ? "격돌 중..."
-                              : "Battling..."
-                            : isKo
-                            ? "실시간 결투"
-                            : "Real-time Duel"}
-                        </span>
-                      </button>
-                    </div>
+                        <span>{isKo ? "결투장" : "Arena"}</span>
+                      </button>                    </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
@@ -2739,36 +2663,32 @@ export const BioStitchLabView: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                  /* TAB 2: MONSTER CLASH ARENA (실시간 물리 영상 격돌 + AI 동영상 생성 API 연동) */
+                  /* TAB 2: MONSTER CLASH ARENA (설계한 괴수만: 왼쪽/오른쪽 절반 화면 → 서로 마주봄 → [결투] 12초 영상 → 결과) */
                   <div className="flex flex-col flex-1 min-h-0 gap-2 animate-fadeIn">
-                    {/* 1-Line Top Arena Fight Control Bar */}
+                    {/* Match list + story editor */}
                     <div className="flex items-center justify-between gap-2 bg-slate-900/95 border border-rose-500/40 px-2.5 py-1.5 rounded-xl shrink-0 overflow-x-auto no-scrollbar">
                       <div className="flex items-center gap-1.5 shrink-0">
                         <select
-                          value={arenaFighter1.id}
-                          onChange={(e) => {
-                            const roster = customArenaRoster;
-                            const found = roster.find((m) => m.id === e.target.value);
-                            if (found) { cancelArenaBattle(); setArenaFighter1(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
-                          }}
+                          aria-label={isKo ? "왼쪽 괴수" : "Left monster"}
+                          value={arenaSlots.left ?? ""}
+                          onChange={(e) => setArenaSlots((s) => selectSlot(s, "left", e.target.value || null))}
                           className="bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
-                          {customArenaRoster.map((m) => (
-                            <option key={m.id} value={m.id}>🔵 {m.nameKo}</option>
+                          <option value="">{isKo ? "— 왼쪽 괴수 선택 —" : "— Left monster —"}</option>
+                          {arenaRosterList.map((m) => (
+                            <option key={m.id} value={m.id}>🔵 {isKo ? m.nameKo : m.nameEn}</option>
                           ))}
                         </select>
                         <span className="text-xs font-black text-rose-500 px-0.5">VS</span>
                         <select
-                          value={arenaFighter2.id}
-                          onChange={(e) => {
-                            const roster = customArenaRoster;
-                            const found = roster.find((m) => m.id === e.target.value);
-                            if (found) { cancelArenaBattle(); setArenaFighter2(found); setAiBattleVideoUrl(null); setActiveClashVideoUrl(null); setArenaWinner(null); setArenaPhase("idle"); setArenaHp1(100); setArenaHp2(100); setArenaCombatLog([]); }
-                          }}
+                          aria-label={isKo ? "오른쪽 괴수" : "Right monster"}
+                          value={arenaSlots.right ?? ""}
+                          onChange={(e) => setArenaSlots((s) => selectSlot(s, "right", e.target.value || null))}
                           className="bg-slate-950 border border-rose-500/60 text-rose-300 text-xs font-bold px-2 py-1 rounded-lg focus:outline-none max-w-[190px]"
                         >
-                          {customArenaRoster.map((m) => (
-                            <option key={m.id} value={m.id}>🔴 {m.nameKo}</option>
+                          <option value="">{isKo ? "— 오른쪽 괴수 선택 —" : "— Right monster —"}</option>
+                          {arenaRosterList.map((m) => (
+                            <option key={m.id} value={m.id}>🔴 {isKo ? m.nameKo : m.nameEn}</option>
                           ))}
                         </select>
                       </div>
@@ -2783,23 +2703,10 @@ export const BioStitchLabView: React.FC = () => {
                         >
                           {isKo ? "📝 스토리 편집" : "📝 Edit story"}
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleGenerateAiClashVideo}
-                          disabled={isGeneratingAiClash || !arenaHasTwoDesigns}
-                          title={isKo ? "편집한 스토리로 12초 전투 영상을 생성합니다 (1편 약 $1.56)" : "Generate the 12 s battle video from the story (about $1.56)"}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-black border border-amber-400/70 bg-amber-500/15 text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-wait whitespace-nowrap"
-                        >
-                          {isGeneratingAiClash
-                            ? (isKo ? "⏳ 전투 영상 생성 중..." : "⏳ Generating battle video...")
-                            : (isKo ? `⚔️ 전투 영상 생성 (${BATTLE_VIDEO_SECONDS}초)` : `⚔️ Generate battle video (${BATTLE_VIDEO_SECONDS} s)`)}
-                        </button>
-                        {aiClashStatus && (
+                        {aiClashStatus && aiClashStatus.kind !== "loading" && (
                           <span
                             role="status"
-                            className={`text-[10px] font-bold max-w-[340px] truncate ${
-                              aiClashStatus.kind === "ok" ? "text-emerald-300" : aiClashStatus.kind === "loading" ? "text-cyan-300" : "text-rose-300"
-                            }`}
+                            className={`text-[10px] font-bold max-w-[340px] truncate ${aiClashStatus.kind === "ok" ? "text-emerald-300" : "text-rose-300"}`}
                             title={aiClashStatus.text}
                           >
                             {aiClashStatus.text}
@@ -2808,115 +2715,131 @@ export const BioStitchLabView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Full-Viewport Unified Clash Stage (화면 흔들림 없이 안정 고정) */}
-                    <div className="relative flex-1 min-h-[72vh] rounded-2xl overflow-hidden border-2 border-rose-500/50 bg-black shadow-2xl flex items-center justify-center">
-                      {!arenaHasTwoDesigns ? (
-                        <div className="flex flex-col items-center gap-3 text-center px-6 max-w-md">
-                          <span className="text-4xl">🧬⚔️🧬</span>
-                          <p className="text-sm font-black text-rose-200">
-                            {isKo
-                              ? "결투장은 직접 설계한 괴수끼리만 싸웁니다."
-                              : "The arena is only for monsters you designed."}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {isKo
-                              ? `커스텀 괴수 스튜디오에서 괴수를 2마리 이상 설계해 주세요. (현재 ${customArenaRoster.length}마리) 샘플 괴수 6종은 배양기 시연 전용입니다.`
-                              : `Design at least 2 monsters in the Custom Monster Studio (you have ${customArenaRoster.length}). The 6 sample monsters are for the bioreactor only.`}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => { setIsStitchModalOpen(false); setIsCustomMonsterModalOpen(true); }}
-                            className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
-                          >
-                            {isKo ? "🧬 커스텀 괴수 설계하러 가기" : "🧬 Design a monster"}
-                          </button>
-                        </div>
-                      ) : aiBattleVideoUrl ? (
-                        /* AI 생성 실제 격돌 동영상 전체 화면 재생 */
-                        <div className="relative w-full h-full">
-                          <video
-                            src={aiBattleVideoUrl}
-                            autoPlay
-                            loop
-                            playsInline
-                            controls
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setAiBattleVideoUrl(null)}
-                            aria-label={isKo ? "실시간 아레나로 복귀" : "Back to the live arena"}
-                            title={isKo ? "실시간 아레나로 복귀" : "Back to the live arena"}
-                            className="absolute top-3 right-3 z-30 w-8 h-8 rounded-full bg-black/60 border border-slate-600 text-slate-200 hover:bg-black/80"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          {/* Top HP Bars HUD */}
-                          {/* 전투 장면에는 글자를 띄우지 않는다: HP는 막대만 표시 (이름·수치는 상단 드롭다운에 있음) */}
-                          {!activeClashVideoUrl && (
-                            <div className="absolute top-3 inset-x-3 z-30 flex items-center justify-between gap-6 pointer-events-none" aria-hidden="true">
-                              <div className="flex-1 h-2.5 bg-slate-800/80 rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300" style={{ width: `${arenaHp1}%` }} />
-                              </div>
-                              <div className="flex-1 h-2.5 bg-slate-800/80 rounded-full overflow-hidden flex justify-end">
-                                <div className="h-full bg-gradient-to-l from-rose-500 to-amber-400 transition-all duration-300" style={{ width: `${arenaHp2}%` }} />
-                              </div>
-                            </div>
-                          )}
+                    {/* Stage: two halves (perspective on the stage so the turn toward each other reads as 3D) */}
+                    <div
+                      className="relative flex-1 min-h-[60vh] rounded-2xl overflow-hidden border-2 border-rose-500/50 bg-black shadow-2xl"
+                      style={{ perspective: "1400px" }}
+                    >
+                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(244,63,94,0.22)_0%,_rgba(15,23,42,0.95)_75%,_#000_100%)] pointer-events-none" />
+                      <div className="relative w-full h-full flex items-stretch">
+                        <ArenaHalf
+                          monster={arenaLeft}
+                          angleDeg={faceOffAngleDeg("left", arenaHasTwoDesigns)}
+                          isKo={isKo}
+                          tint="cyan"
+                          emptyLabel={isKo ? "왼쪽 자리: 먼저 출격한 괴수가 서 있습니다. 위 목록에서 고를 수도 있습니다." : "Left half: the first monster to enter stands here. You can also pick one from the list above."}
+                        />
+                        <ArenaHalf
+                          monster={arenaRight}
+                          angleDeg={faceOffAngleDeg("right", arenaHasTwoDesigns)}
+                          isKo={isKo}
+                          tint="rose"
+                          emptyLabel={isKo ? "오른쪽 자리: 괴수 설계실에서 두 번째 괴수를 만들어 출격시키세요." : "Right half: design a second monster in the Design Room and send it out."}
+                        />
+                      </div>
 
-                          {/* Unified Arena Background */}
-                          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(244,63,94,0.22)_0%,_rgba(15,23,42,0.95)_75%,_#000_100%)] pointer-events-none z-0" />
-
-                          {activeClashVideoUrl ? (
-                            /* Option A: Unified Single-Frame Cinematic Monster Clash MP4 */
-                            <div className="relative w-full h-full">
-                              <video
-                                key={activeClashVideoUrl}
-                                src={activeClashVideoUrl}
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setActiveClashVideoUrl(null)}
-                                aria-label={isKo ? "듀얼 스테이지로" : "Back to the dual stage"}
-                                title={isKo ? "듀얼 스테이지로" : "Back to the dual stage"}
-                                className="absolute top-3 right-3 z-30 w-8 h-8 rounded-full bg-black/60 border border-slate-600 text-slate-200 hover:bg-black/80"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ) : (
-                          /* Dual Confrontation Stage: Two Monsters Actually Lunging & Clashing */
-                          <div className={`relative w-full h-full flex items-center justify-between overflow-hidden ${stageShakeClass(arenaPhase, arenaStrike)}`}>
-                            {renderArenaFighter(1)}
-                            {renderArenaFighter(2)}
+                      {/* Center: duel button / progress */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                        {arenaRosterList.length < 2 && !arenaHasTwoDesigns && (
+                          <div className="pointer-events-auto flex flex-col items-center gap-2 text-center px-4 py-3 rounded-2xl bg-black/70 border border-slate-700 max-w-xs">
+                            <p className="text-xs font-black text-rose-200">
+                              {isKo ? "결투장은 직접 설계한 괴수끼리만 싸웁니다." : "The arena is only for monsters you designed."}
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              {isKo
+                                ? `괴수 설계실에서 2마리를 설계하세요. (현재 ${arenaRosterList.length}마리) 샘플 6종은 배양기 시연 전용입니다.`
+                                : `Design 2 monsters in the Design Room (you have ${arenaRosterList.length}). The 6 samples are for the bioreactor only.`}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={backToDesignRoom}
+                              className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
+                            >
+                              🧬 {isKo ? "괴수 설계실로" : "Design Room"}
+                            </button>
                           </div>
-                          )}
+                        )}
+                        {arenaHasTwoDesigns && isGeneratingAiClash && (
+                          <div role="status" aria-live="polite" className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl bg-black/75 border border-amber-400/50 max-w-xs text-center">
+                            <div className="w-8 h-8 rounded-full border-4 border-amber-300/30 border-t-amber-300 animate-spin motion-reduce:animate-none" />
+                            <p className="text-xs font-black text-amber-200">
+                              {isKo ? `⚔️ ${BATTLE_VIDEO_SECONDS}초 전투 영상 생성 중...` : `⚔️ Generating the ${BATTLE_VIDEO_SECONDS} s battle video...`}
+                            </p>
+                            <p className="text-[10px] text-slate-400">{isKo ? "보통 1~2분, 최대 4분 걸립니다." : "Usually 1-2 minutes, up to 4."}</p>
+                          </div>
+                        )}
+                        {arenaHasTwoDesigns && !isGeneratingAiClash && duelReady && (
+                          <div className="pointer-events-auto flex flex-col items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={handleDuel}
+                              className="px-6 py-3 rounded-2xl text-base sm:text-lg font-black text-white bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 shadow-[0_0_30px_rgba(244,63,94,0.6)] motion-safe:animate-pulse"
+                            >
+                              {aiClashUrl ? (isKo ? "▶ 결투 다시 보기" : "▶ Replay the duel") : (isKo ? "⚔️ 결투" : "⚔️ Duel")}
+                            </button>
+                            <span className="text-[10px] font-bold text-amber-200/90 bg-black/60 rounded px-2 py-0.5">
+                              {aiClashUrl
+                                ? (isKo ? "이미 만든 영상이라 무료" : "Already made, free")
+                                : (isKo ? `${BATTLE_VIDEO_SECONDS}초 전투 영상 약 $1.56` : `${BATTLE_VIDEO_SECONDS} s battle video, about $1.56`)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                          {/* Center Clash Shockwave (visual only, no text) */}
-                          {arenaPhase === "clash" && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-                              <div className="arena-shock-ring absolute w-40 h-40 rounded-full border-4 border-amber-300" />
-                              <svg viewBox="0 0 200 200" className="absolute w-64 h-64 drop-shadow-[0_0_12px_rgba(250,204,21,0.9)]" aria-hidden="true">
-                                <polyline className="arena-bolt" fill="none" stroke="#fde047" strokeWidth="4" strokeLinejoin="round" points="100,0 80,70 110,75 70,140 105,145 85,200" />
-                                <polyline className="arena-bolt" fill="none" stroke="#e0f2fe" strokeWidth="3" strokeLinejoin="round" points="0,100 70,85 75,115 140,90 145,112 200,100" />
-                              </svg>
+                      {/* Battle video (full stage, plays once) and the outcome after it ends */}
+                      {battlePhase !== "stage" && aiClashUrl && (
+                        <div className="absolute inset-0 z-30 bg-black">
+                          <video
+                            key={`${aiClashUrl}-${duelReplayKey}`}
+                            src={aiClashUrl}
+                            autoPlay
+                            muted
+                            playsInline
+                            controls={battlePhase === "playing"}
+                            onEnded={() => setBattlePhase("outcome")}
+                            className="w-full h-full object-contain"
+                          />
+                          {battlePhase === "playing" && (
+                            <button
+                              type="button"
+                              onClick={() => setBattlePhase("stage")}
+                              aria-label={isKo ? "두 괴수 화면으로" : "Back to the two monsters"}
+                              title={isKo ? "두 괴수 화면으로" : "Back to the two monsters"}
+                              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/60 border border-slate-600 text-slate-200 hover:bg-black/80"
+                            >
+                              ✕
+                            </button>
+                          )}
+                          {battlePhase === "outcome" && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center" role="status" aria-live="polite">
+                              <p className="text-2xl sm:text-4xl font-black text-amber-300 drop-shadow-[0_0_14px_rgba(251,191,36,0.8)]">
+                                {duelWinner
+                                  ? (isKo ? `🏆 ${duelWinner.nameKo} 승리!` : `🏆 ${duelWinner.nameEn} wins!`)
+                                  : (isKo ? "결투 종료" : "Duel over")}
+                              </p>
+                              {duelOutcomeLine && <p className="max-w-2xl text-sm sm:text-base text-slate-100 leading-relaxed">{duelOutcomeLine}</p>}
+                              <div className="flex flex-wrap items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => { setDuelReplayKey((k) => k + 1); setBattlePhase("playing"); }}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-black border border-amber-400/70 bg-amber-500/20 text-amber-100 hover:bg-amber-500/35"
+                                >
+                                  ▶ {isKo ? "다시 보기" : "Replay"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setBattlePhase("stage")}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
+                                >
+                                  ↩ {isKo ? "두 괴수 화면으로" : "Back to the two monsters"}
+                                </button>
+                              </div>
                             </div>
                           )}
-
-                        </>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  </div>                )}
                 </div>
               </div>
             )}
@@ -3041,32 +2964,30 @@ export const BioStitchLabView: React.FC = () => {
                 isKo={isKo}
                 opponentRoster={customArenaRoster}
                 onStartBattleVideo={(me, opponent) => {
-                  setCustomArenaRoster((prev) => addToRoster(prev, me));
-                  cancelArenaBattle();
-                  setAiBattleVideoUrl(null);
-                  setArenaWinner(null);
-                  setArenaPhase("idle");
-                  setArenaHp1(100);
-                  setArenaHp2(100);
-                  setArenaCombatLog([]);
+                  setCustomArenaRoster((prev) => addToRoster(addToRoster(prev, me), opponent));
+                  setBattlePhase("stage");
                   setIsCustomMonsterModalOpen(false);
                   setIsStitchModalOpen(true);
                   setActiveModalTab("monster_arena");
                   // 바로 생성하지 않고 스토리 편집 창을 연다 (비용은 편집 창의 생성 버튼에서만 발생)
-                  if (me.id === arenaFighter1.id && opponent.id === arenaFighter2.id) {
+                  if (me.id === arenaSlots.left && opponent.id === arenaSlots.right) {
                     openStoryEditor();
                   } else {
                     pendingBattleVideoRef.current = { f1: me.id, f2: opponent.id };
-                    setArenaFighter1(me);
-                    setArenaFighter2(opponent);
+                    setArenaSlots({ left: me.id, right: opponent.id });
                   }
                 }}
-                onAwakenCustomMonster={(customMonster) => {
-                  setCustomArenaRoster((prev) => addToRoster(prev, customMonster));
+                onIncubateStart={(m) => {
+                  // 배양기 전체 화면 영상을 틀고(설계실은 닫음) 이미지는 백그라운드에서 생성
+                  setRevealMonster(null);
+                  setIncubating({ monster: m, ready: null, readyAt: null, phase: "growing" });
                   setIsCustomMonsterModalOpen(false);
-                  setIsStitchModalOpen(true);
-                  setActiveModalTab("chimera_assembler");
-                  handleSelectAndAwakenMonster(customMonster);
+                }}
+                onIncubateFailed={(message) => {
+                  setIncubating(null);
+                  setIsCustomMonsterModalOpen(true);
+                  setSummon(null);
+                  void message;
                 }}
                 onMonsterImageReady={handleMonsterImageReady}
                 onSummonStart={(m) => {
@@ -3077,26 +2998,66 @@ export const BioStitchLabView: React.FC = () => {
                 onSummonProgress={(pct) => setSummon((s) => (s ? { ...s, progress: pct } : s))}
                 onSummonFailed={(message) => setSummon((s) => (s ? { ...s, error: message } : s))}
                 onSendToArena={(customMonster) => {
-                  // 동영상 완성: 출격 대기 화면을 닫고 결투장에 등장 (마지막 포효는 최대 음량)
+                  // 동영상 완성: 출격 대기 화면을 닫고 결투장에 등장 (마지막 포효는 최대 음량).
+                  // 먼저 들어온 괴수는 왼쪽, 두 번째는 오른쪽 절반에 선다
                   if (summonRef.current) playChimeraRoar(customMonster.roarAudio);
                   setSummon(null);
                   setCustomArenaRoster((prev) => addToRoster(prev, customMonster));
-                  cancelArenaBattle();
-                  setArenaFighter1(customMonster);
-                  setAiBattleVideoUrl(null);
-                  setActiveClashVideoUrl(null);
-                  setArenaWinner(null);
-                  setArenaPhase("idle");
-                  setArenaHp1(100);
-                  setArenaHp2(100);
-                  setArenaCombatLog([]);
+                  setArenaSlots((s) => placeEntrant(s, customMonster.id));
+                  setBattlePhase("stage");
                   setIsCustomMonsterModalOpen(false);
                   setIsStitchModalOpen(true);
                   setActiveModalTab("monster_arena");
-                }}
-              />
+                }}              />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ⚡ 배양기 가동: 전체 화면 배양기 영상 → 이미지가 탱크 안에서 형성 → (reveal) 유리 파열 3D 연출이 위에 겹친다. 영상은 끝까지 마운트되어 검은 프레임이 없다 */}
+      {incubating && (
+        <div className="fixed inset-0 z-[66] bg-black overflow-hidden text-slate-100" role="status" aria-live="polite">
+          <video
+            src="/videos/chimera_growth_dragon_24s.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover transition-[filter] duration-700 motion-reduce:transition-none"
+            style={{ filter: incubating.phase === "growing" ? "none" : "brightness(0.5) saturate(1.2)" }}
+          />
+          {incubating.ready && (
+            <>
+              <div
+                className="incubate-liquid absolute inset-0 pointer-events-none"
+                style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
+              />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity motion-reduce:transition-none" style={{ opacity: incubating.phase === "reveal" ? 0 : 1, transitionDuration: `${INCUBATE_REDUCED_FADE_MS}ms` }}>
+                <img
+                  src={incubating.ready.jumpscareImg || incubating.ready.avatarImg}
+                  alt=""
+                  className="incubate-image max-w-[78vw] max-h-[78vh] object-contain"
+                  style={{
+                    ["--reveal-glow" as string]: incubating.ready.colorHex,
+                  } as React.CSSProperties}
+                />
+              </div>
+            </>
+          )}
+          {!incubating.ready && (
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-4 bg-gradient-to-t from-black/80 to-transparent">
+              <p className="text-xs sm:text-sm font-black text-emerald-300">
+                {isKo ? `🧬 ${incubating.monster.nameKo} 배양 중... 이미지가 만들어지는 동안 기다려 주세요.` : `🧬 Culturing ${incubating.monster.nameEn}... the image is being made.`}
+              </p>
+              <button
+                type="button"
+                onClick={backToDesignRoom}
+                className="px-3 py-1.5 rounded-lg text-xs font-black border border-cyan-400/70 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/30"
+              >
+                🧬 {isKo ? "괴수 설계실로 돌아가기" : "Back to the Design Room"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

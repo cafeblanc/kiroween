@@ -12,10 +12,14 @@ import type { ComicMonster } from "../../data/comicMonsters";
 import { saveMonster } from "../../services/monsterVaultService";
 import { monsterToVaultInput, urlToBlob } from "../../services/customMonsterVaultMapping";
 import { opponentsFor } from "../../utils/arenaRoster";
+import { designRoomButtonState } from "../../utils/designRoomState";
 
 interface CustomMonsterStudioProps {
   isKo: boolean;
-  onAwakenCustomMonster: (monster: ComicMonster) => void;
+  /** The bioreactor run started: show the full-screen bioreactor video while the image renders in the background. */
+  onIncubateStart?: (monster: ComicMonster) => void;
+  /** The image job failed: leave the bioreactor screen and come back to the Design Room. */
+  onIncubateFailed?: (message: string) => void;
   /** The monster (with its finished video) enters the arena. `ltxError` is set when the local fallback was used. */
   onSendToArena?: (monster: ComicMonster, ltxError?: string) => void;
   /** The background image job finished: update the monster everywhere and play the 3D reveal. */
@@ -47,7 +51,8 @@ const MUTATION_CHIPS: Array<{
 
 export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   isKo,
-  onAwakenCustomMonster,
+  onIncubateStart,
+  onIncubateFailed,
   onSendToArena,
   onMonsterImageReady,
   onSummonStart,
@@ -178,9 +183,13 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         setGeneratedVideoUrl(null);
         setStatusMessage(
           isKo
-            ? "업로드한 이미지를 괴수 스튜디오에 불러왔습니다. 이제 동영상을 생성할 수 있습니다."
-            : "Uploaded image loaded. You can now generate a video from it.",
+            ? "업로드한 이미지를 불러왔습니다. 이제 [생성 괴수 결투장 출격]을 누를 수 있습니다."
+            : "Uploaded image loaded. You can now press [Send to the arena].",
         );
+        // 업로드한 이미지는 생성 없이 바로 3D 등장 연출(2초) 후 설계실로 돌아온다
+        const uploaded = buildCustomMonsterObject({ imageUrl: reader.result, promptEn: undefined, videoUrl: null });
+        persistToVault(uploaded, reader.result, null);
+        onMonsterImageReady?.(uploaded);
       }
     };
     reader.readAsDataURL(file);
@@ -299,53 +308,42 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
 
   const isBusy = isGeneratingImg || isGeneratingVideo;
 
-  // ⚡ 괴수 배양기 가동: 설계한 괴수의 배양기를 바로 보여주고, 이미지는 그동안 백그라운드에서 생성 → 완성되면 3D로 튀어나오는 연출
+  const { incubateEnabled, deployEnabled } = designRoomButtonState({ hasImage: !!generatedImageUrl, isBusy });
+
+  // ⚡ 괴수 배양기 가동: 화면 전체에 배양기 영상을 보여 주는 동안 이미지는 백그라운드에서 생성 → 완성되면 3D로 튀어나오는 연출(2초) 후 설계실로 복귀
   const handleStartCustomBioreactor = async () => {
-    if (isBusy) return;
-    const monster = buildCustomMonsterObject();
-    persistToVault(monster, generatedImageUrl, generatedVideoUrl);
-    onAwakenCustomMonster(monster);
-    if (generatedImageUrl) return; // 업로드했거나 이미 만든 이미지가 있으면 생성하지 않는다
+    if (!incubateEnabled) return;
+    onIncubateStart?.(buildCustomMonsterObject());
     const img = await runImageJob();
-    if (!img) return;
+    if (!img) {
+      onIncubateFailed?.(isKo ? "괴수 이미지를 만들지 못했습니다. 잠시 후 다시 시도해 주세요." : "The monster image could not be made. Please try again shortly.");
+      return;
+    }
     const ready = buildCustomMonsterObject({ imageUrl: img.imageUrl, promptEn: img.promptEn, themeHex: img.themeHex, videoUrl: null });
     persistToVault(ready, img.imageUrl, null);
     onMonsterImageReady?.(ready);
   };
 
-  // ⚔️ 생성 괴수 결투장 출격: 동영상은 백그라운드에서 생성하고, 그동안 화면에는 배양기 이미지 + 점점 커지는 포효. 완성되면 결투장 등장
+  // ⚔️ 생성 괴수 결투장 출격 (이미지가 있어야 활성): 동영상은 백그라운드에서 생성하고, 그동안 화면 전체에 괴수 이미지 + 점점 커지는 포효. 완성되면 결투장 등장
   const handleSendCustomToArena = async () => {
-    if (isBusy) return;
-    let image = generatedImageUrl;
-    let promptEn = imagePromptEn;
-    let hex = themeHex;
-    if (image && generatedVideoUrl) {
+    if (!deployEnabled || !generatedImageUrl) return;
+    const image = generatedImageUrl;
+    if (generatedVideoUrl) {
       const monster = buildCustomMonsterObject();
       persistToVault(monster, image, generatedVideoUrl);
       onSendToArena?.(monster);
       return;
     }
     onSummonStart?.(buildCustomMonsterObject());
-    if (!image) {
-      const img = await runImageJob();
-      if (img) {
-        image = img.imageUrl;
-        promptEn = img.promptEn;
-        hex = img.themeHex;
-        onMonsterImageReady?.(buildCustomMonsterObject({ imageUrl: image, promptEn, themeHex: hex, videoUrl: null }));
-      }
-    }
-    const source = image || selectedPreset.baseImageSrc;
-    const video = await runVideoJob(source, promptEn, hex, onSummonProgress);
+    const video = await runVideoJob(image, imagePromptEn, themeHex, onSummonProgress);
     if (!video) {
       onSummonFailed?.(isKo ? "동영상을 만들지 못했습니다. 잠시 후 다시 출격해 주세요." : "The video could not be made. Please try again shortly.");
       return;
     }
-    const monster = buildCustomMonsterObject({ imageUrl: image, promptEn, themeHex: hex, videoUrl: video.videoUrl });
+    const monster = buildCustomMonsterObject({ imageUrl: image, videoUrl: video.videoUrl });
     persistToVault(monster, image, video.videoUrl);
     onSendToArena?.(monster, video.ltxError);
   };
-
   const currentId = buildIdRef.current?.id ?? "";
   const opponents = opponentsFor(opponentRoster, currentId);
   const selectedOpponent = opponents.find((m) => m.id === opponentId) ?? opponents[0];
@@ -559,7 +557,7 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         />
       </div>
 
-      {/* 4. One line: upload my image · start the bioreactor (image renders in the background) · send to the arena (video renders in the background) */}
+      {/* 4. Order: 1) make the image (upload or bioreactor) -> 2) send to the arena (video renders in the background) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <label
           className={`bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs sm:text-sm px-3 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 ${
@@ -574,8 +572,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         <button
           type="button"
           onClick={() => void handleStartCustomBioreactor()}
-          disabled={isBusy}
-          className="bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:via-emerald-400 hover:to-cyan-400 disabled:opacity-60 disabled:cursor-wait text-slate-950 font-black text-xs sm:text-sm px-3 py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-1.5"
+          disabled={!incubateEnabled}
+          className="bg-gradient-to-r from-amber-500 via-emerald-500 to-cyan-500 hover:from-amber-400 hover:via-emerald-400 hover:to-cyan-400 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed text-slate-950 font-black text-xs sm:text-sm px-3 py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-1.5"
         >
           <span>⚡</span>
           <span>
@@ -592,8 +590,8 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
         <button
           type="button"
           onClick={() => void handleSendCustomToArena()}
-          disabled={isBusy || !onSendToArena}
-          className="bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 disabled:opacity-60 disabled:cursor-wait text-white font-black text-xs sm:text-sm px-3 py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-1.5"
+          disabled={!deployEnabled || !onSendToArena}
+          className="bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed text-white font-black text-xs sm:text-sm px-3 py-2.5 rounded-xl cursor-pointer transition shadow-xl flex items-center justify-center gap-1.5"
         >
           <span>⚔️</span>
           <span>
@@ -607,7 +605,11 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
           </span>
         </button>
       </div>
-      {statusMessage && (
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        {isKo
+          ? "순서: ① 이미지를 만든다 (⚡ 괴수 배양기 가동, 또는 📁 내 이미지 불러오기) → ② ⚔️ 생성 괴수 결투장 출격 (등장 영상 6초 생성 약 $0.78). 이미지가 있으면 ⚡는 꺼지고 ⚔️가 켜집니다. 다른 기본 괴수를 고르면 처음부터 다시 만듭니다."
+          : "Order: 1) make the image (⚡ Start the bioreactor, or 📁 Upload my image) → 2) ⚔️ Send to the arena (6 s entrance video, about $0.78). Once an image exists, ⚡ turns off and ⚔️ turns on. Picking another base monster starts over."}
+      </p>      {statusMessage && (
         <div className="bg-slate-950/90 border border-cyan-500/30 rounded-xl px-3 py-2 text-[11px] text-cyan-200">
           {statusMessage}
         </div>

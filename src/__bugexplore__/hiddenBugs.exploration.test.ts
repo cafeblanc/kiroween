@@ -257,9 +257,14 @@ describe('C10 resource leaks (1.10)', () => {
     }
   });
 
-  it('C10: arena timers are cleared in an unmount cleanup', () => {
+  it('C10: arena/incubation timers and the battle-video generation are cleaned up (unmount or leave)', () => {
     const src = read(LAB);
-    expect(src).toMatch(/return\s*\(\)\s*=>\s*\{[^}]*arenaTimersRef\.current\.forEach/);
+    // old duel timers (arenaTimersRef) no longer exist; the remaining timers each have a cleanup:
+    expect(src).not.toMatch(/arenaTimersRef/);
+    expect(src).toMatch(/return \(\) => window\.clearTimeout\(t\);/); // duel-ready delay and 3D reveal timer
+    expect(src).toMatch(/return \(\) => window\.clearInterval\(t\);/); // entrance roar interval
+    expect(src).toMatch(/return \(\) => window\.clearInterval\(timer\);/); // incubation phase tick
+    expect(src).toMatch(/return\s*\(\)\s*=>\s*\{[^}]*aiClashAbortRef\.current\?\.abort\(\)/); // unmount aborts generation
   });
 });
 

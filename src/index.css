@@ -401,15 +401,15 @@ body {
 }
 
 /* ── Monster Design Room: 3D reveal when the background image is ready (2.8 s = MONSTER_REVEAL_MS) ── */
-.monster-reveal-stage { perspective: 900px; animation: revealStageShake 2.8s ease-out forwards; }
+.monster-reveal-stage { perspective: 900px; animation: revealStageShake 2s ease-out forwards; }
 .monster-reveal-burst {
   transform-origin: center;
   filter: drop-shadow(0 0 40px var(--reveal-glow, #10b981));
-  animation: monsterRevealBurst 2.8s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+  animation: monsterRevealBurst 2s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
 }
 .monster-reveal-flash {
   background: radial-gradient(circle at center, rgba(255, 255, 255, 0.85), rgba(16, 185, 129, 0.25) 40%, transparent 70%);
-  animation: revealFlash 2.8s ease-out forwards;
+  animation: revealFlash 2s ease-out forwards;
 }
 /* Arena waiting screen: the bioreactor image breathes while the video renders */
 .summon-breath {
@@ -417,8 +417,8 @@ body {
   animation: summonBreath 3.6s ease-in-out infinite;
 }
 @keyframes monsterRevealBurst {
-  0% { transform: translateZ(-600px) scale(0.25) rotateX(18deg); opacity: 0; }
-  18% { transform: translateZ(0) scale(1.05) rotateX(0deg); opacity: 1; }
+  0% { transform: translateZ(-120px) scale(0.9) rotateX(6deg); opacity: 0; }
+  10% { transform: translateZ(0) scale(1.02) rotateX(0deg); opacity: 1; }
   28% { transform: translateZ(60px) scale(0.98); }
   62% { transform: translateZ(140px) scale(1.12); opacity: 1; }
   100% { transform: translateZ(820px) scale(2.6); opacity: 0; filter: drop-shadow(0 0 80px var(--reveal-glow, #10b981)) blur(6px); }
@@ -436,7 +436,28 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .monster-reveal-stage, .summon-breath { animation: none; }
-  .monster-reveal-burst { animation: revealFadeOnly 2.8s ease-out forwards; }
+  .monster-reveal-burst { animation: revealFadeOnly 2s ease-out forwards; }
   .monster-reveal-flash { display: none; }
 }
+/* Bioreactor hand-off: the finished image forms inside the tank over the playing video (1.4 s = INCUBATE_MATERIALISE_MS) */
+.incubate-image {
+  animation: incubateMaterialise 1.4s cubic-bezier(0.25, 0.8, 0.3, 1) forwards;
+  filter: drop-shadow(0 0 36px var(--reveal-glow, #10b981));
+}
+.incubate-liquid {
+  background: radial-gradient(circle at 50% 55%, var(--reveal-glow, #10b981) 0%, rgba(16, 185, 129, 0.25) 45%, transparent 75%);
+  mix-blend-mode: screen;
+  animation: incubateLiquid 1.4s ease-in-out forwards;
+}
+@keyframes incubateMaterialise {
+  0% { opacity: 0; filter: blur(26px) saturate(0.4) drop-shadow(0 0 60px var(--reveal-glow, #10b981)); transform: scale(0.94); }
+  70% { opacity: 1; filter: blur(0px) saturate(1) drop-shadow(0 0 44px var(--reveal-glow, #10b981)); transform: scale(1); }
+  100% { opacity: 1; filter: blur(0px) saturate(1) drop-shadow(0 0 36px var(--reveal-glow, #10b981)); transform: scale(1); }
+}
+@keyframes incubateLiquid { 0% { opacity: 0; } 45% { opacity: 0.85; } 100% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .incubate-image { animation: incubateFade 0.4s ease-out forwards; filter: none; }
+  .incubate-liquid { display: none; }
+}
+@keyframes incubateFade { 0% { opacity: 0; } 100% { opacity: 1; } }
 @keyframes revealFadeOnly { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
