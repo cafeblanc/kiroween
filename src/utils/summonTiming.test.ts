@@ -115,6 +115,13 @@ describe("bioreactor overlay wiring", () => {
     expect(kf).toMatch(/0%\s*\{[^}]*opacity:\s*0[^}]*blur\(28px\)/);
     expect(kf).toMatch(/100%\s*\{[^}]*opacity:\s*1[^}]*blur\(0\)/);
   });
+  it("the emerging adult has no rectangle: soft round mask, no drop-shadow on the image", () => {
+    const rule = /\.incubate-emerge\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toMatch(/(^|\s)mask-image:\s*radial-gradient/);
+    const kf = /@keyframes incubateEmerge\s*\{([\s\S]*?)\r?\n\}/.exec(css)?.[1] ?? "";
+    expect(kf).not.toContain("drop-shadow");
+    expect(lab).toMatch(/className="incubate-emerge-glow /);
+  });
   it("the expansion ends with the finished adult filling the screen (scale 1, no fade-out)", () => {
     const kf = /@keyframes incubateExpand\s*\{([\s\S]*?)\r?\n\}/.exec(css)?.[1] ?? "";
     expect(kf).toMatch(/100%\s*\{[^}]*scale\(1\)[^}]*opacity:\s*1/);

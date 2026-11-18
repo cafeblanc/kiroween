@@ -50,13 +50,13 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     colorHex: "#8b5cf6",
     baseImageSrc: "/images/samples/myth_kraken.jpg",
     defaultParts: {
-      head: "거대한 문어처럼 크고 둥근 보라색 머리와 노랗게 빛나는 커다란 눈 두 개",
-      hornsOrCrown: "머리 위에 솟은 보랏빛 발광 지느러미 볏",
-      torso: "머리 아래에서 촉수들이 모이는 짧고 두꺼운 보라색 몸통",
-      arms: "흡반마다 갈고리 가시가 돋은 굵고 긴 보라색 촉수 여덟 개",
-      legs: "바닥을 짚고 몸을 받치는 아래쪽 촉수들",
-      tail: "몸 뒤로 길게 늘어진 촉수 끝",
-      auraAndSkin: "흡반을 따라 청록색으로 빛나는 점액질 보라색 피부",
+      head: "거대한 대왕문어의 부풀어 오른 보라색 머리와 노랗게 빛나는 커다란 눈 두 개, 촉수 가운데 숨은 날카로운 부리",
+      hornsOrCrown: "머리 위로 솟은 보랏빛 발광 가시 볏",
+      torso: "흉터투성이의 두꺼운 보라색 문어 외투막 몸통",
+      arms: "흡반과 갈고리 가시로 뒤덮인 굵고 긴 보라색 문어 촉수 여덟 개가 사방으로 휘몰아치는 모습",
+      legs: "바닥을 움켜쥐고 거대한 몸을 들어 올리는 굵은 촉수들",
+      tail: "몸 뒤로 채찍처럼 휘어진 가장 긴 촉수 두 개",
+      auraAndSkin: "흡반을 따라 청록색으로 빛나는 점액질 보라색 피부와 주위에 소용돌이치는 물살",
     },
   },
   {
@@ -84,13 +84,13 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     colorHex: "#06b6d4",
     baseImageSrc: "/images/samples/alien_void_slug.jpg",
     defaultParts: {
-      head: "빛나는 시안색 눈 여섯 개와 바늘 이빨이 늘어선 큰 입을 가진 장어 같은 머리",
-      hornsOrCrown: "머리 주위에 떠 있는 반투명 발광 촉모 왕관",
-      torso: "속의 빛나는 장기가 비치는 길고 반투명한 뱀장어형 몸통",
-      arms: "몸 옆에서 물결치는 가늘고 긴 발광 촉수 네 개",
-      legs: "몸 아래에서 물결치는 넓은 지느러미",
-      tail: "끝이 희미하게 사라지는 길고 반투명한 꼬리지느러미",
-      auraAndSkin: "주위에 시안색과 에메랄드색 빛 입자가 떠도는 반투명한 푸른 피부",
+      head: "빛나는 시안색 눈 여섯 개와 바늘 이빨이 겹겹이 늘어선 거대한 입을 벌린 바다뱀 머리",
+      hornsOrCrown: "머리 뒤로 뻗은 반투명 발광 가시 지느러미 왕관",
+      torso: "S자로 크게 휘감긴 길고 굵은 반투명 바다뱀 몸통, 속에서 빛나는 장기가 비침",
+      arms: "몸통 앞쪽 양옆에서 펼쳐진 날개 같은 거대한 가슴지느러미 한 쌍",
+      legs: "몸통 아래를 따라 이어진 물결치는 긴 지느러미",
+      tail: "끝이 넓은 노처럼 퍼진 길고 반투명한 꼬리지느러미",
+      auraAndSkin: "깊은 바닷속 어둠에서 시안색과 에메랄드색으로 빛나는 반투명한 푸른 비늘 피부",
     },
   },
   {
@@ -107,7 +107,7 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
       arms: "봉합선과 금속 고리가 감긴 굵고 긴 팔과 큰 주먹",
       legs: "검은 바지를 입은 굵은 다리",
       tail: "등에서 늘어진 굵은 전선 케이블",
-      auraAndSkin: "창백한 회녹색 피부 위로 흐르는 녹색 전기 줄기",
+      auraAndSkin: "창백한 회녹색 피부 주위로 튀는 푸른 번개 줄기",
     },
   },
   {
@@ -358,7 +358,7 @@ export function composeEnglishMonsterPrompt(
   );
   const name = presetNameEn.replace(/[;]+/g, " ").trim() || "bio-engineered";
   const parts = [
-    `${IMAGE_PROMPT_HEAD} ${name} monster, its whole body visible from head to toe inside the frame, side three-quarter view facing right`,
+    `${IMAGE_PROMPT_HEAD} colossal ferocious ${name} monster in a powerful aggressive battle stance, its whole body visible from head to toe inside the frame, side three-quarter view facing right`,
     design || "a hulking bio-engineered creature",
   ];
   if (stats) parts.push(statCuesForImage(stats));

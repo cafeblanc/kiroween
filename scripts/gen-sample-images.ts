@@ -49,6 +49,13 @@ const hfToken = useHf
   ? (/^\s*HF_TOKEN\s*=\s*(.*)$/m.exec(readFileSync(join(process.cwd(), ".env.local"), "utf8"))?.[1] ?? "").trim().replace(/^["']|["']$/g, "")
   : "";
 const outSuffix = useHf ? "hf" : "raw";
+// 6th argument: candidates per preset (default 1); files become <id>.hf1.jpg, <id>.hf2.jpg, ...
+const candidates = Math.max(1, Math.min(4, Number(process.argv[6] ?? 1) || 1));
+// Sample-only extra negatives (HF): body plans the model kept getting wrong (legs on a kraken or a sea serpent).
+const SAMPLE_EXTRA_NEGATIVE: Record<string, string> = {
+  myth_kraken: "legs, feet, claws, paws, lizard, reptile, dinosaur, humanoid",
+  alien_void_slug: "legs, feet, arms, claws, paws, dinosaur, lizard, standing upright, humanoid",
+};
 const presets = MONSTER_STUDIO_PRESETS.filter((p) => only.length === 0 || only.includes(p.id));
 mkdirSync(OUT, { recursive: true });
 writeFileSync(LOG, `start ${new Date().toISOString()} ${presets.map((p) => p.id).join(",")} seedBase=${seedBase}\n`);
@@ -59,14 +66,17 @@ for (let i = 0; i < presets.length; i++) {
     const translated = (await Promise.all(stripPartLabels(description).split("\n").map(translateLine))).join("\n");
     const prompt = composeEnglishMonsterPrompt(p.nameEn, translated, computeMonsterBioStats(description));
     writeFileSync(join(OUT, `${p.id}.txt`), prompt + "\n");
-    const seed = seedBase + MONSTER_STUDIO_PRESETS.indexOf(p);
+    const negative = [IMAGE_NEGATIVE_PROMPT, SAMPLE_EXTRA_NEGATIVE[p.id]].filter(Boolean).join(", ");
+    for (let c = 0; c < candidates; c++) {
+    const seed = seedBase + MONSTER_STUDIO_PRESETS.indexOf(p) * 10 + c;
+    const file = candidates > 1 ? `${p.id}.${outSuffix}${c + 1}.jpg` : `${p.id}.${outSuffix}.jpg`;
     let saved = false;
     for (let attempt = 0; attempt < 2 && !saved; attempt++) {
       const res = useHf
         ? await fetch(HF_FLUX_URL, {
             method: "POST",
             headers: { Authorization: `Bearer ${hfToken}`, "Content-Type": "application/json", Accept: "image/jpeg" },
-            body: JSON.stringify({ inputs: prompt, parameters: { seed, width: 1024, height: 1024, negative_prompt: IMAGE_NEGATIVE_PROMPT } }),
+            body: JSON.stringify({ inputs: prompt, parameters: { seed, width: 1024, height: 1024, negative_prompt: negative } }),
           })
         : await fetch(pollinationsImageUrl(prompt, seed));
       if (useHf && !res.ok) {
@@ -76,13 +86,14 @@ for (let i = 0; i < presets.length; i++) {
       const type = res.headers.get("content-type") ?? "";
       if (res.ok && type.startsWith("image/")) {
         const buf = Buffer.from(await res.arrayBuffer());
-        writeFileSync(join(OUT, `${p.id}.${outSuffix}.jpg`), buf);
-        log(`${p.id}: saved ${Math.round(buf.length / 1024)} KB seed ${seed}`);
+        writeFileSync(join(OUT, file), buf);
+        log(`${p.id}: saved ${file} ${Math.round(buf.length / 1024)} KB seed ${seed}`);
         saved = true;
       } else {
         log(`${p.id}: HTTP ${res.status} ${type} (attempt ${attempt + 1})`);
         if (attempt === 0) await sleep(60_000);
       }
+    }
     }
   } catch (e) {
     log(`${p.id}: error ${(e as Error).message}`);

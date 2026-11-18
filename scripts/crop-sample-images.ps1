@@ -9,14 +9,15 @@ $check = Join-Path $root 'scripts\image-check'
 $out = Join-Path $root 'public\images\samples'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 # id, source file, mirror, crop bottom (fraction)
-# HuggingFace SD3 pass (gen-sample-images.ts all 9400 hf); the bottom 6% removes small model "signatures".
+# HuggingFace SD3 "powerful" pass (gen-sample-images.ts all 9600 hf <model> 2), best of two candidates each;
+# the bottom 6% removes small model "signatures".
 $picks = @(
-  @('myth_dragon',       (Join-Path $check 'myth_dragon.hf.jpg'),       $true,  0.06),
-  @('myth_kraken',       (Join-Path $check 'myth_kraken.hf.jpg'),       $false, 0.06),
-  @('alien_xenomorph',   (Join-Path $check 'alien_xenomorph.hf.jpg'),   $false, 0.06),
-  @('alien_void_slug',   (Join-Path $check 'alien_void_slug.hf.jpg'),   $true,  0.06),
-  @('myth_frankenstein', (Join-Path $check 'myth_frankenstein.hf.jpg'), $false, 0.06),
-  @('human_prometheus',  (Join-Path $check 'human_prometheus.hf.jpg'),  $false, 0.06)
+  @('myth_dragon',       (Join-Path $check 'myth_dragon.hf1.jpg'),       $true,  0.06),
+  @('myth_kraken',       (Join-Path $check 'myth_kraken.hf1.jpg'),       $false, 0.06),
+  @('alien_xenomorph',   (Join-Path $check 'alien_xenomorph.hf2.jpg'),   $true,  0.06),
+  @('alien_void_slug',   (Join-Path $check 'alien_void_slug.hf1.jpg'),   $true,  0.06),
+  @('myth_frankenstein', (Join-Path $check 'myth_frankenstein.hf1.jpg'), $false, 0.06),
+  @('human_prometheus',  (Join-Path $check 'human_prometheus.hf2.jpg'),  $false, 0.06)
 )
 $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
 $params = New-Object System.Drawing.Imaging.EncoderParameters 1

@@ -57,7 +57,7 @@ describe("composeEnglishMonsterPrompt", () => {
 
   it("asks for one full-body creature seen from the side, then design, cues and scene split by ';'", () => {
     const sections = prompt.split(";").map((s) => s.trim());
-    expect(sections[0]).toBe(`${IMAGE_PROMPT_HEAD} Pyroclastic Dragon monster, its whole body visible from head to toe inside the frame, side three-quarter view facing right`);
+    expect(sections[0]).toBe(`${IMAGE_PROMPT_HEAD} colossal ferocious Pyroclastic Dragon monster in a powerful aggressive battle stance, its whole body visible from head to toe inside the frame, side three-quarter view facing right`);
     expect(sections[1].startsWith("head: glowing reptile eyes")).toBe(true);
     expect(sections).toHaveLength(4);
     expect(prompt.endsWith("no text, no letters")).toBe(true);

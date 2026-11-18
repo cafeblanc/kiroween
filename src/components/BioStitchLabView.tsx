@@ -3175,11 +3175,14 @@ export const BioStitchLabView: React.FC = () => {
           {/* The finished form emerges slowly where the egg's shadow was: blurred and dark, then sharp and lit */}
           {(incubating.phase === "materialising" || incubating.phase === "reveal") && incubating.ready && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+              <div
+                className="incubate-emerge-glow absolute w-[90vmin] h-[90vmin]"
+                style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
+              />
               <img
                 src={incubating.ready.jumpscareImg || incubating.ready.avatarImg}
                 alt=""
-                className="incubate-emerge max-w-[62vw] max-h-[62vh] object-contain"
-                style={{ ["--reveal-glow" as string]: incubating.ready.colorHex } as React.CSSProperties}
+                className="incubate-emerge relative w-[70vmin] h-[70vmin] object-cover"
               />
             </div>
           )}

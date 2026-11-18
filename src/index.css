@@ -512,19 +512,29 @@ body {
   .embryo-frame-active, .embryo-frame-hold { animation: none; }
 }
 
-/* The finished monster emerges inside the egg (4 s = MONSTER_EMERGE_MS): a dark blurred shadow that slowly sharpens,
-   brightens and grows, glowing in the monster colour, then the 3D burst takes over. */
+/* The finished monster emerges inside the egg (4 s = MONSTER_EMERGE_MS): a faint blurred shape that slowly sharpens,
+   brightens and grows, then the 3D burst takes over.
+   No rectangle: the image's own (opaque) background fades out at the edges through a soft round mask, and there is no
+   drop-shadow (a drop-shadow on an opaque image traces its rectangular edge). The glow is a separate layer behind. */
 .incubate-emerge {
-  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 52%, rgba(0, 0, 0, 0.6) 72%, transparent 100%);
+  mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 52%, rgba(0, 0, 0, 0.6) 72%, transparent 100%);
   animation: incubateEmerge 4s ease-in forwards;
 }
 @keyframes incubateEmerge {
-  0% { opacity: 0; transform: scale(0.72); filter: blur(28px) brightness(0.25) saturate(0.4) drop-shadow(0 0 0 transparent); }
-  35% { opacity: 0.45; transform: scale(0.8); filter: blur(16px) brightness(0.5) saturate(0.7) drop-shadow(0 0 30px var(--reveal-glow, #10b981)); }
-  75% { opacity: 0.85; transform: scale(0.92); filter: blur(5px) brightness(0.85) saturate(1) drop-shadow(0 0 46px var(--reveal-glow, #10b981)); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0) brightness(1.05) saturate(1.1) drop-shadow(0 0 60px var(--reveal-glow, #10b981)); mix-blend-mode: normal; }
+  0% { opacity: 0; transform: scale(0.72); filter: blur(28px) brightness(0.3) saturate(0.4); }
+  35% { opacity: 0.4; transform: scale(0.8); filter: blur(16px) brightness(0.55) saturate(0.7); }
+  75% { opacity: 0.85; transform: scale(0.92); filter: blur(5px) brightness(0.85) saturate(1); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0) brightness(1.05) saturate(1.1); }
 }
+.incubate-emerge-glow {
+  background: radial-gradient(ellipse closest-side at 50% 50%, var(--reveal-glow, #10b981), transparent 70%);
+  mix-blend-mode: screen;
+  animation: incubateEmergeGlow 4s ease-in forwards;
+}
+@keyframes incubateEmergeGlow { 0% { opacity: 0; } 60% { opacity: 0.35; } 100% { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) {
   .incubate-emerge { animation: incubateFade 1.2s ease-out forwards; }
+  .incubate-emerge-glow { animation: none; opacity: 0.4; }
 }
 @keyframes revealFadeOnly { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
