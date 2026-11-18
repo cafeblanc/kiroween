@@ -2,6 +2,7 @@ import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { translateTextToLanguage } from "./scienceStitchService";
 import { generateMonsterVideo } from "./videoGenService";
 import { LTX_MAX_WAIT_MS, prepareImageForLtx } from "./ltxJobClient";
+import { HF_IMAGE_URL, MAX_IMAGE_PROMPT_CHARS, hfImageRequestBody } from "../utils/hfImage";
 
 export interface MonsterBodyParts {
   head: string;
@@ -49,12 +50,12 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     colorHex: "#8b5cf6",
     baseImageSrc: "/images/samples/myth_kraken.jpg",
     defaultParts: {
-      head: "크고 둥근 보라색 문어 머리와 노랗게 빛나는 커다란 눈 두 개",
+      head: "거대한 문어처럼 크고 둥근 보라색 머리와 노랗게 빛나는 커다란 눈 두 개",
       hornsOrCrown: "머리 위에 솟은 보랏빛 발광 지느러미 볏",
       torso: "머리 아래에서 촉수들이 모이는 짧고 두꺼운 보라색 몸통",
       arms: "흡반마다 갈고리 가시가 돋은 굵고 긴 보라색 촉수 여덟 개",
-      legs: "다리 없이 바닥을 짚고 몸을 받치는 아래쪽 촉수들",
-      tail: "꼬리 없이 몸 뒤로 길게 늘어진 촉수 끝",
+      legs: "바닥을 짚고 몸을 받치는 아래쪽 촉수들",
+      tail: "몸 뒤로 길게 늘어진 촉수 끝",
       auraAndSkin: "흡반을 따라 청록색으로 빛나는 점액질 보라색 피부",
     },
   },
@@ -87,7 +88,7 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
       hornsOrCrown: "머리 주위에 떠 있는 반투명 발광 촉모 왕관",
       torso: "속의 빛나는 장기가 비치는 길고 반투명한 뱀장어형 몸통",
       arms: "몸 옆에서 물결치는 가늘고 긴 발광 촉수 네 개",
-      legs: "다리 없이 몸 아래에서 물결치는 넓은 지느러미",
+      legs: "몸 아래에서 물결치는 넓은 지느러미",
       tail: "끝이 희미하게 사라지는 길고 반투명한 꼬리지느러미",
       auraAndSkin: "주위에 시안색과 에메랄드색 빛 입자가 떠도는 반투명한 푸른 피부",
     },
@@ -105,7 +106,7 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
       torso: "흉터와 봉합선으로 이어 붙인 근육질 거구 상체",
       arms: "봉합선과 금속 고리가 감긴 굵고 긴 팔과 큰 주먹",
       legs: "검은 바지를 입은 굵은 다리",
-      tail: "꼬리 없음, 등에서 늘어진 굵은 전선 케이블",
+      tail: "등에서 늘어진 굵은 전선 케이블",
       auraAndSkin: "창백한 회녹색 피부 위로 흐르는 녹색 전기 줄기",
     },
   },
@@ -122,7 +123,7 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
       torso: "가슴 한가운데 빛나는 인공 심장이 비치는 투명 흉갑을 두른 근육질 상체",
       arms: "주먹에 생체 강철 너클이 돋은 굵은 근육질 양팔",
       legs: "무릎 장갑을 두른 탄탄한 근육질 두 다리",
-      tail: "꼬리 없음, 척추를 따라 빛나는 에메랄드색 줄",
+      tail: "척추를 따라 빛나는 에메랄드색 줄",
       auraAndSkin: "녹색 빛 혈관이 비치는 반투명한 합성 피부",
     },
   },
@@ -306,6 +307,8 @@ export function statCuesForImage(stats: MonsterCombatStats): string {
 /** Max length of the design part of the image prompt (the model weighs the first part of a long prompt most). */
 export const MAX_IMAGE_DESIGN_CHARS = 700;
 
+export { HF_IMAGE_MODEL, IMAGE_NEGATIVE_PROMPT } from "../utils/hfImage";
+
 /** Opening of every image prompt; also how the battle prompt recognises the current format. */
 export const IMAGE_PROMPT_HEAD = "Full-body shot of a single";
 
@@ -399,6 +402,28 @@ export function buildImageSeed(
   return (hashString(`${description}|${statKey}`) + nonce * 31 + seedCounter * 7919) % 2_147_483_647;
 }
 
+/** Same-origin server image route; any failure (not configured, cap, credits, timeout) returns null -> fallback. */
+export async function fetchServerImage(prompt: string, seed: number, timeoutMs = 55000): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch("/api/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: prompt.slice(0, MAX_IMAGE_PROMPT_CHARS), seed }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json().catch(() => null)) as { imageDataUrl?: unknown } | null;
+    const url = data?.imageDataUrl;
+    return typeof url === "string" && /^data:image\/(png|jpeg|webp);base64,/.test(url) ? url : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchImageBlobAsDataUrl(url: string, init?: RequestInit, timeoutMs = 15000): Promise<string> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -440,20 +465,28 @@ export async function generateCustomMonsterImage(params: {
   const seed = buildImageSeed(description, stats);
   const englishPrompt = await buildEnglishMonsterPrompt(preset, description, stats);
 
-  // 1. Optional HuggingFace Inference (FLUX / LTX ecosystem) when HF token is provided
+  // 1. HuggingFace SD3 through our server (/api/generate-image, server-side HF_TOKEN): sharper, follows the
+  //    description better, supports a negative prompt and has no watermark.
+  const serverImage = await fetchServerImage(englishPrompt, seed);
+  if (serverImage) {
+    return { imageUrl: serverImage, themeHex: theme.primary, source: "hf", promptEn: englishPrompt, seed };
+  }
+
+  // 1b. A personal HuggingFace token entered in the browser (optional)
   if (hfToken?.trim()) {
     try {
       const dataUrl = await fetchImageBlobAsDataUrl(
-        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
+        HF_IMAGE_URL,
         {
           method: "POST",
           headers: {
             Authorization: `Bearer ${hfToken.trim()}`,
             "Content-Type": "application/json",
+            Accept: "image/jpeg",
           },
-          body: JSON.stringify({ inputs: englishPrompt, parameters: { seed } }),
+          body: hfImageRequestBody(englishPrompt, seed),
         },
-        20000,
+        45000,
       );
       return { imageUrl: dataUrl, themeHex: theme.primary, source: "hf", promptEn: englishPrompt, seed };
     } catch {

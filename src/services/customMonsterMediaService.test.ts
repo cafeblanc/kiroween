@@ -16,6 +16,7 @@ import {
   composeDescriptionFromParts,
   composeEnglishMonsterPrompt,
   describeStatsForPrompt,
+  fetchServerImage,
   generateVideoFromMonsterImage,
   pollinationsImageUrl,
   statCuesForImage,
@@ -93,6 +94,25 @@ describe("stripPartLabels (Korean design text before translation)", () => {
   });
   it("leaves free text without labels alone", () => {
     expect(stripPartLabels("a dragon: very big")).toBe("a dragon: very big");
+  });
+});
+
+describe("fetchServerImage (HF through our server first)", () => {
+  afterEach(() => vi.restoreAllMocks());
+  it("returns the server's data URL", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ imageDataUrl: "data:image/jpeg;base64,AAAA" }), { status: 200 }),
+    );
+    expect(await fetchServerImage("a dragon", 3)).toBe("data:image/jpeg;base64,AAAA");
+    expect(spy.mock.calls[0][0]).toBe("/api/generate-image");
+  });
+  it("returns null on any failure so Pollinations takes over", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ code: "NO_KEY" }), { status: 503 }));
+    expect(await fetchServerImage("a dragon", 3)).toBeNull();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ imageDataUrl: "javascript:alert(1)" }), { status: 200 }));
+    expect(await fetchServerImage("a dragon", 3)).toBeNull();
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    expect(await fetchServerImage("a dragon", 3)).toBeNull();
   });
 });
 
