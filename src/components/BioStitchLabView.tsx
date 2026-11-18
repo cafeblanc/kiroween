@@ -21,7 +21,7 @@ import { ArenaHalf } from "./bioreactor/ArenaHalf";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
-import { BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
+import { BATTLE_PLAYBACK_RATE, BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
 import {
   EMPTY_SLOTS,
   canStartDesignedBattle,
@@ -2893,6 +2893,8 @@ export const BioStitchLabView: React.FC = () => {
                             muted
                             playsInline
                             controls={battlePhase === "playing"}
+                            // Slightly faster than real time so the fight feels snappy (12 s clip -> 10 s)
+                            onLoadedMetadata={(e) => { e.currentTarget.playbackRate = BATTLE_PLAYBACK_RATE; }}
                             onEnded={() => setBattlePhase("outcome")}
                             className="w-full h-full object-cover"
                           />

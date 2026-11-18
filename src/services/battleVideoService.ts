@@ -149,7 +149,7 @@ export function composeBattleVideoPrompt(
   let fin = MAX_STORY_CHARS;
   let fig = MAX_FIGHTER_CHARS;
   let prompt = build(ex, fin, fig);
-  for (let i = 0; i < 6 && prompt.length > MAX_BATTLE_PROMPT_CHARS; i++) {
+  for (let i = 0; i < 20 && prompt.length > MAX_BATTLE_PROMPT_CHARS; i++) {
     const over = prompt.length - MAX_BATTLE_PROMPT_CHARS + 10;
     if (ex > 20) ex = Math.max(0, ex - over);
     else if (fin > MIN_FINISH_CHARS) fin = Math.max(MIN_FINISH_CHARS, fin - over);
@@ -158,8 +158,6 @@ export function composeBattleVideoPrompt(
   }
   return prompt.slice(0, MAX_BATTLE_PROMPT_CHARS);
 }
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function composeParts(
   f1: BattleVideoFighter,
@@ -184,20 +182,21 @@ function composeParts(
   void n1;
   void n2;
   const parts = [
-    "One continuous cinematic take, no cuts, from the first frame: a wide side-view shot of a dark sci-fi bio-lab arena.",
+    "One continuous cinematic take, no cuts, from the first frame: a wide side-view shot of a dark sci-fi arena.",
     "Two completely different creatures face each other in profile.",
     `On the left, facing right toward its enemy: ${describeBattleFighter(f1, "the left monster", fighterChars)}.`,
     `On the right, facing left toward its enemy: ${describeBattleFighter(f2, "the right monster", fighterChars)}.`,
-    "Each keeps its own colours, body shape, head, horns, limbs and tail; they never merge, swap places or turn into each other.",
-    "They never look at or attack toward the camera; every strike and blast travels sideways across the arena into the other creature's body.",
-    `They charge and collide: ${tag1} swings its clawed arms into the face and torso of ${tag2}, which is knocked back;`,
-    `${tag2} whips its spiked tail into the head of ${tag1}, which reels backward; legs stomp the cracking floor.`,
-    `${cap(tag1)} turns its head toward ${tag2}, opens its jaws and fires a flame cannon from its mouth with ${atk1}, hitting ${tag2} in the chest;`,
-    `${tag2} fires back from its mouth with ${atk2} and laser beams into the body of ${tag1}.`,
-    "The blasts collide between them in sparks, smoke and debris, and every hit visibly shoves its target backward.",
+    "Each keeps its own colours, shape and long massive tail, the same size all clip long; they never merge or swap places.",
+    "They never face or attack the camera; every hit travels sideways into the other's body.",
+    "A full-speed real-time fight, no slow motion, no pauses; each beat uses a different body part, no move repeats.",
+    `They collide: ${tag1} rakes its clawed arms across the face of ${tag2}, knocking it back;`,
+    `${tag2} spins and whips its massive spiked tail into the head of ${tag1};`,
+    `${tag1} leaps and kicks the chest of ${tag2} with its hind legs;`,
+    `${tag2} rams its head into the torso of ${tag1} and bites its neck;`,
+    `both open their jaws and blast flame cannons from their mouths at each other, ${tag1} with ${atk1}, ${tag2} with ${atk2} and laser beams; every hit shoves its target back.`,
     exchange ? `The exchange: ${exchange}.` : "",
     `The camera tracks sideways for the finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
-    "Fast handheld side-on action camera, motion blur, photorealistic creatures, no text, no subtitles, no logos.",
+    "Fast handheld side-on camera, motion blur, photorealistic creatures, no text, no subtitles, no logos.",
   ].filter(Boolean);
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
@@ -213,6 +212,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /** Share of the image height cut from the bottom of each monster image (removes the pollinations.ai watermark). */
 export const FIRST_FRAME_CROP_BOTTOM = 0.1;
+/** Battle clip playback speed: a little faster than real time so the fight feels snappy (12 s -> 10 s). */
+export const BATTLE_PLAYBACK_RATE = 1.2;
 /** The right fighter is drawn mirrored (images face right), in the first frame and in the arena's right half. */
 export const MIRROR_RIGHT_FIGHTER = true;
 /** Half-width of the blended dark band between the two monsters in the first frame. */
@@ -240,6 +241,21 @@ export function coverSourceRect(
   // Image is taller: keep full width, crop from the top part (heads sit near the top of creature shots).
   const sh = w / boxAspect;
   return { sx: 0, sy: Math.max(0, (usableH - sh) * 0.25), sw: w, sh };
+}
+
+/** Margin kept around the whole body in each half of the first frame. */
+export const FIRST_FRAME_BODY_MARGIN = 0.04;
+
+/**
+ * Where the whole (uncropped) monster image goes inside one half of the first frame: contain-fit with a small margin,
+ * standing on the lower part of the half. Pure, for tests.
+ */
+export function wholeBodyRect(imgW: number, imgH: number, boxW: number, boxH: number): { x: number; y: number; w: number; h: number } {
+  const m = Math.round(Math.min(boxW, boxH) * FIRST_FRAME_BODY_MARGIN);
+  const r = containRect(imgW, imgH, m, m, Math.max(1, boxW - 2 * m), Math.max(1, boxH - 2 * m));
+  // Feet on the ground: push a short image down toward the bottom margin instead of floating in the middle.
+  const y = Math.max(m, boxH - m - r.h - Math.round((boxH - 2 * m - r.h) * 0.15));
+  return { ...r, y };
 }
 
 /** Fits an image inside a box (contain) and returns the drawn rect. Pure, for tests. */
@@ -280,17 +296,30 @@ export async function composeBattleFirstFrame(img1: string, img2: string): Promi
     const half = W / 2;
     // Monster images face right (composeEnglishMonsterPrompt), so the right fighter is mirrored: from the first frame
     // the two face each other, and the video model attacks across the arena instead of toward the camera.
+    // The WHOLE body is shown (contain): a cover crop of a square image into a tall half cut the tail off, so the model
+    // drew a small tail while fighting and a huge one once the body fell and came into view. The empty space is filled
+    // by a blurred, darkened cover copy of the same image so the half still reads as one scene.
     for (const [img, x0, mirror] of [[a, 0, false], [b, half, MIRROR_RIGHT_FIGHTER]] as const) {
-      const s = coverSourceRect(img.naturalWidth || img.width, img.naturalHeight || img.height, half, H, FIRST_FRAME_CROP_BOTTOM);
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const usableH = Math.round(ih * (1 - FIRST_FRAME_CROP_BOTTOM));
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x0, 0, half, H);
+      ctx.clip();
       if (mirror) {
-        ctx.save();
         ctx.translate(x0 + half, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(img, s.sx, s.sy, s.sw, s.sh, 0, 0, half, H);
-        ctx.restore();
       } else {
-        ctx.drawImage(img, s.sx, s.sy, s.sw, s.sh, x0, 0, half, H);
+        ctx.translate(x0, 0);
       }
+      const bg = coverSourceRect(iw, ih, half, H, FIRST_FRAME_CROP_BOTTOM);
+      ctx.filter = "blur(18px) brightness(0.45)";
+      ctx.drawImage(img, bg.sx, bg.sy, bg.sw, bg.sh, -20, -20, half + 40, H + 40);
+      ctx.filter = "none";
+      const fit = wholeBodyRect(iw, usableH, half, H);
+      ctx.drawImage(img, 0, 0, iw, usableH, fit.x, fit.y, fit.w, fit.h);
+      ctx.restore();
     }
     // Blend the seam: a dark band in the middle fades both halves into the same smoky arena.
     const seam = ctx.createLinearGradient(half - FIRST_FRAME_SEAM_PX, 0, half + FIRST_FRAME_SEAM_PX, 0);

@@ -14,6 +14,8 @@ import {
   designFromImagePrompt,
   generateBattleVideo,
   MIRROR_RIGHT_FIGHTER,
+  BATTLE_PLAYBACK_RATE,
+  wholeBodyRect,
 } from "./battleVideoService";
 import { composeEnglishMonsterPrompt } from "./customMonsterMediaService";
 import * as videoGenService from "./videoGenService";
@@ -31,25 +33,43 @@ describe("composeBattleVideoPrompt", () => {
   const p = composeBattleVideoPrompt(fire, xeno, story);
 
   it("makes every body part fight, with the mouth flame cannon, tail attacks and lasers", () => {
-    for (const word of ["head", "jaws", "clawed arms", "legs", "tail", "torso", "flame cannon from its mouth", "laser beams"]) {
+    for (const word of ["head", "jaws", "clawed arms", "legs", "tail", "torso", "flame cannons from their mouths", "laser beams"]) {
       expect(p).toContain(word);
     }
-    expect(p).toMatch(/whips its spiked tail/);
+    expect(p).toMatch(/whips its massive spiked tail/);
+  });
+
+  it("varies the attacks beat by beat: claws, tail, hind-leg kick, head ram and bite, mouth fire; no repeats", () => {
+    const order = [
+      "rakes its clawed arms across the face of",
+      "whips its massive spiked tail into the head",
+      "kicks the chest of the toxic green right creature with its hind legs",
+      "rams its head into the torso of the crimson red left creature and bites its neck",
+      "both open their jaws and blast flame cannons from their mouths",
+    ].map((s) => p.indexOf(s));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(p).toContain("each beat uses a different body part, no move repeats");
+  });
+
+  it("keeps the tails the same size all clip long and asks for full speed", () => {
+    expect(p).toContain("long massive tail, the same size all clip long");
+    expect(p).toContain("A full-speed real-time fight, no slow motion, no pauses");
+    expect(BATTLE_PLAYBACK_RATE).toBeGreaterThan(1);
+    expect(BATTLE_PLAYBACK_RATE).toBeLessThanOrEqual(1.3);
   });
 
   it("aims every attack at the opponent, never at the camera (fighting, not dancing)", () => {
     expect(p).toContain("a wide side-view shot");
     expect(p).toContain("On the left, facing right toward its enemy:");
     expect(p).toContain("On the right, facing left toward its enemy:");
-    expect(p).toContain("They never look at or attack toward the camera");
-    expect(p).toContain("travels sideways across the arena into the other creature's body");
+    expect(p).toContain("They never face or attack the camera");
+    expect(p).toContain("every hit travels sideways into the other's body");
     // who -> direction -> body part hit -> reaction
-    expect(p).toContain("swings its clawed arms into the face and torso of the toxic green right creature, which is knocked back");
-    expect(p).toContain("whips its spiked tail into the head of the crimson red left creature, which reels backward");
-    expect(p).toContain("The crimson red left creature turns its head toward the toxic green right creature");
-    expect(p).toContain("hitting the toxic green right creature in the chest");
-    expect(p).toContain("laser beams into the body of the crimson red left creature");
-    expect(p).toContain("every hit visibly shoves its target backward");
+    expect(p).toContain("rakes its clawed arms across the face of the toxic green right creature, knocking it back");
+    expect(p).toContain("whips its massive spiked tail into the head of the crimson red left creature");
+    expect(p).toContain("the crimson red left creature with molten magma blasts, the toxic green right creature with corrosive acid sprays and laser beams");
+    expect(p).toContain("every hit shoves its target back.");
     // The edited story still fits in full with normal-length input
     expect(p).toContain("slashes its claws across the titan's torso");
     expect(p.length).toBeLessThanOrEqual(MAX_BATTLE_PROMPT_CHARS);
@@ -63,8 +83,9 @@ describe("composeBattleVideoPrompt", () => {
       { act2_clash: long, act3_finish: long },
     );
     expect(out.length).toBeLessThanOrEqual(MAX_BATTLE_PROMPT_CHARS);
-    expect(out).toContain("never look at or attack toward the camera");
-    expect(out).toContain("every hit visibly shoves its target backward");
+    expect(out).toContain("They never face or attack the camera");
+    expect(out).toContain("every hit shoves its target back.");
+    expect(out).toContain("whips its massive spiked tail");
     expect(out.endsWith("no text, no subtitles, no logos.")).toBe(true);
   });
 
@@ -76,7 +97,7 @@ describe("composeBattleVideoPrompt", () => {
 
   it("locks each fighter's identity: different colours, never merge or swap", () => {
     expect(p).toContain("Two completely different creatures");
-    expect(p).toContain("they never merge, swap places or turn into each other");
+    expect(p).toContain("they never merge or swap places");
     expect(p).toContain("the crimson red left creature");
     expect(p).toContain("the toxic green right creature");
   });
@@ -165,6 +186,29 @@ describe("coverSourceRect (first frame: each monster fills its half, watermark s
         expect(s.sx + s.sw).toBeLessThanOrEqual(iw + 1e-6);
         expect(s.sy + s.sh).toBeLessThanOrEqual(ih * (1 - FIRST_FRAME_CROP_BOTTOM) + 1e-6);
         expect(s.sw / s.sh).toBeCloseTo(bw / bh, 3);
+      }),
+    );
+  });
+});
+
+describe("wholeBodyRect (first frame shows the whole body, tail included)", () => {
+  it("fits a square image entirely inside a tall half with a margin, standing low", () => {
+    const r = wholeBodyRect(1024, 963, 640, 720);
+    expect(r.x).toBeGreaterThanOrEqual(0);
+    expect(r.x + r.w).toBeLessThanOrEqual(640);
+    expect(r.y).toBeGreaterThanOrEqual(0);
+    expect(r.y + r.h).toBeLessThanOrEqual(720);
+    expect(r.w / r.h).toBeCloseTo(1024 / 963, 1);
+    expect(r.y).toBeGreaterThan((720 - r.h) / 2); // lower than centred
+  });
+  it("never leaves the half for any image or box size", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 50, max: 4000 }), fc.integer({ min: 50, max: 4000 }), fc.integer({ min: 100, max: 2000 }), fc.integer({ min: 100, max: 2000 }), (iw, ih, bw, bh) => {
+        const r = wholeBodyRect(iw, ih, bw, bh);
+        expect(r.x).toBeGreaterThanOrEqual(0);
+        expect(r.y).toBeGreaterThanOrEqual(0);
+        expect(r.x + r.w).toBeLessThanOrEqual(bw + 1);
+        expect(r.y + r.h).toBeLessThanOrEqual(bh + 1);
       }),
     );
   });
