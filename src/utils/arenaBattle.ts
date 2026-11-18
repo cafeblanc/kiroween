@@ -2,6 +2,7 @@
  * Pure, stat-driven arena battle resolver (Task 2).
  * No React, no timers, no globals: all randomness comes from an injected RNG.
  */
+import { PROB_MIN, WIN_PROB_FLOOR, boundedProb, enforceStatLimits } from "./statBalance";
 
 export interface CombatStats {
   atk: number;
@@ -68,33 +69,38 @@ export function createSeededRng(seed: number): Rng {
   };
 }
 
-/** Fills missing/invalid stats with defaults and clamps each to 1..100. */
+/**
+ * Fills missing/invalid stats with defaults and balances them (statBalance.ts): each stat 30..90 with soft
+ * compression of extremes, and a shared total budget, so no monster is ever all-powerful or helpless.
+ */
 export function resolveCombatStats(partial?: Partial<CombatStats> | null): CombatStats {
-  const pick = (v: unknown, d: number) =>
-    typeof v === "number" && Number.isFinite(v) ? clamp(v, 1, 100) : d;
-  const p = partial ?? {};
-  return {
-    atk: pick(p.atk, DEFAULT_COMBAT_STATS.atk),
-    def: pick(p.def, DEFAULT_COMBAT_STATS.def),
-    spd: pick(p.spd, DEFAULT_COMBAT_STATS.spd),
-    regen: pick(p.regen, DEFAULT_COMBAT_STATS.regen),
-    energy: pick(p.energy, DEFAULT_COMBAT_STATS.energy),
-  };
+  // Limits only: fighters' stats were already balanced in the Design Room, so they are not compressed twice.
+  return enforceStatLimits(partial);
 }
 
 /** Probability that fighter A strikes first. Equal SPD gives 0.5. */
 export function firstStrikeProbability(a: CombatStats, b: CombatStats): number {
-  return clamp(0.5 + (a.spd - b.spd) / 200, 0.15, 0.85);
+  return boundedProb(0.5 + (a.spd - b.spd) / 200, 0.15, 0.85);
 }
 
-/** Probability that the defender dodges the attacker's hit. */
+/** Probability that the defender dodges the attacker's hit (never 0: even a slow body can twist away). */
 export function evasionProbability(att: CombatStats, def: CombatStats): number {
-  return clamp(0.04 + (def.spd - att.spd) / 250, 0, 0.3);
+  return boundedProb(0.08 + (def.spd - att.spd) / 250, PROB_MIN, 0.3);
 }
 
 /** Critical-hit probability; ENERGY raises it. */
 export function critProbability(att: CombatStats, bonus = 0): number {
-  return clamp(0.14 + att.energy * 0.003 + bonus, 0.05, 0.75);
+  return boundedProb(0.14 + att.energy * 0.003 + bonus, PROB_MIN, 0.6);
+}
+
+/**
+ * Probability that fighter 1 wins the final verdict from the end-of-round-3 state: remaining HP plus a REGEN/ENERGY
+ * comeback bonus. Bounded to WIN_PROB_FLOOR..1-WIN_PROB_FLOOR, so the weaker side always keeps a real chance.
+ */
+export function finalWinProbability(hp1: number, hp2: number, s1: CombatStats, s2: CombatStats): number {
+  const score = (hp: number, s: CombatStats) => hp + s.regen * 0.15 + s.energy * 0.1;
+  const p = 0.5 + (score(hp1, s1) - score(hp2, s2)) / 120;
+  return boundedProb(p, WIN_PROB_FLOOR, 1 - WIN_PROB_FLOOR);
 }
 
 /** Damage of a non-critical hit with base roll in [0, 1). ATK raises, DEF lowers. */
@@ -246,10 +252,8 @@ export function resolveBattle(f1: FighterInfo, f2: FighterInfo, rng: Rng): Battl
     evaded: false,
   });
 
-  // R4: final verdict; REGEN/ENERGY give comeback potential on top of random variance
-  const score1 = hp1 + rng() * 45 + s1.regen * 0.15 + s1.energy * 0.1;
-  const score2 = hp2 + rng() * 45 + s2.regen * 0.15 + s2.energy * 0.1;
-  const winner: 1 | 2 = score1 >= score2 ? 1 : 2;
+  // R4: final verdict; REGEN/ENERGY give comeback potential, and neither side is ever certain to win or lose
+  const winner: 1 | 2 = rng() < finalWinProbability(hp1, hp2, s1, s2) ? 1 : 2;
   const loser: 1 | 2 = winner === 1 ? 2 : 1;
   const comeback = (winner === 1 ? hp1 < hp2 : hp2 < hp1);
   if (loser === 1) hp1 = 0;

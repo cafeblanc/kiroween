@@ -4,6 +4,7 @@
  */
 import type { ComicMonster, MonsterPartKey } from '../data/comicMonsters';
 import type { VaultMonster, VaultMonsterInput } from './monsterVaultService';
+import { enforceStatLimits } from '../utils/statBalance';
 
 /** How many roster entries the arena dropdowns display. The vault itself is unbounded (source of truth). */
 export const CUSTOM_ROSTER_DISPLAY_LIMIT = 24;
@@ -97,13 +98,15 @@ export function vaultToComicMonster(v: VaultMonster): ComicMonster | null {
     ...(bodyParts ? { bodyParts } : {}),
     ...(stats
       ? {
-          customStats: {
+          // Older records may hold stats from before the balance (e.g. 99 everywhere): enforce the limits on load
+          // (idempotent, so balanced records never drift).
+          customStats: enforceStatLimits({
             atk: num(stats.atk, 70),
             def: num(stats.def, 70),
             spd: num(stats.spd, 70),
             regen: num(stats.regen, 70),
             energy: num(stats.energy, 70),
-          },
+          }),
         }
       : {}),
   };

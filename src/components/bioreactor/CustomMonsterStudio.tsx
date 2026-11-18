@@ -5,6 +5,7 @@ import {
   MonsterStudioPreset,
   composeDescriptionFromParts,
   computeMonsterBioStats,
+  computeMonsterRawStats,
   generateCustomMonsterImage,
   generateVideoFromMonsterImage,
   mirrorImageDataUrl,
@@ -14,6 +15,7 @@ import { saveMonster } from "../../services/monsterVaultService";
 import { monsterToVaultInput, urlToBlob } from "../../services/customMonsterVaultMapping";
 import { opponentsFor } from "../../utils/arenaRoster";
 import { designRoomButtonState } from "../../utils/designRoomState";
+import { STAT_INPUT_MAX, STAT_INPUT_MIN, STAT_MAX, STAT_MIN, STAT_TOTAL_BUDGET, balanceStats, budgetApplied } from "../../utils/statBalance";
 
 interface CustomMonsterStudioProps {
   isKo: boolean;
@@ -97,14 +99,19 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
   >({});
 
   const computedStats = computeMonsterBioStats(longPrompt);
-  const bioStats = {
-    ...computedStats,
-    atk: statOverrides.atk ?? computedStats.atk,
-    def: statOverrides.def ?? computedStats.def,
-    spd: statOverrides.spd ?? computedStats.spd,
-    regen: statOverrides.regen ?? computedStats.regen,
-    energy: statOverrides.energy ?? computedStats.energy,
+  const autoInputs = computeMonsterRawStats(longPrompt);
+  // Slider positions (what the user asked for, or the description's raw keyword stats) and the applied stats after
+  // the shared balance (statBalance.ts), applied exactly once: extremes are compressed and the five stats share one
+  // budget, so nothing is ever 0 or 100.
+  const statInputs = {
+    atk: statOverrides.atk ?? autoInputs.atk,
+    def: statOverrides.def ?? autoInputs.def,
+    spd: statOverrides.spd ?? autoInputs.spd,
+    regen: statOverrides.regen ?? autoInputs.regen,
+    energy: statOverrides.energy ?? autoInputs.energy,
   };
+  const bioStats = { ...computedStats, ...balanceStats(statInputs) };
+  const statBudgetHit = budgetApplied(statInputs);
 
   const handleSelectPreset = (preset: MonsterStudioPreset) => {
     setSelectedPreset(preset);
@@ -530,17 +537,22 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
               <div key={stat.key} className="bg-slate-900/95 border border-slate-800 rounded-lg p-2 flex flex-col gap-1.5 shadow-sm">
                 <div className="flex justify-between items-center text-[10px] font-mono font-bold">
                   <span className={stat.text}>{isKo ? stat.labelKo : stat.labelEn}</span>
-                  <span className="text-white font-black bg-slate-800/80 px-1.5 py-0.5 rounded text-[10px] border border-slate-700/60">{stat.val}</span>
+                  <span
+                    className="text-white font-black bg-slate-800/80 px-1.5 py-0.5 rounded text-[10px] border border-slate-700/60"
+                    title={isKo ? "적용값 (과도한 값은 생체 한계 안으로 조정)" : "Applied value (extremes are kept within biological limits)"}
+                  >
+                    {statInputs[stat.key] !== stat.val ? `${statInputs[stat.key]}→${stat.val}` : stat.val}
+                  </span>
                 </div>
                 <div className="text-[9px] text-slate-400 flex justify-between items-center font-sans">
                   <span>{isKo ? stat.subKo : stat.subEn}</span>
-                  <span className="text-[8px] text-slate-400 font-mono">20~99</span>
+                  <span className="text-[8px] text-slate-400 font-mono">{isKo ? `적용 ${STAT_MIN}~${STAT_MAX}` : `applied ${STAT_MIN}-${STAT_MAX}`}</span>
                 </div>
                 <input
                   type="range"
-                  min={20}
-                  max={99}
-                  value={stat.val}
+                  min={STAT_INPUT_MIN}
+                  max={STAT_INPUT_MAX}
+                  value={statInputs[stat.key]}
                   aria-label={stat.labelKo}
                   onChange={(e) =>
                     setStatOverrides((prev) => ({
@@ -553,6 +565,18 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
               </div>
             ))}
           </div>
+          <p className="text-[9px] text-slate-400 leading-snug">
+            {isKo
+              ? `생체 한계: 능력치는 ${STAT_MIN}~${STAT_MAX} 안에서만 적용되고, 극단값은 완만하게 줄어듭니다. 다섯 능력치 합은 ${STAT_TOTAL_BUDGET}을 넘을 수 없습니다. 결투에서도 승률·회피·치명타가 0%나 100%가 되지 않습니다.`
+              : `Biological limits: stats apply within ${STAT_MIN}-${STAT_MAX}, extremes are softened, and the five stats share a total of ${STAT_TOTAL_BUDGET}. In battle no chance is ever 0% or 100%.`}
+            {statBudgetHit && (
+              <span className="block text-amber-300 font-bold mt-0.5">
+                {isKo
+                  ? `⚖️ 총합 ${STAT_TOTAL_BUDGET} 초과: 한쪽을 올리면 다른 능력치가 함께 낮아집니다 (갑옷이 무거우면 느려지듯).`
+                  : `⚖️ Over the ${STAT_TOTAL_BUDGET} budget: raising one stat lowers the others (heavy armour costs speed).`}
+              </span>
+            )}
+          </p>
         </div>
       </div>
 

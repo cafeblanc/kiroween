@@ -3,6 +3,7 @@ import { translateTextToLanguage } from "./scienceStitchService";
 import { generateMonsterVideo } from "./videoGenService";
 import { LTX_MAX_WAIT_MS, prepareImageForLtx } from "./ltxJobClient";
 import { HF_IMAGE_URL, MAX_IMAGE_PROMPT_CHARS, hfImageRequestBody } from "../utils/hfImage";
+import { balanceStats } from "../utils/statBalance";
 
 export interface MonsterBodyParts {
   head: string;
@@ -139,7 +140,11 @@ export interface MonsterBioStats {
   elementLabelEn: string;
 }
 
-export function computeMonsterBioStats(description: string): MonsterBioStats {
+/**
+ * Stats read from the description's keywords BEFORE the balance (the Design Room's slider positions).
+ * Not final: pass them through balanceStats() exactly once.
+ */
+export function computeMonsterRawStats(description: string): MonsterCombatStats {
   const d = description.toLowerCase();
   let atk = 68;
   let def = 65;
@@ -152,8 +157,13 @@ export function computeMonsterBioStats(description: string): MonsterBioStats {
   if (/(날개|역관절|유영|지느러미|민첩|추진|도약|채찍)/.test(d)) spd += 25;
   if (/(재생|줄기세포|블라스테마|봉합|심장|회복|불사|미토콘드리아)/.test(d)) regen += 26;
   if (/(화염|용암|마그마|전기|스파크|볼트|생체\s*발광|산성|형광|우주)/.test(d)) energy += 24;
+  return { atk, def, spd, regen, energy };
+}
 
-  const clamp = (n: number) => Math.min(99, Math.max(40, n));
+export function computeMonsterBioStats(description: string): MonsterBioStats {
+  const d = description.toLowerCase();
+  // Shared balance (statBalance.ts): each stat 30..90 with soft compression and one total budget.
+  const balanced = balanceStats(computeMonsterRawStats(description));
   let elementLabelKo = "생체 키메라형";
   let elementLabelEn = "Bio-Chimera";
   if (/(화염|용암|마그마|불꽃)/.test(d)) {
@@ -171,11 +181,7 @@ export function computeMonsterBioStats(description: string): MonsterBioStats {
   }
 
   return {
-    atk: clamp(atk),
-    def: clamp(def),
-    spd: clamp(spd),
-    regen: clamp(regen),
-    energy: clamp(energy),
+    ...balanced,
     elementLabelKo,
     elementLabelEn,
   };

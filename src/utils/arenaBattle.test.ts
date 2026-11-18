@@ -72,7 +72,8 @@ describe("arenaBattle", () => {
 
   it("curated monsters without customStats resolve to defaults and battle fine", () => {
     expect(resolveCombatStats(undefined)).toEqual(DEFAULT_COMBAT_STATS);
-    expect(resolveCombatStats({ atk: NaN, def: 500 })).toMatchObject({ atk: 70, def: 100 });
+    // Out-of-range input is balanced (statBalance.ts), never 100
+    expect(resolveCombatStats({ atk: NaN, def: 500 })).toMatchObject({ atk: 70, def: 90 });
     const [m1, m2] = COMIC_MONSTERS;
     const r = resolveBattle(m1, m2, createSeededRng(7));
     expect(r.events.map((e) => e.round)).toEqual([1, 2, 3, 4]);
