@@ -30,7 +30,7 @@ export const BATTLE_VIDEO_SECONDS: LtxDuration = 12;
 /** Must stay under the server's MAX_PROMPT_CHARS (2000). */
 export const MAX_BATTLE_PROMPT_CHARS = 1900;
 const MAX_FIGHTER_CHARS = 200;
-const MIN_FIGHTER_CHARS = 60;
+const MIN_FIGHTER_CHARS = 30;
 const MAX_STORY_CHARS = 300;
 const MIN_FINISH_CHARS = 80;
 const MAX_EXCHANGE_CHARS = 360;
@@ -59,7 +59,7 @@ function toPromptText(text: string | undefined, max: number): string {
 }
 
 function cleanName(nameEn: string, fallback: string): string {
-  return toPromptText(nameEn.replace(/^\d+\s*[.)]\s*/, ""), 60) || fallback;
+  return toPromptText(nameEn.replace(/^\d+\s*[.)]\s*/, ""), 40) || fallback;
 }
 
 /**
@@ -182,21 +182,21 @@ function composeParts(
   void n1;
   void n2;
   const parts = [
-    "One continuous cinematic take, no cuts, from the first frame: a wide side-view shot of a dark sci-fi arena.",
-    "Two completely different creatures face each other in profile.",
+    "One continuous cinematic take, no cuts, from the first frame: a wide side view of a dark sci-fi arena.",
+    "Two completely different creatures share one open arena floor, already locked in close combat at the centre from the first second, bodies touching.",
     `On the left, facing right toward its enemy: ${describeBattleFighter(f1, "the left monster", fighterChars)}.`,
     `On the right, facing left toward its enemy: ${describeBattleFighter(f2, "the right monster", fighterChars)}.`,
     "Each keeps its own colours, shape and long massive tail, the same size all clip long; they never merge or swap places.",
     "They never face or attack the camera; every hit travels sideways into the other's body.",
-    "A full-speed real-time fight, no slow motion, no pauses; each beat uses a different body part, no move repeats.",
-    `They collide: ${tag1} rakes its clawed arms across the face of ${tag2}, knocking it back;`,
+    "Full-speed real time, no slow motion, no pauses; they stay in contact and trade blows nonstop, each beat a different body part, no move repeats.",
+    `At once ${tag1} rakes its clawed arms across the face of ${tag2}, knocking it back;`,
     `${tag2} spins and whips its massive spiked tail into the head of ${tag1};`,
     `${tag1} leaps and kicks the chest of ${tag2} with its hind legs;`,
     `${tag2} rams its head into the torso of ${tag1} and bites its neck;`,
     `both open their jaws and blast flame cannons from their mouths at each other, ${tag1} with ${atk1}, ${tag2} with ${atk2} and laser beams; every hit shoves its target back.`,
     exchange ? `The exchange: ${exchange}.` : "",
-    `The camera tracks sideways for the finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
-    "Fast handheld side-on camera, motion blur, photorealistic creatures, no text, no subtitles, no logos.",
+    `Finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
+    "Fast handheld side-on camera, motion blur, photorealistic, no text, no subtitles, no logos.",
   ].filter(Boolean);
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
@@ -216,8 +216,47 @@ export const FIRST_FRAME_CROP_BOTTOM = 0.1;
 export const BATTLE_PLAYBACK_RATE = 1.2;
 /** The right fighter is drawn mirrored (images face right), in the first frame and in the arena's right half. */
 export const MIRROR_RIGHT_FIGHTER = true;
-/** Half-width of the blended dark band between the two monsters in the first frame. */
-export const FIRST_FRAME_SEAM_PX = 70;
+/**
+ * Share of the frame width where the two fighters' boxes overlap in the centre of the first frame: the bodies already
+ * touch, so the video starts in close combat instead of two creatures moving about on their own.
+ */
+export const FIRST_FRAME_CONTACT_OVERLAP = 0.22;
+
+/**
+ * The two fighters' boxes in the first frame (one shared arena, no halves): each box is wider than half the frame and
+ * they overlap in the centre by FIRST_FRAME_CONTACT_OVERLAP. Pure, for tests.
+ */
+/**
+ * Oval mask radius as a share of the monster's drawn width/height, and where the fade-out starts (0..1).
+ * Radius 0.5 makes the oval touch the image's edge midpoints, so every edge and corner is fully transparent
+ * (a larger radius left a faint horizontal line at the top of each image).
+ */
+export const FIRST_FRAME_MASK_RADIUS = 0.5;
+export const FIRST_FRAME_MASK_SOLID = 0.55;
+
+/**
+ * Darkens bright, colourless pixels (white or grey studio backdrops) so they sink into the dark arena instead of
+ * forming a bright oval behind the monster. Coloured pixels (fire, glow, skin) are left alone. Pure, for tests.
+ */
+export function dimBackdropPixel(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const sat = max === 0 ? 0 : (max - min) / max;
+  if (lum < 0.55 || sat > 0.22) return [r, g, b];
+  // Stronger for brighter and greyer pixels: pure white -> about 20% brightness
+  const k = Math.min(1, (lum - 0.55) / 0.35) * (1 - sat / 0.22);
+  const f = 1 - 0.8 * k;
+  return [Math.round(r * f), Math.round(g * f), Math.round(b * f)];
+}
+
+export function battleFrameLayout(W: number, H: number): {
+  left: { x: number; w: number; h: number };
+  right: { x: number; w: number; h: number };
+} {
+  const boxW = Math.round(W * (0.5 + FIRST_FRAME_CONTACT_OVERLAP / 2));
+  return { left: { x: 0, w: boxW, h: H }, right: { x: W - boxW, w: boxW, h: H } };
+}
 
 /**
  * Source rectangle that makes an image cover a box (crop, no letterbox), after cutting `cropBottom` (0..0.5) of its
@@ -288,47 +327,62 @@ export async function composeBattleFirstFrame(img1: string, img2: string): Promi
     canvas.height = H;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.fillStyle = "#020617";
+    // ONE shared arena, not two halves: a split frame (two backgrounds side by side, a dark band between them) was kept
+    // by the video model as a wall for the whole clip. So there is one background, and each monster is laid on it with
+    // soft oval edges (its own backdrop fades into the arena; no rectangle, no line).
+    const glow = ctx.createRadialGradient(W / 2, H * 0.6, H * 0.05, W / 2, H * 0.6, W * 0.7);
+    glow.addColorStop(0, "#1e293b");
+    glow.addColorStop(1, "#020617");
+    ctx.fillStyle = glow;
     ctx.fillRect(0, 0, W, H);
-    // One scene, not two framed photos: each monster fills its half edge to edge (cover), with the image's bottom strip
-    // cropped off (pollinations.ai stamps its watermark there). The video model then animates a single arena instead of
-    // re-drawing the creatures from text.
-    const half = W / 2;
-    // Monster images face right (composeEnglishMonsterPrompt), so the right fighter is mirrored: from the first frame
-    // the two face each other, and the video model attacks across the arena instead of toward the camera.
-    // The WHOLE body is shown (contain): a cover crop of a square image into a tall half cut the tail off, so the model
-    // drew a small tail while fighting and a huge one once the body fell and came into view. The empty space is filled
-    // by a blurred, darkened cover copy of the same image so the half still reads as one scene.
-    for (const [img, x0, mirror] of [[a, 0, false], [b, half, MIRROR_RIGHT_FIGHTER]] as const) {
+    // Monster images face right (composeEnglishMonsterPrompt), so the right fighter is mirrored: the two face each other.
+    // Whole body (contain), tail included: a cropped tail was drawn small while fighting and huge once it came into view.
+    // The two boxes overlap in the centre (battleFrameLayout), so the bodies already touch: close combat from frame 1.
+    const layout = battleFrameLayout(W, H);
+    for (const [img, box, mirror] of [[a, layout.left, false], [b, layout.right, MIRROR_RIGHT_FIGHTER]] as const) {
       const iw = img.naturalWidth || img.width;
       const ih = img.naturalHeight || img.height;
       const usableH = Math.round(ih * (1 - FIRST_FRAME_CROP_BOTTOM));
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x0, 0, half, H);
-      ctx.clip();
+      const fit = wholeBodyRect(iw, usableH, box.w, box.h);
+      const off = document.createElement("canvas");
+      off.width = box.w;
+      off.height = box.h;
+      const o = off.getContext("2d");
+      if (!o) return null;
       if (mirror) {
-        ctx.translate(x0 + half, 0);
-        ctx.scale(-1, 1);
-      } else {
-        ctx.translate(x0, 0);
+        o.translate(box.w, 0);
+        o.scale(-1, 1);
       }
-      const bg = coverSourceRect(iw, ih, half, H, FIRST_FRAME_CROP_BOTTOM);
-      ctx.filter = "blur(18px) brightness(0.45)";
-      ctx.drawImage(img, bg.sx, bg.sy, bg.sw, bg.sh, -20, -20, half + 40, H + 40);
-      ctx.filter = "none";
-      const fit = wholeBodyRect(iw, usableH, half, H);
-      ctx.drawImage(img, 0, 0, iw, usableH, fit.x, fit.y, fit.w, fit.h);
-      ctx.restore();
+      o.drawImage(img, 0, 0, iw, usableH, fit.x, fit.y, fit.w, fit.h);
+      // White/grey studio backdrops sink into the dark arena (skipped if the canvas cannot be read back)
+      try {
+        const px = o.getImageData(0, 0, box.w, box.h);
+        const d = px.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const [r, g, bl] = dimBackdropPixel(d[i], d[i + 1], d[i + 2]);
+          d[i] = r;
+          d[i + 1] = g;
+          d[i + 2] = bl;
+        }
+        o.putImageData(px, 0, 0);
+      } catch {
+        /* tainted canvas: keep the image as drawn */
+      }
+      // Soft oval mask: opaque in the middle, fully transparent at the image's edges and corners.
+      o.setTransform(1, 0, 0, 1, 0, 0);
+      o.globalCompositeOperation = "destination-in";
+      const cx = mirror ? box.w - (fit.x + fit.w / 2) : fit.x + fit.w / 2;
+      o.translate(cx, fit.y + fit.h / 2);
+      o.scale(fit.w * FIRST_FRAME_MASK_RADIUS, fit.h * FIRST_FRAME_MASK_RADIUS);
+      const mask = o.createRadialGradient(0, 0, 0, 0, 0, 1);
+      mask.addColorStop(0, "rgba(0,0,0,1)");
+      mask.addColorStop(FIRST_FRAME_MASK_SOLID, "rgba(0,0,0,1)");
+      mask.addColorStop(1, "rgba(0,0,0,0)");
+      o.fillStyle = mask;
+      o.fillRect(-2, -2, 4, 4);
+      ctx.drawImage(off, box.x, 0);
     }
-    // Blend the seam: a dark band in the middle fades both halves into the same smoky arena.
-    const seam = ctx.createLinearGradient(half - FIRST_FRAME_SEAM_PX, 0, half + FIRST_FRAME_SEAM_PX, 0);
-    seam.addColorStop(0, "rgba(2,6,23,0)");
-    seam.addColorStop(0.5, "rgba(2,6,23,0.85)");
-    seam.addColorStop(1, "rgba(2,6,23,0)");
-    ctx.fillStyle = seam;
-    ctx.fillRect(half - FIRST_FRAME_SEAM_PX, 0, FIRST_FRAME_SEAM_PX * 2, H);
-    // Shared lighting: a vignette and a darker floor so both halves read as the same place.
+    // Shared lighting: a vignette and a darker floor so the whole frame reads as the same place.
     const vignette = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.35, W / 2, H * 0.55, W * 0.75);
     vignette.addColorStop(0, "rgba(2,6,23,0)");
     vignette.addColorStop(1, "rgba(2,6,23,0.7)");

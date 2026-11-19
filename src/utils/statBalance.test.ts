@@ -57,9 +57,10 @@ describe("balanceStats: never 0, never 100, never all at maximum", () => {
     expect(softStat("99")).toBe(STAT_DEFAULT);
   });
 
-  it("maxing everything gives a strong but ordinary monster (all 80), not a god", () => {
-    expect(balanceStats({ atk: 99, def: 99, spd: 99, regen: 99, energy: 99 })).toEqual({ atk: 80, def: 80, spd: 80, regen: 80, energy: 80 });
-    expect(budgetApplied({ atk: 99, def: 99, spd: 99, regen: 99, energy: 99 })).toBe(true);
+  it("maxing everything gives a strong monster (all 89, total 445 <= 450), still never 100", () => {
+    expect(STAT_TOTAL_BUDGET).toBe(450);
+    expect(balanceStats({ atk: 99, def: 99, spd: 99, regen: 99, energy: 99 })).toEqual({ atk: 89, def: 89, spd: 89, regen: 89, energy: 89 });
+    expect(budgetApplied({ atk: 99, def: 99, spd: 99, regen: 99, energy: 99 })).toBe(false);
   });
 
   it("one specialised stat can stay high when the others leave room", () => {
@@ -95,7 +96,8 @@ describe("balanceStats: never 0, never 100, never all at maximum", () => {
 
   it("old records with extreme stats are brought inside the limits on load", () => {
     const s = enforceStatLimits({ atk: 99, def: 99, spd: 99, regen: 99, energy: 99 });
-    for (const k of STAT_KEYS) expect(s[k]).toBe(80);
+    for (const k of STAT_KEYS) expect(s[k]).toBe(90);
+    expect(statTotal(s)).toBeLessThanOrEqual(STAT_TOTAL_BUDGET);
     expect(enforceStatLimits({ atk: 0, def: 1, spd: 100 })).toMatchObject({ atk: 30, def: 30, spd: 90 });
   });
 });

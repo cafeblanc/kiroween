@@ -15,8 +15,15 @@ import {
   generateBattleVideo,
   MIRROR_RIGHT_FIGHTER,
   BATTLE_PLAYBACK_RATE,
+  FIRST_FRAME_CONTACT_OVERLAP,
+  FIRST_FRAME_MASK_RADIUS,
+  FIRST_FRAME_MASK_SOLID,
+  battleFrameLayout,
+  dimBackdropPixel,
   wholeBodyRect,
 } from "./battleVideoService";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { composeEnglishMonsterPrompt } from "./customMonsterMediaService";
 import * as videoGenService from "./videoGenService";
 
@@ -49,18 +56,25 @@ describe("composeBattleVideoPrompt", () => {
     ].map((s) => p.indexOf(s));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(p).toContain("each beat uses a different body part, no move repeats");
+    expect(p).toContain("each beat a different body part, no move repeats");
+  });
+
+  it("starts in close combat and stays in contact (no separate dancing, then one clash)", () => {
+    expect(p).toContain("already locked in close combat at the centre from the first second, bodies touching");
+    expect(p).toContain("share one open arena floor");
+    expect(p).toContain("they stay in contact and trade blows nonstop");
+    expect(p.indexOf("At once")).toBeLessThan(p.indexOf("whips its massive spiked tail"));
   });
 
   it("keeps the tails the same size all clip long and asks for full speed", () => {
     expect(p).toContain("long massive tail, the same size all clip long");
-    expect(p).toContain("A full-speed real-time fight, no slow motion, no pauses");
+    expect(p).toContain("Full-speed real time, no slow motion, no pauses");
     expect(BATTLE_PLAYBACK_RATE).toBeGreaterThan(1);
     expect(BATTLE_PLAYBACK_RATE).toBeLessThanOrEqual(1.3);
   });
 
   it("aims every attack at the opponent, never at the camera (fighting, not dancing)", () => {
-    expect(p).toContain("a wide side-view shot");
+    expect(p).toContain("a wide side view of a dark sci-fi arena");
     expect(p).toContain("On the left, facing right toward its enemy:");
     expect(p).toContain("On the right, facing left toward its enemy:");
     expect(p).toContain("They never face or attack the camera");
@@ -188,6 +202,41 @@ describe("coverSourceRect (first frame: each monster fills its half, watermark s
         expect(s.sw / s.sh).toBeCloseTo(bw / bh, 3);
       }),
     );
+  });
+});
+
+describe("first frame: one shared arena, fighters already in contact, no divider", () => {
+  it("the two boxes overlap in the centre and together cover the whole width", () => {
+    const { left, right } = battleFrameLayout(1280, 720);
+    expect(left.x).toBe(0);
+    expect(right.x + right.w).toBe(1280);
+    const overlap = left.x + left.w - right.x;
+    expect(overlap).toBeCloseTo(1280 * FIRST_FRAME_CONTACT_OVERLAP, -1);
+    // The whole bodies drawn inside the boxes reach into each other's side
+    const a = wholeBodyRect(1024, 963, left.w, left.h);
+    const b = wholeBodyRect(1024, 963, right.w, right.h);
+    expect(left.x + a.x + a.w).toBeGreaterThan(right.x + (right.w - (b.x + b.w)));
+  });
+
+  it("draws one background and soft oval edges, never a seam band or per-half clipping", () => {
+    const src = readFileSync(resolve(__dirname, "battleVideoService.ts"), "utf8");
+    const fn = src.slice(src.indexOf("export async function composeBattleFirstFrame"), src.indexOf("export interface BattleVideoResult"));
+    expect(fn).toContain('globalCompositeOperation = "destination-in"');
+    expect(fn).not.toMatch(/seam|SEAM/);
+    expect(fn).not.toContain("ctx.clip()");
+    expect(fn).not.toContain("blur(18px)");
+    // Every image edge midpoint (normalised distance 0.5 / radius) is at or outside the oval: fully transparent, so
+    // no rectangle and no horizontal line shows
+    expect(0.5 / FIRST_FRAME_MASK_RADIUS).toBeGreaterThanOrEqual(1);
+    expect(FIRST_FRAME_MASK_SOLID).toBeLessThan(1);
+  });
+
+  it("sinks white/grey studio backdrops into the dark arena but keeps coloured parts", () => {
+    const [r, g, b] = dimBackdropPixel(255, 255, 255);
+    expect(Math.max(r, g, b)).toBeLessThanOrEqual(60);
+    expect(dimBackdropPixel(240, 120, 20)).toEqual([240, 120, 20]); // fire orange
+    expect(dimBackdropPixel(40, 200, 90)).toEqual([40, 200, 90]); // green glow
+    expect(dimBackdropPixel(30, 30, 30)).toEqual([30, 30, 30]); // dark parts
   });
 });
 

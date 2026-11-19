@@ -6,7 +6,7 @@
  *   1. Soft knees: the part of a value above STAT_SOFT_HIGH or below STAT_SOFT_LOW counts half.
  *      Input 0..100 therefore maps to STAT_MIN..STAT_MAX (30..90).
  *   2. Total budget: when the five stats add up to more than STAT_TOTAL_BUDGET, every stat's share above STAT_MIN
- *      is scaled down by the same factor (all at maximum -> all 80).
+ *      is scaled down by the same factor (all at maximum -> all 89).
  */
 
 export interface BalancedStats {
@@ -25,8 +25,11 @@ export const STAT_MAX = 90;
 /** Above / below these the input counts half (soft compression instead of a hard cut). */
 export const STAT_SOFT_HIGH = 80;
 export const STAT_SOFT_LOW = 40;
-/** The five stats share this total (average 80). */
-export const STAT_TOTAL_BUDGET = 400;
+/**
+ * The five stats share this total (user decision: 450, average 90). With STAT_MAX 90 this equals 5 x STAT_MAX, so
+ * the budget only guards against out-of-range input; the per-stat limits and the soft knees do the balancing.
+ */
+export const STAT_TOTAL_BUDGET = 450;
 /** Used when a stat is missing or not a finite number. */
 export const STAT_DEFAULT = 70;
 
