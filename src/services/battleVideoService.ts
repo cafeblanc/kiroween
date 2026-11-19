@@ -23,12 +23,14 @@ export interface BattleStoryActsEn {
 }
 
 /**
- * One multi-shot generation long enough for the 3-act story (LTX-2.5 keeps both creatures consistent across cuts).
- * 12 s at 1080p costs about $1.56 on ltx-2-5-fast; the server allows up to 16 s for a longer try.
+ * One continuous take long enough for every beat (claws, tail, two spinning kicks, head ram and bite, flame cannon).
+ * 16 s is the server maximum; at 1080p on ltx-2-5-fast it costs about $2.08 ($0.13 per second).
  */
-export const BATTLE_VIDEO_SECONDS: LtxDuration = 12;
-/** Must stay under the server's MAX_PROMPT_CHARS (2000). */
-export const MAX_BATTLE_PROMPT_CHARS = 1900;
+export const BATTLE_VIDEO_SECONDS: LtxDuration = 16;
+/** Approximate LTX cost of one battle clip in USD, shown on the buttons. */
+export const BATTLE_VIDEO_COST_USD = Math.round(BATTLE_VIDEO_SECONDS * 0.13 * 100) / 100;
+/** Must stay under the server's MAX_PROMPT_CHARS (2000), with a small margin. */
+export const MAX_BATTLE_PROMPT_CHARS = 1980;
 const MAX_FIGHTER_CHARS = 200;
 const MIN_FIGHTER_CHARS = 30;
 const MAX_STORY_CHARS = 300;
@@ -198,11 +200,12 @@ function composeParts(
     `${tag1} spins a full turn and slams a powerful spinning roundhouse kick into the head of ${tag2}, sending it staggering;`,
     `${tag2} answers with a jumping spinning back kick to the chest of ${tag1};`,
     "these spinning kicks are the heaviest blows, legs in full view (legless creatures spin and strike with tail or tentacles);",
+    `${tag1} rams its head into the torso of ${tag2} and bites deep into its neck;`,
     `the biggest moment: both open their jaws wide and unleash huge roaring flame cannons from their mouths, thick torrents of ${atk1} and ${atk2} held for two full seconds, engulfing each other;`,
     "the torrents collide in a giant fireball that hurls both back; every hit shoves its target back.",
     exchange ? `The exchange: ${exchange}.` : "",
     `Finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
-    "Fast handheld side-on camera, motion blur, photorealistic, no text, no subtitles, no logos.",
+    "Handheld side-on camera, motion blur, photorealistic, no text, no subtitles, no logos.",
   ].filter(Boolean);
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
@@ -218,7 +221,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /** Share of the image height cut from the bottom of each monster image (removes the pollinations.ai watermark). */
 export const FIRST_FRAME_CROP_BOTTOM = 0.1;
-/** Battle clip playback speed: a little faster than real time so the fight feels snappy (12 s -> 10 s). */
+/** Battle clip playback speed: a little faster than real time so the fight feels snappy (16 s -> about 13 s). */
 export const BATTLE_PLAYBACK_RATE = 1.2;
 /** The right fighter is drawn mirrored (images face right), in the first frame and in the arena's right half. */
 export const MIRROR_RIGHT_FIGHTER = true;

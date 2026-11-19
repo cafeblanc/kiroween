@@ -21,7 +21,7 @@ import { ArenaHalf } from "./bioreactor/ArenaHalf";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
-import { BATTLE_PLAYBACK_RATE, BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
+import { BATTLE_PLAYBACK_RATE, BATTLE_VIDEO_COST_USD, BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
 import {
   EMPTY_SLOTS,
   canStartDesignedBattle,
@@ -2874,7 +2874,7 @@ export const BioStitchLabView: React.FC = () => {
                               onClick={handleDuel}
                               title={aiClashUrl
                                 ? (isKo ? "이미 만든 영상이라 무료" : "Already made, free")
-                                : (isKo ? `${BATTLE_VIDEO_SECONDS}초 전투 영상 약 $1.56` : `${BATTLE_VIDEO_SECONDS} s battle video, about $1.56`)}
+                                : (isKo ? `${BATTLE_VIDEO_SECONDS}초 전투 영상 약 $${BATTLE_VIDEO_COST_USD.toFixed(2)}` : `${BATTLE_VIDEO_SECONDS} s battle video, about $${BATTLE_VIDEO_COST_USD.toFixed(2)}`)}
                               className="px-6 py-3 rounded-2xl text-base sm:text-lg font-black text-white bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 shadow-[0_0_30px_rgba(244,63,94,0.6)] motion-safe:animate-pulse"
                             >
                               {aiClashUrl ? (isKo ? "▶ 결투 다시 보기" : "▶ Replay the duel") : (isKo ? "⚔️ 결투" : "⚔️ Duel")}
@@ -2893,7 +2893,7 @@ export const BioStitchLabView: React.FC = () => {
                             muted
                             playsInline
                             controls={battlePhase === "playing"}
-                            // Slightly faster than real time so the fight feels snappy (12 s clip -> 10 s)
+                            // Slightly faster than real time so the fight feels snappy (16 s clip -> about 13 s)
                             onLoadedMetadata={(e) => { e.currentTarget.playbackRate = BATTLE_PLAYBACK_RATE; }}
                             onEnded={() => setBattlePhase("outcome")}
                             className="w-full h-full object-cover"
@@ -3303,8 +3303,8 @@ export const BioStitchLabView: React.FC = () => {
             </div>
             <p className="text-[11px] text-slate-400">
               {isKo
-                ? `머리·팔·다리·꼬리·몸통의 공격과 입 화염포, 꼬리 공격을 자유롭게 고치세요. 편집은 무료이며, 비용은 [전투 영상 생성]을 누를 때만 듭니다 (${BATTLE_VIDEO_SECONDS}초 1편 약 $1.56). 한국어로 고친 내용은 영상 프롬프트용으로 영어로 번역됩니다.`
-                : `Edit the head, arm, leg, tail and torso attacks, the mouth flame cannon and the tail strikes. Editing is free; only [Generate battle video] costs (${BATTLE_VIDEO_SECONDS} s, about $1.56).`}
+                ? `머리·팔·다리·꼬리·몸통의 공격과 입 화염포, 꼬리 공격을 자유롭게 고치세요. 편집은 무료이며, 비용은 [전투 영상 생성]을 누를 때만 듭니다 (${BATTLE_VIDEO_SECONDS}초 1편 약 $${BATTLE_VIDEO_COST_USD.toFixed(2)}). 한국어로 고친 내용은 영상 프롬프트용으로 영어로 번역됩니다.`
+                : `Edit the head, arm, leg, tail and torso attacks, the mouth flame cannon and the tail strikes. Editing is free; only [Generate battle video] costs (${BATTLE_VIDEO_SECONDS} s, about $${BATTLE_VIDEO_COST_USD.toFixed(2)}).`}
             </p>
             {([
               ["act1", isKo ? "1막 · 대치" : "Act 1 · Confrontation"],

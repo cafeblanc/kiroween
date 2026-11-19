@@ -5,6 +5,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import fc from "fast-check";
 import {
   BATTLE_VIDEO_SECONDS,
+  BATTLE_VIDEO_COST_USD,
   FIRST_FRAME_CROP_BOTTOM,
   MAX_BATTLE_PROMPT_CHARS,
   colorWord,
@@ -52,6 +53,7 @@ describe("composeBattleVideoPrompt", () => {
       "whips its massive spiked tail into the head",
       "spins a full turn and slams a powerful spinning roundhouse kick into the head of the toxic green right beast",
       "answers with a jumping spinning back kick to the chest of the crimson red left beast",
+      "rams its head into the torso of the toxic green right beast and bites deep into its neck",
       "unleash huge roaring flame cannons from their mouths",
     ].map((s) => p.indexOf(s));
     expect(order.every((i) => i > 0)).toBe(true);
@@ -282,13 +284,14 @@ describe("containRect", () => {
 });
 
 describe("generateBattleVideo", () => {
-  it("requests a 12 s 16:9 LTX clip and keeps the blob URL for the caller", async () => {
+  it("requests a 16 s 16:9 LTX clip (about $2.08) and keeps the blob URL for the caller", async () => {
     const spy = vi.spyOn(videoGenService, "generateMonsterVideo").mockResolvedValue({ success: true, videoUrl: "blob:x", provider: "ltx" });
     const out = await generateBattleVideo({ f1: fire, f2: xeno, storyEn: story });
-    expect(BATTLE_VIDEO_SECONDS).toBe(12);
+    expect(BATTLE_VIDEO_SECONDS).toBe(16);
+    expect(BATTLE_VIDEO_COST_USD).toBe(2.08);
     expect(out).toEqual({ success: true, videoUrl: "blob:x", mode: "text" });
     const req = spy.mock.calls[0][0];
-    expect(req).toMatchObject({ provider: "ltx", aspect: "16:9", duration: 12, keepBlobUrl: true });
+    expect(req).toMatchObject({ provider: "ltx", aspect: "16:9", duration: 16, keepBlobUrl: true });
     expect(req.image).toBeUndefined(); // no avatar images -> text-to-video
   });
 
