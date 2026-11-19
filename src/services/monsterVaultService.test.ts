@@ -61,6 +61,21 @@ describe('monsterVaultService', () => {
     expect(b.videoUrl).toBeNull();
   });
 
+  it('renameMonster changes only the names and keeps the image, video and save time', async () => {
+    const v = createMonsterVault(asFactory(new FakeFactory()));
+    await v.saveMonster({ id: 'custom_a', meta: { nameKo: '옛 이름', nameEn: 'Old', colorHex: '#f97316' }, image: blob('img', 'image/png'), video: blob('vid') });
+    const before = (await v.getAllMonsters())[0];
+    created.push(before.imageUrl!, before.videoUrl!);
+    expect(await v.renameMonster('custom_a', '새 이름')).toBe(true);
+    const after = (await v.getAllMonsters())[0];
+    created.push(after.imageUrl!, after.videoUrl!);
+    expect(after.meta).toEqual({ nameKo: '새 이름', nameEn: '새 이름', colorHex: '#f97316' });
+    expect(after.imageUrl).toMatch(/^blob:/);
+    expect(after.videoUrl).toMatch(/^blob:/);
+    expect(after.savedAt).toBe(before.savedAt);
+    expect(await v.renameMonster('missing', 'x')).toBe(false);
+  });
+
   it('deleteMonster removes one, clearVault removes everything (both stores)', async () => {
     const v = createMonsterVault(asFactory(new FakeFactory()));
     await v.saveMonster({ id: 'custom_a', meta: {} });

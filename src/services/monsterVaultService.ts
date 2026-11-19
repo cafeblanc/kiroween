@@ -157,6 +157,8 @@ export interface MonsterVault {
   saveMonster(input: VaultMonsterInput): Promise<boolean>;
   getAllMonsters(): Promise<VaultMonster[]>;
   deleteMonster(id: string): Promise<boolean>;
+  /** Changes the Korean and English name; the stored image, video and save time are kept. False when not found. */
+  renameMonster(id: string, name: string): Promise<boolean>;
   clearVault(): Promise<boolean>;
   saveChronicle(input: BattleChronicleInput): Promise<boolean>;
   getChronicles(limit?: number): Promise<BattleChronicle[]>;
@@ -275,6 +277,16 @@ export function createMonsterVault(factory?: IDBFactory | null): MonsterVault {
         return true;
       }, false),
 
+    renameMonster: (id, name) =>
+      run(STORE_MONSTERS, 'readwrite', async (tx) => {
+        const store = tx.objectStore(STORE_MONSTERS);
+        const row = (await reqToPromise(store.get(id))) as StoredMonster | undefined;
+        if (!row) return false;
+        // Same record, same Blobs: only the names change (saveMonster would need the media again)
+        await reqToPromise(store.put({ ...row, meta: { ...row.meta, nameKo: name, nameEn: name } }));
+        return true;
+      }, false),
+
     clearVault: () =>
       run([STORE_MONSTERS, STORE_CHRONICLES], 'readwrite', async (tx) => {
         await Promise.all([
@@ -342,6 +354,7 @@ export const isVaultAvailable = defaultVault.isAvailable;
 export const saveMonster = defaultVault.saveMonster;
 export const getAllMonsters = defaultVault.getAllMonsters;
 export const deleteMonster = defaultVault.deleteMonster;
+export const renameMonster = defaultVault.renameMonster;
 export const clearVault = defaultVault.clearVault;
 export const saveChronicle = defaultVault.saveChronicle;
 export const getChronicles = defaultVault.getChronicles;

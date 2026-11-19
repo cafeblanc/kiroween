@@ -75,6 +75,7 @@ import { GoogleLanguageSelector, getBcp47ForLang } from "./GoogleLanguageSelecto
 import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { resolveBattle, type BattleResult } from "../utils/arenaBattle";
 import { addToRoster, mergeRoster, ownedBlobUrls, vaultToComicMonster } from "../services/customMonsterVaultMapping";
+import MonsterManager from "./bioreactor/MonsterManager";
 
 type LangMode = "KO" | "EN";
 
@@ -279,6 +280,8 @@ export const BioStitchLabView: React.FC = () => {
   // Monster Clash Arena: 설계한 괴수만 서는 두 개의 절반 화면 (왼쪽 / 오른쪽)
   const [arenaSlots, setArenaSlots] = useState<ArenaSlots>(EMPTY_SLOTS);
   const [customArenaRoster, setCustomArenaRoster] = useState<ComicMonster[]>([]);
+  // 괴수 관리 창 (보관함의 괴수 목록: 이름 바꾸기, 삭제, 중복 정리, 내보내기)
+  const [isMonsterManagerOpen, setIsMonsterManagerOpen] = useState<boolean>(false);
   // 결투 영상 단계: 두 괴수 화면 → (생성 중) → 영상 재생 → 결과 표시
   const [battlePhase, setBattlePhase] = useState<"stage" | "playing" | "outcome">("stage");
   const [duelWinnerSide, setDuelWinnerSide] = useState<1 | 2 | null>(null);
@@ -940,6 +943,17 @@ export const BioStitchLabView: React.FC = () => {
       restoredUrlsRef.current = [];
     };
   }, []);
+
+  // 괴수 관리 창에서 지운 괴수는 결투장 목록에서도 빼고(자리도 비워짐: pruneSlots), 그 괴수의 blob: URL을 해제한다
+  const handleManagerDeleted = (ids: string[]) => {
+    const gone = new Set(ids);
+    revokeObjectUrls(ownedBlobUrls(customRosterRef.current.filter((m) => gone.has(m.id))));
+    setCustomArenaRoster((prev) => prev.filter((m) => !gone.has(m.id)));
+  };
+  // 이름을 바꾸면 결투장 목록에도 바로 반영 (영상 프롬프트의 영어 이름도 같은 이름을 쓴다)
+  const handleManagerRenamed = (id: string, name: string) => {
+    setCustomArenaRoster((prev) => prev.map((m) => (m.id === id ? { ...m, nameKo: name, nameEn: name } : m)));
+  };
 
   // 연대기 목록의 괴수 이름 (로스터에서 찾고 없으면 id)
   const nameOfFighter = (id: string): string => {
@@ -2550,6 +2564,13 @@ export const BioStitchLabView: React.FC = () => {
                       </button>
                       <button
                         type="button"
+                        onClick={() => setIsMonsterManagerOpen(true)}
+                        className="bg-amber-900/40 hover:bg-amber-800 text-amber-200 border border-amber-500/50 px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer whitespace-nowrap"
+                      >
+                        🗂️ {isKo ? "괴수 관리" : "Manage"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setIsStitchModalOpen(false)}
                         className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer shrink-0 whitespace-nowrap"
                       >
@@ -3030,6 +3051,16 @@ export const BioStitchLabView: React.FC = () => {
         </div>
       )}
 
+      {/* 괴수 관리: 열 때마다 보관함을 새로 읽는다 (닫으면 그 창이 만든 blob: URL을 해제) */}
+      {isMonsterManagerOpen && (
+        <MonsterManager
+          isKo={isKo}
+          onClose={() => setIsMonsterManagerOpen(false)}
+          onDeleted={handleManagerDeleted}
+          onRenamed={handleManagerRenamed}
+        />
+      )}
+
       {/* 괴수 설계실 (MONSTER DESIGN ROOM): 닫아도 마운트를 유지해 설계 내용과 백그라운드 이미지·영상 작업이 이어진다 */}
       {(
         <div
@@ -3050,13 +3081,22 @@ export const BioStitchLabView: React.FC = () => {
                   {isKo ? "괴수 설계실" : "Monster Design Room"}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsCustomMonsterModalOpen(false)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs px-3 py-1 rounded-lg cursor-pointer transition"
-              >
-                ✕ {isKo ? "닫기" : "Close"}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsMonsterManagerOpen(true)}
+                  className="bg-amber-900/50 hover:bg-amber-800 text-amber-200 border border-amber-500/50 font-bold text-xs px-3 py-1 rounded-lg cursor-pointer transition"
+                >
+                  🗂️ {isKo ? "괴수 관리" : "Manage"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomMonsterModalOpen(false)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs px-3 py-1 rounded-lg cursor-pointer transition"
+                >
+                  ✕ {isKo ? "닫기" : "Close"}
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 sm:p-4">
               <CustomMonsterStudio
