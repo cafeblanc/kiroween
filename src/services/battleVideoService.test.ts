@@ -39,50 +39,61 @@ afterEach(() => vi.restoreAllMocks());
 describe("composeBattleVideoPrompt", () => {
   const p = composeBattleVideoPrompt(fire, xeno, story);
 
-  it("makes every body part fight, with the mouth flame cannon, tail attacks and lasers", () => {
-    for (const word of ["head", "jaws", "clawed arms", "legs", "tail", "torso", "flame cannons from their mouths", "laser beams"]) {
+  it("makes every body part fight, with the mouth flame cannon, tail attacks and spinning kicks", () => {
+    for (const word of ["head", "jaws", "claws", "legs", "tail", "chest", "roundhouse kick", "back kick", "flame cannons from their mouths"]) {
       expect(p).toContain(word);
     }
     expect(p).toMatch(/whips its massive spiked tail/);
   });
 
-  it("varies the attacks beat by beat: claws, tail, hind-leg kick, head ram and bite, mouth fire; no repeats", () => {
+  it("varies the attacks beat by beat: claws, tail, spinning roundhouse, spinning back kick, head ram, mouth fire", () => {
     const order = [
-      "rakes its clawed arms across the face of",
+      "rakes its claws across the face of",
       "whips its massive spiked tail into the head",
-      "kicks the chest of the toxic green right creature with its hind legs",
-      "rams its head into the torso of the crimson red left creature and bites its neck",
-      "both open their jaws and blast flame cannons from their mouths",
+      "spins a full turn and slams a powerful spinning roundhouse kick into the head of the toxic green right beast",
+      "answers with a jumping spinning back kick to the chest of the crimson red left beast",
+      "unleash huge roaring flame cannons from their mouths",
     ].map((s) => p.indexOf(s));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(p).toContain("each beat a different body part, no move repeats");
+    expect(p).toContain("each beat a different body part");
+  });
+
+  it("makes the spinning kicks the heaviest blows, with a fallback for legless creatures", () => {
+    expect(p).toContain("these spinning kicks are the heaviest blows, legs in full view");
+    expect(p).toContain("legless creatures spin and strike with tail or tentacles");
+  });
+
+  it("makes the flame cannon the biggest moment: a long, thick torrent that engulfs and explodes", () => {
+    expect(p).toContain("the biggest moment: both open their jaws wide");
+    expect(p).toContain("thick torrents of molten magma blasts and corrosive acid sprays");
+    expect(p).toContain("held for two full seconds, engulfing each other");
+    expect(p).toContain("the torrents collide in a giant fireball that hurls both back");
   });
 
   it("starts in close combat and stays in contact (no separate dancing, then one clash)", () => {
-    expect(p).toContain("already locked in close combat at the centre from the first second, bodies touching");
-    expect(p).toContain("share one open arena floor");
-    expect(p).toContain("they stay in contact and trade blows nonstop");
+    expect(p).toContain("locked in close combat at the centre from the first second");
+    expect(p).toContain("they stay in contact trading blows nonstop");
     expect(p.indexOf("At once")).toBeLessThan(p.indexOf("whips its massive spiked tail"));
   });
 
   it("keeps the tails the same size all clip long and asks for full speed", () => {
-    expect(p).toContain("long massive tail, the same size all clip long");
-    expect(p).toContain("Full-speed real time, no slow motion, no pauses");
+    expect(p).toContain("long massive tail all clip long");
+    expect(p).toContain("Full speed, no slow motion");
     expect(BATTLE_PLAYBACK_RATE).toBeGreaterThan(1);
     expect(BATTLE_PLAYBACK_RATE).toBeLessThanOrEqual(1.3);
   });
 
   it("aims every attack at the opponent, never at the camera (fighting, not dancing)", () => {
     expect(p).toContain("a wide side view of a dark sci-fi arena");
-    expect(p).toContain("On the left, facing right toward its enemy:");
-    expect(p).toContain("On the right, facing left toward its enemy:");
+    expect(p).toContain("Left, facing right:");
+    expect(p).toContain("Right, facing left:");
     expect(p).toContain("They never face or attack the camera");
     expect(p).toContain("every hit travels sideways into the other's body");
     // who -> direction -> body part hit -> reaction
-    expect(p).toContain("rakes its clawed arms across the face of the toxic green right creature, knocking it back");
-    expect(p).toContain("whips its massive spiked tail into the head of the crimson red left creature");
-    expect(p).toContain("the crimson red left creature with molten magma blasts, the toxic green right creature with corrosive acid sprays and laser beams");
+    expect(p).toContain("rakes its claws across the face of the toxic green right beast");
+    expect(p).toContain("whips its massive spiked tail into the head of the crimson red left beast");
+    expect(p).toContain("engulfing each other");
     expect(p).toContain("every hit shoves its target back.");
     // The edited story still fits in full with normal-length input
     expect(p).toContain("slashes its claws across the titan's torso");
@@ -105,20 +116,20 @@ describe("composeBattleVideoPrompt", () => {
 
   it("is one continuous take with no cuts (cuts let the model re-draw both fighters as the same creature)", () => {
     expect(p).not.toContain("\n");
-    expect(p).toContain("One continuous cinematic take, no cuts");
+    expect(p).toContain("One continuous take, no cuts");
     expect(p).not.toMatch(/\bcuts to\b|hard cut|match cut|dissolve/i);
   });
 
   it("locks each fighter's identity: different colours, never merge or swap", () => {
     expect(p).toContain("Two completely different creatures");
-    expect(p).toContain("they never merge or swap places");
-    expect(p).toContain("the crimson red left creature");
-    expect(p).toContain("the toxic green right creature");
+    expect(p).toContain("they never merge or swap");
+    expect(p).toContain("the crimson red left beast");
+    expect(p).toContain("the toxic green right beast");
   });
 
   it("puts both fighters, the edited exchange and the finish in the prompt", () => {
-    expect(p).toContain("On the left, facing right toward its enemy: Flame Dragon Custom, a crimson red creature: a crimson dragon");
-    expect(p).toContain("On the right, facing left toward its enemy: Xenomorph Bio-Titan, a toxic green creature");
+    expect(p).toContain("Left, facing right: Flame Dragon Custom, a crimson red creature: a crimson dragon");
+    expect(p).toContain("Right, facing left: Xenomorph Bio-Titan, a toxic green creature");
     expect(p).not.toContain("12.");
     expect(p).toContain("slashes its claws across the titan's torso");
     expect(p).toContain("slams it down");
@@ -157,8 +168,8 @@ describe("fighter descriptions stay distinct", () => {
       { id: "custom_2", nameEn: "Leviathan B", promptEn: boiler("a blue void demon with glowing eyes"), colorHex: "#3b82f6" },
       story,
     );
-    expect(a).toContain("On the left, facing right toward its enemy: Dragon A, a crimson red creature: obsidian scales and ember wings.");
-    expect(a).toContain("On the right, facing left toward its enemy: Leviathan B, a deep blue creature: a blue void demon with glowing eyes.");
+    expect(a).toContain("Left, facing right: Dragon A, a crimson red creature: obsidian scales and ember wings.");
+    expect(a).toContain("Right, facing left: Leviathan B, a deep blue creature: a blue void demon with glowing eyes.");
     expect(a).not.toContain("laboratory bioreactor chamber");
   });
 

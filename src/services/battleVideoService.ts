@@ -145,11 +145,15 @@ export function composeBattleVideoPrompt(
   };
   // The fixed direction and "no text" sentences must always fit. Shrink the flexible parts in this order:
   // the exchange, then the finish, then the fighter designs (each step only as far as needed).
-  let ex = MAX_EXCHANGE_CHARS;
-  let fin = MAX_STORY_CHARS;
-  let fig = MAX_FIGHTER_CHARS;
+  // Start each cap at the text's real length, so every shrink step actually removes characters.
+  let ex = toPromptText(storyEn.act2_clash, MAX_EXCHANGE_CHARS).length;
+  let fin = Math.max(MIN_FINISH_CHARS, toPromptText(storyEn.act3_finish, MAX_STORY_CHARS).length);
+  let fig = Math.max(
+    MIN_FIGHTER_CHARS,
+    ...[f1, f2].map((f) => toPromptText(designFromImagePrompt(f.promptEn), MAX_FIGHTER_CHARS).length),
+  );
   let prompt = build(ex, fin, fig);
-  for (let i = 0; i < 20 && prompt.length > MAX_BATTLE_PROMPT_CHARS; i++) {
+  for (let i = 0; i < 40 && prompt.length > MAX_BATTLE_PROMPT_CHARS; i++) {
     const over = prompt.length - MAX_BATTLE_PROMPT_CHARS + 10;
     if (ex > 20) ex = Math.max(0, ex - over);
     else if (fin > MIN_FINISH_CHARS) fin = Math.max(MIN_FINISH_CHARS, fin - over);
@@ -172,9 +176,9 @@ function composeParts(
 ): string {
   const c1 = colorWord(f1.colorHex);
   const c2 = colorWord(f2.colorHex);
-  // Short visual tags reused in every sentence so the model keeps the two creatures apart ("the crimson red left creature").
-  const tag1 = `the ${c1 && c1 !== c2 ? `${c1} ` : ""}left creature`;
-  const tag2 = `the ${c2 && c2 !== c1 ? `${c2} ` : ""}right creature`;
+  // Short visual tags reused in every sentence so the model keeps the two creatures apart ("the crimson red left beast").
+  const tag1 = `the ${c1 && c1 !== c2 ? `${c1} ` : ""}left beast`;
+  const tag2 = `the ${c2 && c2 !== c1 ? `${c2} ` : ""}right beast`;
   // One continuous take (no cuts): the LTX guide recommends it for image-to-video, and cuts let the model re-draw
   // both fighters from text, which turned two different designs into the same creature.
   // Every attack names who attacks, the direction (across the arena), the body part it hits and the reaction:
@@ -182,18 +186,20 @@ function composeParts(
   void n1;
   void n2;
   const parts = [
-    "One continuous cinematic take, no cuts, from the first frame: a wide side view of a dark sci-fi arena.",
-    "Two completely different creatures share one open arena floor, already locked in close combat at the centre from the first second, bodies touching.",
-    `On the left, facing right toward its enemy: ${describeBattleFighter(f1, "the left monster", fighterChars)}.`,
-    `On the right, facing left toward its enemy: ${describeBattleFighter(f2, "the right monster", fighterChars)}.`,
-    "Each keeps its own colours, shape and long massive tail, the same size all clip long; they never merge or swap places.",
+    "One continuous take, no cuts: a wide side view of a dark sci-fi arena.",
+    "Two completely different creatures, locked in close combat at the centre from the first second.",
+    `Left, facing right: ${describeBattleFighter(f1, "the left monster", fighterChars)}.`,
+    `Right, facing left: ${describeBattleFighter(f2, "the right monster", fighterChars)}.`,
+    "Each keeps its own colours, shape and long massive tail all clip long; they never merge or swap.",
     "They never face or attack the camera; every hit travels sideways into the other's body.",
-    "Full-speed real time, no slow motion, no pauses; they stay in contact and trade blows nonstop, each beat a different body part, no move repeats.",
-    `At once ${tag1} rakes its clawed arms across the face of ${tag2}, knocking it back;`,
-    `${tag2} spins and whips its massive spiked tail into the head of ${tag1};`,
-    `${tag1} leaps and kicks the chest of ${tag2} with its hind legs;`,
-    `${tag2} rams its head into the torso of ${tag1} and bites its neck;`,
-    `both open their jaws and blast flame cannons from their mouths at each other, ${tag1} with ${atk1}, ${tag2} with ${atk2} and laser beams; every hit shoves its target back.`,
+    "Full speed, no slow motion; they stay in contact trading blows nonstop, each beat a different body part.",
+    `At once ${tag1} rakes its claws across the face of ${tag2};`,
+    `${tag2} whips its massive spiked tail into the head of ${tag1};`,
+    `${tag1} spins a full turn and slams a powerful spinning roundhouse kick into the head of ${tag2}, sending it staggering;`,
+    `${tag2} answers with a jumping spinning back kick to the chest of ${tag1};`,
+    "these spinning kicks are the heaviest blows, legs in full view (legless creatures spin and strike with tail or tentacles);",
+    `the biggest moment: both open their jaws wide and unleash huge roaring flame cannons from their mouths, thick torrents of ${atk1} and ${atk2} held for two full seconds, engulfing each other;`,
+    "the torrents collide in a giant fireball that hurls both back; every hit shoves its target back.",
     exchange ? `The exchange: ${exchange}.` : "",
     `Finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
     "Fast handheld side-on camera, motion blur, photorealistic, no text, no subtitles, no logos.",
