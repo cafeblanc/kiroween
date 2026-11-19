@@ -9,6 +9,7 @@ import {
   type BattleResult,
   type CombatStats,
 } from '../utils/arenaBattle';
+import { signatureFor, type SignatureMoves } from '../data/monsterSignatures';
 
 export interface StoryFighter {
   nameKo: string;
@@ -20,6 +21,8 @@ export interface StoryFighter {
   customStats?: Partial<CombatStats>;
   /** Studio body-part text (Korean, as typed). Each part gets a role in the fight. */
   bodyParts?: Partial<Record<StoryPartKey, string>>;
+  /** Preset id for the finisher and defence (ComicMonster.signatureId); names are matched when missing. */
+  signatureId?: string;
 }
 
 export type StoryPartKey = 'head' | 'hornsOrCrown' | 'torso' | 'arms' | 'legs' | 'tail' | 'auraAndSkin';
@@ -123,6 +126,8 @@ interface Side {
   hasParts: boolean;
   /** Short Korean noun phrase per part ("용암 비늘 꼬리"), or the generic noun when the part was not designed. */
   part: Record<'head' | 'arms' | 'legs' | 'tail' | 'torso', string>;
+  /** Finisher and defence (from the preset the monster was designed from). */
+  sig: SignatureMoves;
 }
 
 const GENERIC_PART_KO = { head: '머리', arms: '팔', legs: '다리', tail: '꼬리', torso: '몸통' } as const;
@@ -228,6 +233,7 @@ const gwa = (w: string) => `${w}${withParticle(w)}`;
 function toSide(f: StoryFighter, fallbackNo: 1 | 2): Side {
   const bp = f.bodyParts ?? {};
   return {
+    sig: signatureFor({ signatureId: f.signatureId, nameKo: f.nameKo, nameEn: f.nameEn }),
     ko: cleanStoryName(f.nameKo, `괴수 ${fallbackNo}`),
     en: cleanStoryName(f.nameEn, `Fighter ${fallbackNo}`),
     partsKo: cleanParts(f.partsKo),
@@ -288,6 +294,14 @@ function clashLine(l: Lang, ev: BattleEvent | undefined, s1: Side, s2: Side): st
   return `💥 Head-on clash: ${s1.en} and ${s2.en} open their jaws and fire flame cannons at each other as laser beams cross and a shockwave erupts${skill}`;
 }
 
+/** The loser's signature defence holds against one of the winner's attacks. */
+function defenseLine(l: Lang, winner: Side, loser: Side): string {
+  if (l === 'ko') {
+    return `🛡️ 방어 특기 「${loser.sig.defenseKo}」! ${iga(loser.ko)} ${winner.ko}의 맹공을 한 번 버텨 낸다!`;
+  }
+  return `🛡️ Defence — ${loser.sig.defenseEn}! ${loser.en} survives ${winner.en}'s onslaught, ${loser.sig.defenseActionEn}!`;
+}
+
 function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner' | 'firstAttacker' | 'events'>): StoryActs {
   const sides = { 1: s1, 2: s2 } as const;
   const first = sides[battle.firstAttacker];
@@ -316,22 +330,23 @@ function compose(l: Lang, s1: Side, s2: Side, battle: Pick<BattleResult, 'winner
           `${s1.en} ${epi(s1)} while ${s2.en} ${epi(s2)}; their clashing bio-energy crackles in the air.`,
         ];
 
+  // The loser's defence holds once (the fight stays close); the winner's finisher decides it.
   const act2 = [
     strikeLine(l, ev0, first, second, 'first'),
     strikeLine(l, ev1, second, first, 'counter'),
     clashLine(l, evClash, s1, s2),
+    defenseLine(l, winner, loser),
   ];
 
-  // Finish: legs leap, tail coils and slams, then a mouth flame cannon into the sky as the victory roar
   const act3 =
     l === 'ko'
       ? [
-          `💀 ${iga(winner.ko)} ${ro(winner.part.legs)} 뛰어올라 ${ro(winner.part.tail)} ${loser.ko}의 ${eul(loser.part.torso)} 감아 내리꽂는다 — K.O.!`,
-          `🏆 ${iga(winner.ko)} ${eul(winner.part.head)} 치켜들고 하늘로 화염포를 뿜으며 포효한다!`,
+          `💀 필살기 「${winner.sig.finisherKo}」! ${iga(winner.ko)} ${ro(winner.part.legs)} 땅을 박차고 남은 힘을 모두 모아 ${eul(loser.ko)} 쓰러뜨린다 — K.O.!`,
+          `🏆 ${iga(winner.ko)} ${eul(winner.part.head)} 치켜들고 승리의 포효를 터뜨린다!`,
         ]
       : [
-          `💀 ${winner.en} leaps on its legs, coils its tail around ${loser.en}'s torso and slams it into the ground — K.O.!`,
-          `🏆 ${winner.en} raises its head and blasts a flame cannon into the sky with a victory roar!`,
+          `💀 Finisher — ${winner.sig.finisherEn}! ${winner.en} springs off its legs and ends it, ${winner.sig.finisherActionEn}, and ${loser.en} goes down — K.O.!`,
+          `🏆 ${winner.en} raises its head with a victory roar!`,
         ];
 
   return { act1: act1.join('\n'), act2_clash: act2.join('\n'), act3_finish: act3.join('\n') };
@@ -362,6 +377,8 @@ export interface StoryMonsterSource {
   promptEn?: string;
   customStats?: Partial<CombatStats>;
   bodyParts?: Partial<Record<StoryPartKey, string>>;
+  signatureId?: string;
+  id?: string;
 }
 
 export function toStoryFighter(m: StoryMonsterSource): StoryFighter {
@@ -372,5 +389,7 @@ export function toStoryFighter(m: StoryMonsterSource): StoryFighter {
     partsEn: m.promptEn,
     customStats: m.customStats,
     bodyParts: m.bodyParts,
+    // A preset monster's own id is its signature id
+    signatureId: m.signatureId ?? m.id,
   };
 }

@@ -291,6 +291,7 @@ export const CustomMonsterStudio: React.FC<CustomMonsterStudioProps> = ({
     // English for the video model: the translated image prompt when available (longPrompt is the Korean design text)
     promptEn: `${enPrompt || longPrompt}\n[Combat Stats: ATK ${bioStats.atk}, DEF ${bioStats.def}, SPD ${bioStats.spd}, REGEN ${bioStats.regen}, ENERGY ${bioStats.energy}]`,
     bodyParts: { ...parts },
+    signatureId: selectedPreset.id,
     promptKo: `${longPrompt}\n[전투 능력치: 공격력 ${bioStats.atk}, 방어력 ${bioStats.def}, 속도 ${bioStats.spd}, 재생력 ${bioStats.regen}, 에너지 ${bioStats.energy}]`,
     avatarImg: image,
     jumpscareImg: image,

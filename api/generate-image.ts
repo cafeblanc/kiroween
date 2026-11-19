@@ -50,7 +50,10 @@ export default async function handler(req: any, res: any): Promise<any> {
     return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
   }
 
-  const { prompt, seed = 0 } = req.body || {};
+  const { prompt, seed = 0, negative } = req.body || {};
+  if (negative !== undefined && typeof negative !== "string") {
+    return res.status(400).json({ error: "negative must be a string" });
+  }
   if (typeof prompt !== "string" || !prompt.trim()) return res.status(400).json({ error: "Prompt is required" });
   if (prompt.length > MAX_IMAGE_PROMPT_CHARS) {
     return res.status(400).json({ error: `Prompt must be at most ${MAX_IMAGE_PROMPT_CHARS} characters` });
@@ -67,7 +70,8 @@ export default async function handler(req: any, res: any): Promise<any> {
     const up = await fetch(HF_IMAGE_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "image/jpeg" },
-      body: hfImageRequestBody(prompt, seed),
+      // The extra negative terms are sanitised (ASCII, bounded) inside hfImageRequestBody.
+      body: hfImageRequestBody(prompt, seed, negative),
       signal: controller.signal,
     });
     const type = (up.headers.get("content-type") || "").split(";")[0];

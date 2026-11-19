@@ -9,12 +9,15 @@
 import { detectArenaElement, type ArenaElement, type ElementSource } from "../utils/arenaBattle";
 import { plainStoryText } from "../components/bioreactor/arena/clashPrompt";
 import { IMAGE_PROMPT_HEAD } from "./customMonsterMediaService";
+import { signatureFor } from "../data/monsterSignatures";
 import { generateMonsterVideo } from "./videoGenService";
 import type { LtxDuration, LtxJobStatus } from "./ltxJobClient";
 
 export interface BattleVideoFighter extends ElementSource {
   nameEn: string;
   avatarImg?: string;
+  /** Preset id for the finisher and defence (ComicMonster.signatureId). */
+  signatureId?: string;
 }
 
 export interface BattleStoryActsEn {
@@ -134,6 +137,8 @@ export function composeBattleVideoPrompt(
   f1: BattleVideoFighter,
   f2: BattleVideoFighter,
   storyEn: BattleStoryActsEn,
+  /** Who wins (resolveBattle): the winner's finisher and the loser's defence go into the climax. */
+  winner?: 1 | 2,
 ): string {
   const n1 = cleanName(f1.nameEn, "the left monster");
   const n2 = cleanName(f2.nameEn, "the right monster");
@@ -143,7 +148,7 @@ export function composeBattleVideoPrompt(
   const build = (exchangeChars: number, finishChars: number, fighterChars: number) => {
     const exchange = exchangeChars > 20 ? toPromptText(storyEn.act2_clash, exchangeChars) : "";
     const finish = toPromptText(storyEn.act3_finish, finishChars);
-    return composeParts(f1, f2, n1, n2, atk1, atk2, exchange, finish, fighterChars);
+    return composeParts(f1, f2, n1, n2, atk1, atk2, exchange, finish, fighterChars, winner);
   };
   // The fixed direction and "no text" sentences must always fit. Shrink the flexible parts in this order:
   // the exchange, then the finish, then the fighter designs (each step only as far as needed).
@@ -165,6 +170,35 @@ export function composeBattleVideoPrompt(
   return prompt.slice(0, MAX_BATTLE_PROMPT_CHARS);
 }
 
+/**
+ * The last beats. With a known winner: a short mouth-fire exchange, the loser's signature defence holding once, then
+ * the winner's signature finisher as the biggest moment (the fight is won with it). Without one: both fire flame
+ * cannons that collide.
+ */
+function climax(
+  f1: BattleVideoFighter,
+  f2: BattleVideoFighter,
+  tag1: string,
+  tag2: string,
+  atk1: string,
+  atk2: string,
+  winner?: 1 | 2,
+): string[] {
+  if (winner !== 1 && winner !== 2) {
+    return [
+      `the biggest moment: both open their jaws wide and unleash huge roaring flame cannons from their mouths, thick torrents of ${atk1} and ${atk2} held for two full seconds, engulfing each other;`,
+      "the torrents collide in a giant fireball that hurls both back; every hit shoves its target back.",
+    ];
+  }
+  const [wf, lf, wTag, lTag] = winner === 1 ? [f1, f2, tag1, tag2] : [f2, f1, tag2, tag1];
+  const ws = signatureFor(wf);
+  const ls = signatureFor(lf);
+  return [
+    `${lTag} survives one blow with its defence, ${ls.defenseEn}, ${ls.defenseActionEn};`,
+    `then the biggest moment, held for two full seconds: ${wTag} unleashes its finisher, ${ws.finisherEn}, ${ws.finisherActionEn}; every hit shoves its target back.`,
+  ];
+}
+
 function composeParts(
   f1: BattleVideoFighter,
   f2: BattleVideoFighter,
@@ -175,6 +209,7 @@ function composeParts(
   exchange: string,
   finish: string,
   fighterChars: number,
+  winner?: 1 | 2,
 ): string {
   const c1 = colorWord(f1.colorHex);
   const c2 = colorWord(f2.colorHex);
@@ -201,8 +236,7 @@ function composeParts(
     `${tag2} answers with a jumping spinning back kick to the chest of ${tag1};`,
     "these spinning kicks are the heaviest blows, legs in full view (legless creatures spin and strike with tail or tentacles);",
     `${tag1} rams its head into the torso of ${tag2} and bites deep into its neck;`,
-    `the biggest moment: both open their jaws wide and unleash huge roaring flame cannons from their mouths, thick torrents of ${atk1} and ${atk2} held for two full seconds, engulfing each other;`,
-    "the torrents collide in a giant fireball that hurls both back; every hit shoves its target back.",
+    ...climax(f1, f2, tag1, tag2, atk1, atk2, winner),
     exchange ? `The exchange: ${exchange}.` : "",
     `Finish: ${finish || "the winner coils its tail around the loser and slams it down"}.`,
     "Handheld side-on camera, motion blur, photorealistic, no text, no subtitles, no logos.",
@@ -421,13 +455,15 @@ export async function generateBattleVideo(params: {
   f1: BattleVideoFighter;
   f2: BattleVideoFighter;
   storyEn: BattleStoryActsEn;
+  /** Who wins the planned battle: the winner's finisher ends the clip. */
+  winner?: 1 | 2;
   signal?: AbortSignal;
   onStatus?: (status: LtxJobStatus, elapsedMs: number) => void;
 }): Promise<BattleVideoResult> {
-  const { f1, f2, storyEn, signal, onStatus } = params;
+  const { f1, f2, storyEn, winner, signal, onStatus } = params;
   const frame = f1.avatarImg && f2.avatarImg ? await composeBattleFirstFrame(f1.avatarImg, f2.avatarImg) : null;
   const res = await generateMonsterVideo({
-    prompt: composeBattleVideoPrompt(f1, f2, storyEn),
+    prompt: composeBattleVideoPrompt(f1, f2, storyEn, winner),
     provider: "ltx",
     image: frame ?? undefined,
     aspect: "16:9",

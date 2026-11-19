@@ -604,6 +604,7 @@ export const BioStitchLabView: React.FC = () => {
         f1,
         f2,
         storyEn: await storyEnForVideo(planned),
+        winner: planned.battle.winner,
         signal: controller.signal,
       });
       const safe = res.success && res.videoUrl ? sanitizeVideoUrl(res.videoUrl) : null;

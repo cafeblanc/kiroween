@@ -14,10 +14,12 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 $picks = @(
   @('myth_dragon',       (Join-Path $check 'myth_dragon.hf1.jpg'),       $true,  0.06),
   @('myth_kraken',       (Join-Path $check 'myth_kraken.hf1.jpg'),       $false, 0.06),
-  @('alien_xenomorph',   (Join-Path $check 'alien_xenomorph.hf2.jpg'),   $true,  0.06),
-  @('alien_void_slug',   (Join-Path $check 'alien_void_slug.hf1.jpg'),   $true,  0.06),
-  @('myth_frankenstein', (Join-Path $check 'myth_frankenstein.hf1.jpg'), $false, 0.06),
-  @('human_prometheus',  (Join-Path $check 'human_prometheus.hf2.jpg'),  $false, 0.06)
+  # Design round (scripts/image-check/design/board.html), confirmed by the user:
+  # Silokrax r3 #2, Bornyx r3 #1, Frankenstein r5 #2, Homo Prometheus r5 #1
+  @('alien_xenomorph',   (Join-Path $check 'design\silokrax_r3_2.jpg'),      $false, 0.06),
+  @('alien_void_slug',   (Join-Path $check 'design\bornyx_r3_1.jpg'),        $true,  0.06),
+  @('myth_frankenstein', (Join-Path $check 'design\frankenstein2_r5_2.jpg'), $false, 0.06),
+  @('human_prometheus',  (Join-Path $check 'design\prometheus3_r5_1.jpg'),   $false, 0.06)
 )
 $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
 $params = New-Object System.Drawing.Imaging.EncoderParameters 1

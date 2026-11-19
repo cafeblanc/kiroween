@@ -96,6 +96,7 @@ export function vaultToComicMonster(v: VaultMonster): ComicMonster | null {
     funFactKo: str(m.funFactKo),
     funFactEn: str(m.funFactEn),
     ...(bodyParts ? { bodyParts } : {}),
+    ...(str(m.signatureId) ? { signatureId: str(m.signatureId) } : {}),
     ...(stats
       ? {
           // Older records may hold stats from before the balance (e.g. 99 everywhere): enforce the limits on load

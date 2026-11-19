@@ -44,31 +44,31 @@ export const REAL_STEM_CELL_PHOTOS: RealStemCellPhoto[] = [
   },
   {
     id: "photo_03_alien_xenomorph",
-    titleKo: "03. [외계 괴수] 제노모프 바이오 타이탄",
-    titleEn: "03. [Alien] Xenomorph Bio-Titan",
+    titleKo: "03. [외계 괴수] 실로크락스",
+    titleEn: "03. [Alien] Silokrax",
     categoryKo: "외계 괴수 1",
     categoryEn: "Alien Beast 1",
-    descriptionKo: "키틴질 외골격과 초강산 내성 혈관 조직을 결합해 성간 포식자 제노모프 타이탄을 배양합니다.",
-    descriptionEn: "Splices chitinous exoskeleton with hyper-acidic vascular endothelium to culture a Xenomorph Bio-Titan.",
+    descriptionKo: "탄소 대신 규소–산소 사슬을 뼈대로 삼은 결정 생명체를 고온 배양기에서 키웁니다.",
+    descriptionEn: "Grows a crystal life form built on silicon-oxygen chains instead of carbon, in a high-temperature vat.",
     imgSrc: "/images/samples/alien_xenomorph.jpg",
     targetMonsterId: "alien_xenomorph",
-    targetMonsterName: "제노모프 바이오 타이탄",
+    targetMonsterName: "실로크락스",
     magnification: "1500x",
-    stainType: "Chitin SEM"
+    stainType: "Silicate SEM"
   },
   {
     id: "photo_04_alien_void",
-    titleKo: "04. [외계 괴수] 심우주 보이드 레비아탄",
-    titleEn: "04. [Alien] Void Abyss Leviathan",
+    titleKo: "04. [외계 괴수] 보르닉스",
+    titleEn: "04. [Alien] Bornyx",
     categoryKo: "외계 괴수 2",
     categoryEn: "Alien Beast 2",
-    descriptionKo: "생체 발광 효소와 반투명 유영 조직을 미세 유체 배양기에서 증식시켜 심우주 보이드 괴수를 배양합니다.",
-    descriptionEn: "Cultures bio-photonic translucent tissues inside a microfluidic chamber into a Void Abyss Leviathan.",
+    descriptionKo: "붕소–질소 쌍으로 탄소 구조를 흉내 낸 육각 세라믹 생명체를 고압 배양기에서 키웁니다.",
+    descriptionEn: "Grows a hexagonal ceramic life form whose boron-nitrogen pairs mimic carbon structures, in a high-pressure vat.",
     imgSrc: "/images/samples/alien_void_slug.jpg",
     targetMonsterId: "alien_void_slug",
-    targetMonsterName: "보이드 아비스 레비아탄",
+    targetMonsterName: "보르닉스",
     magnification: "150x",
-    stainType: "Bioluminescence"
+    stainType: "Boron-Nitride XRD"
   },
   {
     id: "photo_05_frankenstein",

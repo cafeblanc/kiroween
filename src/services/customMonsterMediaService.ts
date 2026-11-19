@@ -2,7 +2,7 @@ import { assertAllowedApiEndpoint, sanitizeVideoUrl } from "../utils/security";
 import { translateTextToLanguage } from "./scienceStitchService";
 import { generateMonsterVideo } from "./videoGenService";
 import { LTX_MAX_WAIT_MS, prepareImageForLtx } from "./ltxJobClient";
-import { HF_IMAGE_URL, MAX_IMAGE_PROMPT_CHARS, hfImageRequestBody } from "../utils/hfImage";
+import { HF_IMAGE_URL, MAX_IMAGE_PROMPT_CHARS, hfImageRequestBody, sanitizeNegativeExtra } from "../utils/hfImage";
 import { balanceStats } from "../utils/statBalance";
 
 export interface MonsterBodyParts {
@@ -22,6 +22,16 @@ export interface MonsterStudioPreset {
   icon: string;
   colorHex: string;
   baseImageSrc: string;
+  /**
+   * Extra things the image must not show for this body plan (HuggingFace negative prompt), e.g. legs on a kraken.
+   * Applies to the sample image and to every monster designed from this preset.
+   */
+  negativeExtra?: string;
+  /**
+   * English body plan for the image prompt, replacing the default standing "battle stance, head to toe" (which turned
+   * every creature into a two-legged brute). Only for presets whose body is not built that way.
+   */
+  bodyPlanEn?: string;
   defaultParts: MonsterBodyParts;
 }
 
@@ -50,6 +60,7 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     icon: "🐙",
     colorHex: "#8b5cf6",
     baseImageSrc: "/images/samples/myth_kraken.jpg",
+    negativeExtra: "legs, feet, claws, paws, lizard, reptile, dinosaur, humanoid",
     defaultParts: {
       head: "거대한 대왕문어의 부풀어 오른 보라색 머리와 노랗게 빛나는 커다란 눈 두 개, 촉수 가운데 숨은 날카로운 부리",
       hornsOrCrown: "머리 위로 솟은 보랏빛 발광 가시 볏",
@@ -61,37 +72,46 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     },
   },
   {
+    // Silicon-based life (the id is kept so saved monsters and links stay valid): quartz and silicate crystal body.
     id: "alien_xenomorph",
-    nameKo: "제노모프 바이오 타이탄",
-    nameEn: "Xenomorph Bio-Titan",
-    icon: "👽",
-    colorHex: "#10b981",
+    nameKo: "실로크락스",
+    nameEn: "Silokrax",
+    icon: "💎",
+    colorHex: "#3b82f6",
     baseImageSrc: "/images/samples/alien_xenomorph.jpg",
+    negativeExtra:
+      "flesh, skin, fur, feathers, blood, veins, dragon, wings, robot, mecha, machine, mechanical joints, armor suit, humanoid, rhinoceros, mammal",
+    bodyPlanEn:
+      "a crouching silicon-based crystal war beast on four clawed crystal limbs, its back a bristling mass of long crystal lances, lunging forward to strike",
     defaultParts: {
-      head: "뒤로 길게 뻗은 매끈한 검은 두개골과 눈 없는 얼굴, 은빛 이빨 사이로 나오는 작은 안쪽 턱",
-      hornsOrCrown: "등을 따라 솟은 검은 관 모양 돌기 네 개",
-      torso: "갈비뼈 모양 외골격이 드러난 마르고 긴 검은 몸통",
-      arms: "긴 손가락 끝에 면도날 발톱이 달린 가늘고 긴 팔",
-      legs: "역관절로 꺾인 길고 날렵한 다리",
-      tail: "끝에 칼날이 달린 길고 마디진 검은 꼬리",
-      auraAndSkin: "형광 연두색 산성 침이 흐르는 젖은 흑요석 키틴 외피",
+      head: "얼굴 한가운데가 용광로처럼 주황빛으로 타오르는 쐐기 모양 결정 머리와 녹은 유리를 흘리는 입",
+      hornsOrCrown: "등과 어깨를 빽빽하게 뒤덮은 길고 날카로운 푸른 수정 창 무리",
+      torso: "수정과 규산염 결정판이 겹겹이 자라난 육중한 몸통, 속에서 하얗게 달아오른 결정 격자",
+      arms: "결정 발톱이 달린 굵은 앞다리",
+      legs: "땅을 움켜쥐고 웅크린 결정 뒷다리",
+      tail: "끝에 수정 칼날이 달린 마디진 결정 꼬리",
+      auraAndSkin: "결정 사이로 튀는 압전 번개와 관절에서 흘러내리는 모래",
     },
   },
   {
+    // Boron-nitride life (id kept, see above): interlocking hexagonal mineral plates, blade legs, nitrogen plasma.
     id: "alien_void_slug",
-    nameKo: "보이드 어비스 레비아탄",
-    nameEn: "Void Abyss Leviathan",
-    icon: "🛸",
-    colorHex: "#06b6d4",
+    nameKo: "보르닉스",
+    nameEn: "Bornyx",
+    icon: "⬢",
+    colorHex: "#e2e8f0",
     baseImageSrc: "/images/samples/alien_void_slug.jpg",
+    negativeExtra:
+      "flesh, skin, fur, feathers, scales, blood, veins, dragon, wings, insect, bug, woodlouse, centipede, larva, worm, robot, mecha, machine, mechanical joints, armor suit, humanoid, standing upright",
+    bodyPlanEn: "a low flat boron-nitride predator crouched to pounce on six long scythe-shaped blade legs",
     defaultParts: {
-      head: "빛나는 시안색 눈 여섯 개와 바늘 이빨이 겹겹이 늘어선 거대한 입을 벌린 바다뱀 머리",
-      hornsOrCrown: "머리 뒤로 뻗은 반투명 발광 가시 지느러미 왕관",
-      torso: "S자로 크게 휘감긴 길고 굵은 반투명 바다뱀 몸통, 속에서 빛나는 장기가 비침",
-      arms: "몸통 앞쪽 양옆에서 펼쳐진 날개 같은 거대한 가슴지느러미 한 쌍",
-      legs: "몸통 아래를 따라 이어진 물결치는 긴 지느러미",
-      tail: "끝이 넓은 노처럼 퍼진 길고 반투명한 꼬리지느러미",
-      auraAndSkin: "깊은 바닷속 어둠에서 시안색과 에메랄드색으로 빛나는 반투명한 푸른 비늘 피부",
+      head: "네 갈래 칼날 턱으로 갈라지는 쐐기 모양 머리와 푸르게 타오르는 자외선 눈",
+      hornsOrCrown: "등을 따라 솟은 흰 육각 광물판 가시",
+      torso: "흰색과 옅은 푸른색 육각 광물판이 벌집처럼 맞물린 낮고 납작한 몸통",
+      arms: "강철도 베는 입방정 질화붕소 낫 모양 칼날 앞다리",
+      legs: "몸을 낮게 받치는 여섯 개의 긴 칼날 다리",
+      tail: "육각 마디가 쌓인 채찍 꼬리와 끝의 창날",
+      auraAndSkin: "판 사이로 새어 나오는 푸른 질소 플라스마",
     },
   },
   {
@@ -99,16 +119,19 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     nameKo: "모던 바이오 프랑켄슈타인",
     nameEn: "Modern Bio-Frankenstein",
     icon: "🧟",
-    colorHex: "#38bdf8",
+    colorHex: "#67e8f9",
     baseImageSrc: "/images/samples/myth_frankenstein.jpg",
+    // A bright green giant came out as the Hulk: milky translucent skin with a cyan glow instead.
+    negativeExtra:
+      "green skin, hulk, cartoon, comic, toy, crude stitches, staples, rotten, zombie, blood, gore, robot, armor suit",
     defaultParts: {
-      head: "평평하고 각진 이마에 굵은 수술 봉합선이 있는 창백한 거인 괴물의 얼굴과 빛나는 주황색 눈",
-      hornsOrCrown: "목을 감싼 푸른빛 금속 전극 고리와 케이블",
-      torso: "흉터와 봉합선으로 이어 붙인 근육질 거구 상체",
-      arms: "봉합선과 금속 고리가 감긴 굵고 긴 팔과 큰 주먹",
-      legs: "검은 바지를 입은 굵은 다리",
-      tail: "등에서 늘어진 굵은 전선 케이블",
-      auraAndSkin: "창백한 회녹색 피부 주위로 튀는 푸른 번개 줄기",
+      head: "위가 평평한 네모난 머리와 각진 큰 턱, 번쩍이는 티타늄 이빨",
+      hornsOrCrown: "목과 관자놀이를 가로지르는 가늘고 말끔한 은빛 꿰맨 선",
+      torso: "속이 은은하게 비치는 우유빛 반투명 피부의 거대한 상체, 가슴을 가로지르는 은빛 꿰맨 선",
+      arms: "몸에 비해 거대한 두 주먹을 단 굵은 팔",
+      legs: "검은 바지와 거대하고 무거운 발",
+      tail: "등을 따라 흐르는 청록빛 혈관",
+      auraAndSkin: "속에서 청록빛이 은은하게 발광하는 반투명 피부와 청록빛 조직으로 즉시 메워지는 상처의 김",
     },
   },
   {
@@ -118,14 +141,18 @@ export const MONSTER_STUDIO_PRESETS: MonsterStudioPreset[] = [
     icon: "🧬",
     colorHex: "#34d399",
     baseImageSrc: "/images/samples/human_prometheus.jpg",
+    negativeExtra:
+      "bulky, fat, bodybuilder, cartoon, superhero costume, cape, mask, clothes, armor suit, robot, helmet, photo of a person",
+    bodyPlanEn:
+      "a tall athletic enhanced human warrior with broad shoulders and dense sinewy muscle, in a low wide attack stance with one arm thrust forward",
     defaultParts: {
-      head: "빛나는 에메랄드색 눈과 강철 같은 턱을 가진 민머리 강화 인간 전사의 머리",
-      hornsOrCrown: "관자놀이에서 뒤로 뻗은 금빛 금속 센서 돌기",
-      torso: "가슴 한가운데 빛나는 인공 심장이 비치는 투명 흉갑을 두른 근육질 상체",
-      arms: "주먹에 생체 강철 너클이 돋은 굵은 근육질 양팔",
-      legs: "무릎 장갑을 두른 탄탄한 근육질 두 다리",
-      tail: "척추를 따라 빛나는 에메랄드색 줄",
-      auraAndSkin: "녹색 빛 혈관이 비치는 반투명한 합성 피부",
+      head: "송곳니를 드러내고 포효하는 사나운 얼굴, 빛나는 에메랄드 눈의 민머리",
+      hornsOrCrown: "목과 어깨를 따라 흐르는 에메랄드 에너지 줄기",
+      torso: "넓은 어깨와 철사 같은 근육, 가슴 속에서 빛나는 인공 심장",
+      arms: "강철 케이블처럼 길게 늘어나는 팔과 금빛 너클이 박힌 주먹",
+      legs: "낮게 버틴 길고 단단한 두 다리",
+      tail: "척추를 따라 빛나는 에메랄드 줄",
+      auraAndSkin: "미세한 육각 무늬가 새겨진 흑연빛 갑각 피부와 주먹에서 터지는 초록 에너지",
     },
   },
 ];
@@ -351,6 +378,8 @@ export function composeEnglishMonsterPrompt(
   presetNameEn: string,
   translatedDescription: string,
   stats?: MonsterCombatStats,
+  /** The preset's body plan (MonsterStudioPreset.bodyPlanEn); replaces the standing battle stance. */
+  bodyPlanEn?: string,
 ): string {
   const design = cutAtWord(
     stripPartLabels(translatedDescription)
@@ -363,11 +392,15 @@ export function composeEnglishMonsterPrompt(
     MAX_IMAGE_DESIGN_CHARS,
   );
   const name = presetNameEn.replace(/[;]+/g, " ").trim() || "bio-engineered";
+  const plan = (bodyPlanEn ?? "").replace(/[;]+/g, ",").replace(/\s+/g, " ").trim();
   const parts = [
-    `${IMAGE_PROMPT_HEAD} colossal ferocious ${name} monster in a powerful aggressive battle stance, its whole body visible from head to toe inside the frame, side three-quarter view facing right`,
+    plan
+      ? `${IMAGE_PROMPT_HEAD} colossal ferocious ${name} monster: ${plan}, its whole body visible inside the frame, side three-quarter view facing right`
+      : `${IMAGE_PROMPT_HEAD} colossal ferocious ${name} monster in a powerful aggressive battle stance, its whole body visible from head to toe inside the frame, side three-quarter view facing right`,
     design || "a hulking bio-engineered creature",
   ];
-  if (stats) parts.push(statCuesForImage(stats));
+  // A body plan without limbs must not be handed "claws" by the attack cue
+  if (stats) parts.push(plan ? statCuesForImage(stats).replace(/\bclaws and fangs\b/g, "fangs") : statCuesForImage(stats));
   parts.push(
     // Bright key light: with only rim light on a dark set every creature came out as a black silhouette.
     "bright cinematic key light showing its true colours and details clearly, dark sci-fi arena background, sharp focus, highly detailed fantasy creature concept art, no text, no letters",
@@ -382,7 +415,7 @@ export async function buildEnglishMonsterPrompt(
 ): Promise<string> {
   // Labels are removed before translating, so the translator never sees them.
   const translated = await translateTextToLanguage(stripPartLabels(description), "en", "ko");
-  return composeEnglishMonsterPrompt(preset.nameEn, translated, stats);
+  return composeEnglishMonsterPrompt(preset.nameEn, translated, stats, preset.bodyPlanEn);
 }
 
 export const POLLINATIONS_ATTEMPTS = 2;
@@ -409,14 +442,23 @@ export function buildImageSeed(
 }
 
 /** Same-origin server image route; any failure (not configured, cap, credits, timeout) returns null -> fallback. */
-export async function fetchServerImage(prompt: string, seed: number, timeoutMs = 55000): Promise<string | null> {
+export async function fetchServerImage(
+  prompt: string,
+  seed: number,
+  negativeExtra?: string,
+  timeoutMs = 55000,
+): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch("/api/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt.slice(0, MAX_IMAGE_PROMPT_CHARS), seed }),
+      body: JSON.stringify({
+        prompt: prompt.slice(0, MAX_IMAGE_PROMPT_CHARS),
+        seed,
+        ...(negativeExtra ? { negative: sanitizeNegativeExtra(negativeExtra) } : {}),
+      }),
       signal: controller.signal,
     });
     if (!res.ok) return null;
@@ -473,7 +515,7 @@ export async function generateCustomMonsterImage(params: {
 
   // 1. HuggingFace SD3 through our server (/api/generate-image, server-side HF_TOKEN): sharper, follows the
   //    description better, supports a negative prompt and has no watermark.
-  const serverImage = await fetchServerImage(englishPrompt, seed);
+  const serverImage = await fetchServerImage(englishPrompt, seed, preset.negativeExtra);
   if (serverImage) {
     return { imageUrl: serverImage, themeHex: theme.primary, source: "hf", promptEn: englishPrompt, seed };
   }
@@ -490,7 +532,7 @@ export async function generateCustomMonsterImage(params: {
             "Content-Type": "application/json",
             Accept: "image/jpeg",
           },
-          body: hfImageRequestBody(englishPrompt, seed),
+          body: hfImageRequestBody(englishPrompt, seed, preset.negativeExtra),
         },
         45000,
       );

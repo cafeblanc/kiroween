@@ -84,6 +84,23 @@ describe("composeEnglishMonsterPrompt", () => {
   });
 });
 
+describe("preset body plan", () => {
+  it("replaces the standing battle stance and drops 'claws' from the attack cue", () => {
+    const out = composeEnglishMonsterPrompt("Bornyx", "white hexagonal plates", stats, "a low flat predator on six blade legs");
+    expect(out.startsWith(`${IMAGE_PROMPT_HEAD} colossal ferocious Bornyx monster: a low flat predator on six blade legs, its whole body visible inside the frame`)).toBe(true);
+    expect(out).not.toContain("battle stance");
+    expect(out).not.toContain("claws and fangs");
+    expect(out.split(";")).toHaveLength(4);
+  });
+  it("the four redesigned presets carry their own body plan or avoid list", () => {
+    const byId = Object.fromEntries(MONSTER_STUDIO_PRESETS.map((p) => [p.id, p]));
+    expect(byId.alien_xenomorph.nameKo).toBe("실로크락스");
+    expect(byId.alien_void_slug.nameKo).toBe("보르닉스");
+    for (const id of ["alien_xenomorph", "alien_void_slug", "human_prometheus"]) expect(byId[id].bodyPlanEn).toBeTruthy();
+    expect(byId.myth_frankenstein.negativeExtra).toContain("hulk");
+  });
+});
+
 describe("stripPartLabels (Korean design text before translation)", () => {
   it("keeps only the design phrases", () => {
     const ko = composeDescriptionFromParts(MONSTER_STUDIO_PRESETS[0], MONSTER_STUDIO_PRESETS[0].defaultParts);

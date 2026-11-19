@@ -2,7 +2,15 @@
  * Unit: /api/generate-image (server-side HuggingFace token). Upstream fetch is mocked; HF is never called.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HF_IMAGE_DAILY_CAP, HF_IMAGE_URL, IMAGE_NEGATIVE_PROMPT, MAX_IMAGE_PROMPT_CHARS, hfImageRequestBody } from "../utils/hfImage";
+import {
+  HF_IMAGE_DAILY_CAP,
+  HF_IMAGE_URL,
+  IMAGE_NEGATIVE_PROMPT,
+  MAX_IMAGE_PROMPT_CHARS,
+  MAX_NEGATIVE_EXTRA_CHARS,
+  hfImageRequestBody,
+  sanitizeNegativeExtra,
+} from "../utils/hfImage";
 
 const TOKEN = "hf_test_secret_token_123";
 function mockRes() {
@@ -107,6 +115,30 @@ describe("/api/generate-image", () => {
     // all slots still free for this IP
     for (let i = 0; i < HF_IMAGE_DAILY_CAP; i++) expect(mod.takeDailySlot(ip)).toBe(true);
     expect(mod.takeDailySlot(ip)).toBe(false);
+  });
+});
+
+describe("per-preset negative prompt", () => {
+  it("is appended to the base list, sanitised and bounded", () => {
+    const b = JSON.parse(hfImageRequestBody("x", 1, "dragon, wings"));
+    expect(b.parameters.negative_prompt).toBe(`${IMAGE_NEGATIVE_PROMPT}, dragon, wings`);
+    expect(sanitizeNegativeExtra("용 dragon\n\twings")).toBe("dragon wings");
+    expect(sanitizeNegativeExtra(42)).toBe("");
+    expect(sanitizeNegativeExtra("a, ".repeat(400)).length).toBeLessThanOrEqual(MAX_NEGATIVE_EXTRA_CHARS);
+    expect(JSON.parse(hfImageRequestBody("x", 1, "")).parameters.negative_prompt).toBe(IMAGE_NEGATIVE_PROMPT);
+  });
+
+  it("the route passes it to HF and rejects a non-string", async () => {
+    const h = await load();
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(png());
+    const ok = mockRes();
+    await h(post({ prompt: "a beast", seed: 2, negative: "legs, feet" }), ok);
+    expect(ok.statusCode).toBe(200);
+    const [, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).parameters.negative_prompt).toBe(`${IMAGE_NEGATIVE_PROMPT}, legs, feet`);
+    const bad = mockRes();
+    await h(post({ prompt: "a beast", negative: ["legs"] }), bad);
+    expect(bad.statusCode).toBe(400);
   });
 });
 

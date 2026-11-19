@@ -103,7 +103,10 @@ describe('composeBattleStory (examples)', () => {
       expect(s.storyEn.act2_clash).toContain('flame cannons');
       expect(s.storyKo.act2_clash).toContain('꼬리');
       expect(s.storyEn.act2_clash).toContain('tail');
-      expect(s.storyKo.act3_finish).toContain('화염포');
+      // The fight is won with the winner's signature finisher, and the loser's defence holds once in act 2
+      expect(s.storyKo.act3_finish).toContain('필살기 「');
+      expect(s.storyEn.act3_finish).toContain('Finisher — ');
+      expect(s.storyKo.act2_clash).toContain('방어 특기 「');
     }
   });
 
@@ -189,7 +192,8 @@ describe('composeBattleStory (properties)', () => {
           expect(n1).toBeGreaterThanOrEqual(1);
           expect(n1).toBeLessThanOrEqual(2);
           expect(n2).toBeGreaterThanOrEqual(2);
-          expect(n2).toBeLessThanOrEqual(3);
+          // strike, counter, clash, and the loser's signature defence
+          expect(n2).toBeLessThanOrEqual(4);
           expect(n3).toBeGreaterThanOrEqual(1);
           expect(n3).toBeLessThanOrEqual(2);
           expect(acts.act1.trim()).not.toBe('');
@@ -250,7 +254,7 @@ describe('composeBattleStory (properties)', () => {
           const b = toStoryFighter(COMIC_MONSTERS[j]);
           const { s } = story(a, b, seed);
           expect(lines(s.storyEn.act1).length).toBeLessThanOrEqual(2);
-          expect(lines(s.storyKo.act2_clash).length).toBeLessThanOrEqual(3);
+          expect(lines(s.storyKo.act2_clash).length).toBeLessThanOrEqual(4);
         },
       ),
       { numRuns: 60 },
