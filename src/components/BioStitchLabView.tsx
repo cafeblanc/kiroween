@@ -21,6 +21,7 @@ import { ArenaHalf } from "./bioreactor/ArenaHalf";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
+import { DEMO_BATTLE, DEMO_BATTLE_TITLE, DEMO_BATTLE_VIDEO_URL } from "../data/demoBattle";
 import { BATTLE_PLAYBACK_RATE, BATTLE_VIDEO_COST_USD, BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
 import {
   EMPTY_SLOTS,
@@ -1026,6 +1027,16 @@ export const BioStitchLabView: React.FC = () => {
 
         {showChronicles && (
           <div className="flex flex-col gap-1.5">
+            {/* Free demo battle: a pre-made video served as a static file, so judges can watch one without spending credits */}
+            <button
+              type="button"
+              onClick={() => { closeViewChronicle(); setViewChronicle({ record: DEMO_BATTLE, videoUrl: DEMO_BATTLE_VIDEO_URL }); }}
+              className={`text-left truncate rounded-lg border px-2 py-1 text-[11px] font-black ${
+                rec?.id === DEMO_BATTLE.id ? "border-amber-300 bg-amber-500/15 text-amber-200" : "border-emerald-400/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+              }`}
+            >
+              🎬 {isKo ? `무료 데모 전투 · ${DEMO_BATTLE_TITLE.ko}` : `Free demo battle · ${DEMO_BATTLE_TITLE.en}`}
+            </button>
             {chronicles.length === 0 ? (
               <p className="text-[11px] text-slate-400">{isKo ? "저장된 전투 기록이 없습니다." : "No saved battles yet."}</p>
             ) : (
