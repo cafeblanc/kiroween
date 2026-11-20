@@ -26,10 +26,6 @@ import { shouldResolveViaPipeline } from '../../../utils/customMonsterFlow';
 import fc from 'fast-check';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  getLastConcatenationPlan,
-  videoConcatenationService,
-} from '../../../services/videoConcatenationService';
 import type { MonsterDefinition } from '../../../types/kiroween';
 
 const MONSTER_ID = 'myth_dragon';
@@ -132,7 +128,7 @@ describe('Full growth sequence integration', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  it('user selects monster → pipeline yields a 6-stage 15s video that concatenates cleanly', async () => {
+  it('user selects monster → pipeline yields a 6-stage 15s video', async () => {
     // No AI key: the pipeline falls back to the reference video for the selected monster.
     const pipeline = createVideoPipeline({
       isAIAvailable: () => false,
@@ -146,15 +142,10 @@ describe('Full growth sequence integration', () => {
       expect(c.start).toBeCloseTo(i * STAGE_DURATION_SEC);
       expect(c.end - c.start).toBeCloseTo(STAGE_DURATION_SEC);
     });
-
-    const url = videoConcatenationService.concatenateStages(source.clips);
-    const plan = getLastConcatenationPlan();
-    expect(url).toBe(source.videoUrl);
-    expect(plan?.mode).toBe('crossfade');
-    expect(plan?.totalDuration).toBe(TOTAL_DURATION_SEC);
+    expect(source.clips[STAGE_COUNT - 1].end).toBeCloseTo(TOTAL_DURATION_SEC);
   });
 
-  it('AI-generated 6-stage video is concatenated the same way', async () => {
+  it('AI-generated 6-stage video comes out of the pipeline the same way', async () => {
     const pipeline = createVideoPipeline({
       isAIAvailable: () => true,
       getAIGenerator: async () =>
@@ -164,8 +155,8 @@ describe('Full growth sequence integration', () => {
     });
     const source = await pipeline.getVideoSource(MONSTER_ID);
     expect(source.source).toBe('ai');
-    expect(videoConcatenationService.concatenateStages(source.clips)).toBe('https://example.com/ai.mp4');
-    expect(getLastConcatenationPlan()?.totalDuration).toBe(15);
+    expect(source.videoUrl).toBe('https://example.com/ai.mp4');
+    expect(source.clips).toHaveLength(STAGE_COUNT);
   });
 
   it('bioreactor renders with HUD at every stage, with matching label and BPM', () => {

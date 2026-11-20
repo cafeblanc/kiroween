@@ -48,14 +48,13 @@ export function safeVideoUrl(input: unknown, fallback: string = FALLBACK_VIDEO_U
 
 /** Allowlist of known API hosts and the path prefixes callable on each. "" host = same origin. */
 export const API_ALLOWLIST: Readonly<Record<string, readonly string[]>> = {
-  "": ["/api/generate-video", "/api/openai/", "/sounds/", "/images/", "/videos/"],
+  "": ["/api/generate-video", "/sounds/", "/images/", "/videos/"],
   "api-inference.huggingface.co": ["/models/"],
   "router.huggingface.co": ["/"],
   "image.pollinations.ai": ["/prompt/"],
   "www.ebi.ac.uk": ["/europepmc/webservices/rest/"],
   "en.wikipedia.org": ["/api/rest_v1/", "/w/api.php"],
   "ko.wikipedia.org": ["/api/rest_v1/", "/w/api.php"],
-  "api.openai.com": ["/v1/realtime/"],
   "translate.googleapis.com": ["/translate_a/"],
 };
 

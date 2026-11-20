@@ -5,7 +5,7 @@ import { BioreactorFluid } from './BioreactorFluid';
 import { useGrowthTimelapse } from './GrowthTimelapseEngine';
 import { GROWTH_STAGES, STAGE_COUNT, STAGE_DURATION_SEC } from './growthStages';
 import { StageProgressHUD } from './StageProgressHUD';
-import { AwakeningRoar } from './awakening';
+import { AwakeningRoar } from './awakening/AwakeningRoar';
 import { createVideoPipeline } from '../../services/videoPipeline';
 import { shouldResolveViaPipeline } from '../../utils/customMonsterFlow';
 

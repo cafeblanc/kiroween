@@ -8,14 +8,6 @@ export default defineConfig({
   },
   server: {
     port: 5174,
-    host: true,
-    proxy: {
-      '/api/openai': {
-        target: 'https://api.openai.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/openai/, ''),
-        secure: false
-      }
-    }
+    host: true
   }
 });

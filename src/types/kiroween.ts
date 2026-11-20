@@ -1,6 +1,6 @@
 /**
  * Core types for the Kiroween rearchitecture (15s, 6-stage growth timelapse,
- * hybrid video pipeline, 16x16 battle matrix).
+ * hybrid video pipeline).
  * Source of truth: .kiro/specs/kiroween-rearchitecture/design.md (Data Models).
  */
 
@@ -46,23 +46,6 @@ export interface MonsterDefinition {
   promptKo: string;
   growthReference: string; // URL to reference video
   stages: GrowthStage[];
-}
-
-// ---------------------------------------------------------------------------
-// Battle matrix
-// ---------------------------------------------------------------------------
-
-export interface BattleVideoMapping {
-  f1Id: string;
-  f2Id: string;
-  /** null when no genuine pre-authored clash video exists for the pair (custom monsters always). */
-  videoUrl: string | null;
-  isPreMade: boolean; // true if the MP4 file exists
-}
-
-export interface BattleMatrix {
-  getBattleVideo(f1Id: string, f2Id: string): string | null;
-  generateMatrix(monsters: MonsterDefinition[]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,12 +106,6 @@ export interface AIVideoGenerator {
 
 export interface ReferenceVideoSelector {
   select(monsterId: string): VideoSourceResult;
-}
-
-export interface VideoConcatenationService {
-  concatenateStages(clips: StageClip[]): string; // returns concatenated video URL
-  createCrossfadeTransition(current: StageClip, next: StageClip): Promise<void>;
-  calculateTotalDuration(clips: StageClip[]): number;
 }
 
 export interface VideoPipeline {

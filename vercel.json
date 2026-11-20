@@ -2,10 +2,6 @@
   "outputDirectory": "build",
   "rewrites": [
     {
-      "source": "/api/openai/(.*)",
-      "destination": "https://api.openai.com/$1"
-    },
-    {
       "source": "/((?!videos/|sounds/|images/|assets/|api/).*)",
       "destination": "/index.html"
     }

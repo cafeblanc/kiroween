@@ -3,11 +3,11 @@
  *
  * Written BEFORE any fix and observed to PASS on the unfixed code. They must keep
  * passing after every fix batch. No DOM environment (jsdom) is installed, so the
- * UI and Realtime behaviors (3.1, 3.2, 3.3, and the curated-answer branch of 3.4)
+ * UI behaviors (3.2, 3.3, and the curated-answer branch of 3.4)
  * are pinned by static source assertions; the service, API handler, and URL
  * helpers (3.4 intent, 3.5, 3.6, 3.7) run dynamically.
  *
- * 3.8 (bioreactor sequence, BattleMatrix, AwakeningRoar, cardiac thump, tsc, vite build)
+ * 3.8 (bioreactor sequence, AwakeningRoar, cardiac thump, tsc, vite build)
  * is covered by the existing 104 tests plus the tsc/vite build checks.
  */
 import { readFileSync } from "node:fs";
@@ -26,58 +26,6 @@ import handler from "../../api/generate-video";
 
 const ROOT = resolve(__dirname, "..", "..");
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
-
-// ---------------------------------------------------------------------------
-// 3.1 Realtime happy path (useGptLiveVoice)
-// ---------------------------------------------------------------------------
-describe("3.1 Realtime happy path in useGptLiveVoice (static)", () => {
-  const src = read("src/modules/voice/useGptLiveVoice.ts");
-
-  it("requests client_secrets before posting the SDP to /realtime/calls", () => {
-    const secretIdx = src.indexOf("/realtime/client_secrets'");
-    const callsIdx = src.indexOf("/realtime/calls'");
-    expect(secretIdx).toBeGreaterThan(-1);
-    expect(callsIdx).toBeGreaterThan(secretIdx);
-  });
-
-  it("client_secrets body is only { session: { type: 'realtime', model } }", () => {
-    const start = src.indexOf("/realtime/client_secrets'");
-    const bodyStart = src.indexOf("body: JSON.stringify(", start);
-    const body = src.slice(bodyStart, src.indexOf("});", bodyStart));
-    expect(body).toMatch(/session:\s*{\s*type:\s*'realtime',\s*model:\s*primaryModel\s*}/);
-    expect(body).not.toMatch(/voice|instructions|input_audio_transcription|tools/);
-  });
-
-  it("sends the raw SDP with the ephemeral token as application/sdp", () => {
-    expect(src).toMatch(/if \(usedEphemeral\)[\s\S]*?'Content-Type': 'application\/sdp'[\s\S]*?body: offer\.sdp/);
-    expect(src).toMatch(/Authorization: `Bearer \$\{activeBearer\}`/);
-  });
-
-  it("master-key fallback posts multipart with only sdp and a minimal session", () => {
-    const start = src.indexOf("// Direct master key call");
-    const end = src.indexOf("body: formData", start);
-    const block = src.slice(start, end);
-    expect(block).toContain("formData.append('sdp'");
-    expect(block).toMatch(/type: 'realtime',\s*model: primaryModel/);
-    expect(block).not.toMatch(/voice|instructions|input_audio_transcription/);
-  });
-
-  it("keeps the gpt-realtime / gpt-4o-realtime-preview model fallback", () => {
-    expect(src).toContain("'gpt-realtime'");
-    expect(src).toContain("'gpt-4o-realtime-preview'");
-  });
-
-  it("sends voice, instructions, tools and transcription via session.update on dc.onopen", () => {
-    const cfgStart = src.indexOf("const sessionConfig = {");
-    const cfg = src.slice(cfgStart, src.indexOf("dc.send(JSON.stringify(sessionConfig))", cfgStart));
-    expect(cfg).toContain("type: 'session.update'");
-    expect(cfg).toMatch(/instructions:/);
-    expect(cfg).toMatch(/voice:/);
-    expect(cfg).toMatch(/tools:/);
-    expect(cfg).toMatch(/input_audio_transcription:/);
-    expect(src).toContain("dc.send(JSON.stringify(sessionConfig))");
-  });
-});
 
 // ---------------------------------------------------------------------------
 // 3.2 / 3.3 / 3.4 BioStitchLabView (static; no DOM environment available)

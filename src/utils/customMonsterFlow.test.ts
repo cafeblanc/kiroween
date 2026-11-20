@@ -7,21 +7,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { adultSegmentStart, shouldResolveViaPipeline, isCustomMonsterId } from './customMonsterFlow';
-import { getBattleVideoForPair } from '../components/bioreactor/arena';
 import { safeVideoUrl } from './security';
 import { toMonsterDefinition } from '../components/bioreactor/BioreactorScreen';
 
 const ROOT = resolve(__dirname, '..', '..');
 const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
 const BLOB = 'blob:http://localhost:5173/3f2a9c1e-0000-4000-8000-123456789abc';
-const CURATED_IDS = [
-  'myth_dragon',
-  'myth_kraken',
-  'alien_xenomorph',
-  'alien_void_slug',
-  'myth_frankenstein',
-  'human_prometheus',
-];
 
 describe('adultSegmentStart', () => {
   it('seeks curated clips to 68% of a finite duration', () => {
@@ -55,16 +46,6 @@ describe('blob: video through the incubator/awakening definitions', () => {
     });
     expect(def.growthReference).toBe(BLOB);
     expect(safeVideoUrl(def.growthReference || def.awakeningVideo)).toBe(BLOB);
-  });
-});
-
-describe('BattleMatrix: custom monster vs the 6 curated monsters', () => {
-  it('never gets a pre-made clash video (null), in both fighter orders', () => {
-    const custom = 'custom_myth_dragon_1700000000000';
-    for (const id of CURATED_IDS) {
-      expect(getBattleVideoForPair(custom, id)).toBeNull();
-      expect(getBattleVideoForPair(id, custom)).toBeNull();
-    }
   });
 });
 

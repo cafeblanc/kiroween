@@ -1,14 +1,15 @@
 ﻿/**
  * Bug condition exploration tests for spec `hidden-bugs-audit` (Task 1).
  *
- * These tests encode the EXPECTED (fixed) behavior for C1-C12 and are meant to FAIL on
+ * These tests encode the EXPECTED (fixed) behavior for C1-C10 and are meant to FAIL on
  * unfixed code. Do not "fix" them; they validate the fix in task 3.6.
  *
  * Run alone:  npx vitest --run src/__bugexplore__
  *
- * The workspace has no jsdom / testing-library, so UI-only bugs (C3, C5, C6, C10 timers,
- * C12) are checked by structural assertions on the component source, while C1, C2, C7,
- * C8, C9, C11 are checked behaviorally (file system, vercel.json, real handler, real service).
+ * The workspace has no jsdom / testing-library, so UI-only bugs (C3, C5, C6, C10 timers)
+ * are checked by structural assertions on the component source, while C1, C2, C7,
+ * C8, C9 are checked behaviorally (file system, vercel.json, real handler, real service).
+ * C11/C12 (OpenAI Realtime voice) were removed together with the voice module.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -269,120 +270,3 @@ describe('C10 resource leaks (1.10)', () => {
     expect(src).toMatch(/return\s*\(\)\s*=>\s*\{[^}]*aiClashAbortRef\.current\?\.abort\(\)/); // unmount aborts generation
   });
 });
-
-describe('C11 GptLiveService contract (1.11)', () => {
-  type Call = { url: string; init: any };
-  async function connectWith(secretsOk: boolean) {
-    const calls: Call[] = [];
-    const fetchStub = vi.fn(async (url: string, init: any) => {
-      calls.push({ url: String(url), init });
-      if (String(url).includes('client_secrets')) {
-        return secretsOk
-          ? new Response(JSON.stringify({ value: 'ek_test' }), { status: 200 })
-          : new Response('{}', { status: 500 });
-      }
-      if (String(url).includes('realtime/sessions')) return new Response('{}', { status: 500 });
-      return new Response('v=0 answer', { status: 200 });
-    });
-    class FakeDC {
-      close() {}
-    }
-    class FakePC {
-      ontrack: any;
-      localDescription = { sdp: 'v=0 offer' };
-      addTrack() {}
-      createDataChannel() {
-        return new FakeDC();
-      }
-      async createOffer() {
-        return { type: 'offer', sdp: 'v=0 offer' };
-      }
-      async setLocalDescription() {}
-      async setRemoteDescription() {}
-      close() {}
-    }
-    vi.stubGlobal('fetch', fetchStub);
-    vi.stubGlobal('RTCPeerConnection', FakePC);
-    vi.stubGlobal('Audio', class {});
-    vi.stubGlobal('requestAnimationFrame', () => 1);
-    vi.stubGlobal('cancelAnimationFrame', () => {});
-    vi.stubGlobal('window', { AudioContext: undefined });
-    vi.stubGlobal('navigator', {
-      mediaDevices: { getUserMedia: async () => ({ getAudioTracks: () => [], getTracks: () => [] }) },
-    });
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { GptLiveService } = await import('../modules/agent/gptLiveService');
-    const svc = new GptLiveService({
-      onStatusChange: () => {},
-      onTranscript: () => {},
-      onToolCall: () => {},
-      onError: () => {},
-    });
-    await svc.connect('sk-test', 'be helpful', 'p1');
-    return calls;
-  }
-
-  it('C11: client_secrets request body has only {session:{type,model}} (no voice)', async () => {
-    const calls = await connectWith(true);
-    const secret = calls.find((c) => c.url.includes('client_secrets'))!;
-    const session = JSON.parse(secret.init.body).session;
-    expect(session.voice).toBeUndefined();
-    expect(Object.keys(session).sort()).toEqual(['model', 'type']);
-  });
-
-  it('C11: first model tried is gpt-realtime', async () => {
-    const calls = await connectWith(true);
-    const secret = calls.find((c) => c.url.includes('client_secrets'))!;
-    expect(JSON.parse(secret.init.body).session.model).toBe('gpt-realtime');
-  });
-
-  it('C11: ephemeral /calls request sends raw SDP with application/sdp', async () => {
-    const calls = await connectWith(true);
-    const call = calls.find((c) => c.url.endsWith('/realtime/calls'))!;
-    expect(call.init.headers['Content-Type']).toBe('application/sdp');
-    expect(call.init.headers.Authorization).toBe('Bearer ek_test');
-    expect(typeof call.init.body).toBe('string');
-  });
-
-  it('C11: master-key multipart session has no instructions or voice', async () => {
-    const calls = await connectWith(false);
-    const call = calls.find((c) => c.url.endsWith('/realtime/calls'))!;
-    expect(call.init.body).toBeInstanceOf(FormData);
-    const session = JSON.parse(call.init.body.get('session'));
-    expect(session.instructions).toBeUndefined();
-    expect(session.voice).toBeUndefined();
-  });
-});
-
-describe('C12 useGptLiveVoice state (1.12)', () => {
-  const src = read('src/modules/voice/useGptLiveVoice.ts');
-
-  it('C12: failure paths do not call stopVoice() right after reportError() (overwrites error with idle)', () => {
-    expect(src).not.toMatch(/reportError\([\s\S]{0,300}?\);\s*stopVoice\(\);/);
-  });
-
-  it('C12: dc.onmessage reads the domain from a ref', () => {
-    expect(src).toMatch(/activeDomainRef/);
-  });
-
-  it('C12: startVoice has a re-entry guard', () => {
-    expect(src).toMatch(/isStartingRef/);
-  });
-
-  it('C12: model fallback retry requests a fresh ephemeral token', () => {
-    const retry = src.slice(src.indexOf('const fallbackModel'), src.indexOf('fallbackFormData.append'));
-    expect(retry.length).toBeGreaterThan(0);
-    expect(retry).toMatch(/client_secrets/);
-  });
-
-  it('C12: API key is persisted only with explicit consent', () => {
-    for (const f of ['src/modules/agent/GptLiveVoiceModal.tsx', 'src/modules/voice/GptLiveVoiceWidget.tsx']) {
-      const s = read(f);
-      expect(s, f + ' persists the key to localStorage without a consent option').toMatch(/remember|consent/i);
-    }
-  });
-});
-
-
