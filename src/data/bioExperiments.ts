@@ -15,6 +15,11 @@ export interface BioExperimentCase {
   videoUrl: string;
   /** Local LTX-2.5 clip (public/videos/experiments); the viewport falls back to videoUrl when it fails. */
   clipUrl?: string;
+  /**
+   * The clip plays once, then loops only from this second on (a clip that changes from start to end, like the heart
+   * filling with blood, would otherwise jump back to its first frame on every loop).
+   */
+  clipLoopFromSec?: number;
   fallbackVideoUrl: string;
   microscopyPhotoUrl: string;
   secondaryPhotoUrl: string;
@@ -250,7 +255,9 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 18193059 / DOI: 10.1038/nm1684",
     pubMedSearchQuery: "perfusion decellularized matrix heart stem cell recellularization",
     wikiTitle: "Decellularization",
-    clipUrl: "/videos/experiments/ghost_heart.mp4",
+    // White ghost heart -> blood flows in -> beating (first + last frame); after the first play only the beating loops
+    clipUrl: "/videos/experiments/ghost_heart_beat.mp4",
+    clipLoopFromSec: 4.5,
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/04/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s001.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/4/4c/Proteolysis-regulates-cardiomyocyte-maturation-and-tissue-integration-ncomms14495-s3.ogv",
     microscopyPhotoUrl: "/images/ghost_heart_bioreactor.jpg",

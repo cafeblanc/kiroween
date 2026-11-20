@@ -136,6 +136,15 @@ describe("3.3 muted video layered over the confocal photo (static + data)", () =
     }
   });
 
+  it("a clip that changes from start to end plays once, then loops only its tail", () => {
+    const heart = VERIFIED_BIO_EXPERIMENTS.find((e) => e.id === "case-02-ghost-heart");
+    expect(heart?.clipUrl).toBe("/videos/experiments/ghost_heart_beat.mp4");
+    expect(heart?.clipLoopFromSec).toBeGreaterThan(0);
+    expect(heart?.clipLoopFromSec).toBeLessThan(8);
+    expect(src).toContain("loop={!(playingClip && activeExp.clipLoopFromSec)}");
+    expect(src).toMatch(/onEnded=\{\(e\) => \{\s*const from = playingClip \? activeExp\.clipLoopFromSec : undefined;/);
+  });
+
   it("falls back from the local LTX clip to the archival video when the clip fails", () => {
     expect(src).toContain("activeExp.clipUrl && !clipFailed ? activeExp.clipUrl : activeExp.videoUrl");
     expect(src).toContain("setClipFailed(true)");

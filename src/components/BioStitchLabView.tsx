@@ -2357,9 +2357,17 @@ export const BioStitchLabView: React.FC = () => {
                 key={activeExp.id + "-" + activeVideoSrc}
                 src={activeVideoSrc}
                 autoPlay
-                loop
+                // A clip with clipLoopFromSec plays once, then loops only its tail (see onEnded)
+                loop={!(playingClip && activeExp.clipLoopFromSec)}
                 muted
                 playsInline
+                onEnded={(e) => {
+                  const from = playingClip ? activeExp.clipLoopFromSec : undefined;
+                  if (from === undefined) return;
+                  const v = e.currentTarget;
+                  v.currentTime = Number.isFinite(v.duration) ? Math.min(from, Math.max(0, v.duration - 0.5)) : from;
+                  void v.play().catch(() => {});
+                }}
                 onError={() => (playingClip ? setClipFailed(true) : setVideoFailed(true))}
                 className={
                   playingClip
