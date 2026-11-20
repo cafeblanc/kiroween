@@ -307,7 +307,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
     microscopyPhotoUrl: "/images/yale_brainex_perfusion_lab.jpg",
-    secondaryPhotoUrl: "/images/yale_brainex_nature_cover.jpg",
+    secondaryPhotoUrl: "/images/yale_brainex_perfusion_lab.jpg",
     hostTissueA: "Decapitated Mammalian Brain (4 Hours Post-Mortem Ischemia)",
     koreanHostTissueA: "사망 후 4시간이 경과해 혈류가 완전히 멈춘 포유류의 분리된 뇌",
     stemCellBridge: {

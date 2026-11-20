@@ -1,0 +1,47 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "related-tests-on-save",
+      "description": "Run the vitest suites that import a saved TypeScript file, so regressions show up right after the agent edits code.",
+      "trigger": "PostFileSave",
+      "matcher": "(src|api)[\\\\/].*\\.(ts|tsx)$",
+      "timeout": 120,
+      "action": {
+        "type": "command",
+        "command": "npx vitest related {{filePath}} --run --passWithNoTests --reporter=dot"
+      }
+    },
+    {
+      "name": "secret-scan-on-save",
+      "description": "Warn when a saved file contains a HuggingFace, AWS, OpenAI or GitHub token or a private key. Keys belong in .env.local or Vercel env only.",
+      "trigger": "PostFileSave",
+      "timeout": 20,
+      "action": {
+        "type": "command",
+        "command": "node scripts/hooks/scan-secrets.mjs {{filePath}}"
+      }
+    },
+    {
+      "name": "private-strategy-doc-guard",
+      "description": "AGENTS.md rule 5: a new BLUEPRINT/ARCHITECTURE/STRATEGY/BUSINESS/COMMERCIAL/ROADMAP document must be gitignored before it can be committed.",
+      "trigger": "PostFileCreate",
+      "matcher": "(BLUEPRINT|ARCHITECTURE|STRATEGY|BUSINESS|COMMERCIAL|ROADMAP)[^\\\\/]*\\.md$",
+      "timeout": 20,
+      "action": {
+        "type": "command",
+        "command": "node scripts/hooks/check-private-doc.mjs {{filePath}}"
+      }
+    },
+    {
+      "name": "peer-review-citation-check",
+      "description": "When the experiment archive changes, re-check every citation against EuropePMC and every Wikimedia media link against CREDITS.md.",
+      "trigger": "PostFileSave",
+      "matcher": "src[\\\\/]data[\\\\/]bioExperiments\\.ts$",
+      "action": {
+        "type": "agent",
+        "prompt": "src/data/bioExperiments.ts was just edited. For every experiment entry that changed: (1) confirm the cited paper exists by querying https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=<title or DOI>&format=json and check that journal, year and lead lab match the entry; (2) confirm every upload.wikimedia.org / commons.wikimedia.org URL is listed in CREDITS.md with its author and license, adding missing rows; (3) report any claim that the paper does not support. Do not change the narrative text without telling me."
+      }
+    }
+  ]
+}
