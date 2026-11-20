@@ -283,6 +283,9 @@ export const BioStitchLabView: React.FC = () => {
   const [customArenaRoster, setCustomArenaRoster] = useState<ComicMonster[]>([]);
   // 괴수 관리 창 (보관함의 괴수 목록: 이름 바꾸기, 삭제, 중복 정리, 내보내기)
   const [isMonsterManagerOpen, setIsMonsterManagerOpen] = useState<boolean>(false);
+  // Free demo battle (static file): "playing" -> "outcome" (story) -> closed. The replay key restarts the video.
+  const [demoBattlePhase, setDemoBattlePhase] = useState<"closed" | "playing" | "outcome">("closed");
+  const [demoReplayKey, setDemoReplayKey] = useState<number>(0);
   // 결투 영상 단계: 두 괴수 화면 → (생성 중) → 영상 재생 → 결과 표시
   const [battlePhase, setBattlePhase] = useState<"stage" | "playing" | "outcome">("stage");
   const [duelWinnerSide, setDuelWinnerSide] = useState<1 | 2 | null>(null);
@@ -2576,6 +2579,14 @@ export const BioStitchLabView: React.FC = () => {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
+                        onClick={() => { setDemoReplayKey((k) => k + 1); setDemoBattlePhase("playing"); }}
+                        title={isKo ? "미리 만든 16초 전투 영상 (무료)" : "Pre-made 16 s battle video (free)"}
+                        className="bg-emerald-600/25 hover:bg-emerald-600/45 text-emerald-100 border border-emerald-400/70 px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer whitespace-nowrap shadow-[0_0_14px_rgba(16,185,129,0.45)]"
+                      >
+                        🎬 {isKo ? "무료 데모 전투" : "Free demo battle"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={backToDesignRoom}
                         className="bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-200 border border-cyan-400/60 px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer whitespace-nowrap"
                       >
@@ -3067,6 +3078,64 @@ export const BioStitchLabView: React.FC = () => {
               {isKo ? "확인 완료 — 현재 실험실 화면으로 돌아가기" : "Got it — back to the active experiment"}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Free demo battle: full-screen playback of the pre-made 16 s video, then the story and the winner. No cost. */}
+      {demoBattlePhase !== "closed" && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={isKo ? `무료 데모 전투: ${DEMO_BATTLE_TITLE.ko}` : `Free demo battle: ${DEMO_BATTLE_TITLE.en}`}
+          className="fixed inset-0 z-[90] bg-black flex items-center justify-center"
+          onKeyDown={(e) => { if (e.key === "Escape") setDemoBattlePhase("closed"); }}
+        >
+          <video
+            key={`demo-${demoReplayKey}`}
+            src={DEMO_BATTLE_VIDEO_URL}
+            autoPlay
+            muted
+            playsInline
+            controls={demoBattlePhase === "playing"}
+            onLoadedMetadata={(e) => { e.currentTarget.playbackRate = BATTLE_PLAYBACK_RATE; }}
+            onEnded={() => setDemoBattlePhase("outcome")}
+            className={`w-full h-full object-contain ${demoBattlePhase === "outcome" ? "opacity-30" : ""}`}
+          />
+          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 border border-emerald-400/60 text-emerald-200 text-xs font-black">
+            🎬 {isKo ? `무료 데모 전투 · ${DEMO_BATTLE_TITLE.ko}` : `Free demo battle · ${DEMO_BATTLE_TITLE.en}`}
+          </div>
+          <button
+            type="button"
+            autoFocus
+            onClick={() => setDemoBattlePhase("closed")}
+            className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-100 text-xs font-black"
+          >
+            ✕ {isKo ? "닫기" : "Close"}
+          </button>
+          {demoBattlePhase === "outcome" && (
+            <div className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:w-[min(42rem,92vw)] max-h-[70vh] overflow-y-auto rounded-2xl border border-amber-400/60 bg-slate-950/95 p-4 flex flex-col gap-3">
+              <h3 className="text-sm font-black text-amber-300">📜 {isKo ? "AI 생체 배틀 서사" : "AI Bio-Battle Story"}</h3>
+              <p className="text-xs sm:text-sm text-slate-100 whitespace-pre-line leading-relaxed">
+                {isKo ? DEMO_BATTLE.storyKo : DEMO_BATTLE.storyEn}
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setDemoReplayKey((k) => k + 1); setDemoBattlePhase("playing"); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-black text-white bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400"
+                >
+                  ▶ {isKo ? "다시 보기" : "Replay"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDemoBattlePhase("closed")}
+                  className="px-3 py-1.5 rounded-lg text-xs font-black bg-slate-800 hover:bg-slate-700 text-slate-100"
+                >
+                  {isKo ? "결투장으로" : "Back to the arena"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
