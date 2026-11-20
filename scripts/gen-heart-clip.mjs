@@ -2,7 +2,7 @@
 // First frame: the white decellularised heart (ghost_heart_bioreactor.jpg). Last frame: the same heart filled with
 // blood (ghost_heart_perfused.jpg, scripts/make-heart-last-frame.ps1). LTX interpolates between them, so blood
 // visibly flows in; the prompt asks for a strong heartbeat once it is red.
-// 8 s at 1080p ltx-2-5-fast costs about $1.04. Saves public/videos/experiments/ghost_heart_beat.mp4.
+// 8 s at 1080p ltx-2-5-fast costs about $1.04. Saves public/videos/experiments/ghost_heart_beat_v2.mp4.
 // Usage: node scripts/gen-heart-clip.mjs   (progress: scripts/gen-heart-clip.log)
 import { readFileSync, writeFileSync, appendFileSync, existsSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const API = "https://asura.cafeblanc.kr/api/generate-video";
 const LOG = join(ROOT, "scripts", "gen-heart-clip.log");
-const OUT = join(ROOT, "public", "videos", "experiments", "ghost_heart_beat.mp4");
+const OUT = join(ROOT, "public", "videos", "experiments", "ghost_heart_beat_v2.mp4");
 const PROMPT =
   "A pale white decellularised human heart floats in a glass bioreactor full of clear fluid. " +
   "Dark red blood starts pumping in through the clear tubes at the top and surges down into the heart, " +
@@ -31,7 +31,7 @@ const dataUri = (file) => `data:image/jpeg;base64,${readFileSync(join(ROOT, "pub
 
 writeFileSync(LOG, `start ${new Date().toISOString()}\n`);
 if (existsSync(OUT) && statSync(OUT).size > 100_000) {
-  log("ghost_heart_beat.mp4 already exists, nothing to do (delete it to make a new one)");
+  log("ghost_heart_beat_v2.mp4 already exists, nothing to do (delete it to make a new one)");
   process.exit(0);
 }
 const body = {
@@ -88,5 +88,5 @@ while (start < total) {
   start += buf.length;
 }
 writeFileSync(OUT, Buffer.concat(parts));
-log(`saved ghost_heart_beat.mp4 ${Math.round(start / 1024)} KB in ${Math.round((Date.now() - started) / 1000)} s`);
+log(`saved ghost_heart_beat_v2.mp4 ${Math.round(start / 1024)} KB in ${Math.round((Date.now() - started) / 1000)} s`);
 log("done");

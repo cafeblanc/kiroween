@@ -3606,7 +3606,7 @@ export const BioStitchLabView: React.FC = () => {
                     <li>1.1 Create <code>.kiro/steering/product.md</code> and <code>tech.md</code></li>
                     <li>1.2 Author EARS-compliant <code>requirements.md</code></li>
                     <li>1.3 Author Mermaid architecture & state diagrams in <code>design.md</code></li>
-                    <li>1.4 Configure <code>pubmed-citation-verifier.hook.json</code></li>
+                    <li>1.4 Configure agent hooks in <code>.kiro/hooks/prometheus-lab.json</code></li>
                   </ul>
                 </div>
 
@@ -3636,16 +3636,43 @@ export const BioStitchLabView: React.FC = () => {
             {kiroModalTab === "hooks" && (
               <div className="flex flex-col gap-3 text-xs">
                 <div className="bg-slate-950 border border-cyan-500/40 rounded-xl p-3 font-mono">
-                  <p className="text-cyan-300 font-bold mb-1.5">📄 .kiro/hooks/pubmed-citation-verifier.hook.json</p>
+                  <p className="text-cyan-300 font-bold mb-1.5">📄 .kiro/hooks/prometheus-lab.json</p>
+                  <ul className="text-slate-300 font-sans list-disc list-inside space-y-1 mb-2">
+                    <li><code>related-tests-on-save</code>: {isKo ? "에이전트가 저장한 파일과 관련된 vitest 테스트를 바로 실행" : "runs the vitest suites related to a file the agent saves"}</li>
+                    <li><code>secret-scan-on-save</code>: {isKo ? "저장한 파일에서 HF·AWS·OpenAI·GitHub 토큰과 개인 키를 찾아 경고" : "warns about HF, AWS, OpenAI or GitHub tokens and private keys in a saved file"}</li>
+                    <li><code>private-strategy-doc-guard</code>: {isKo ? "새 전략 문서가 .gitignore에 등록됐는지 확인" : "checks that a new strategy document is gitignored"}</li>
+                    <li><code>peer-review-citation-check</code>: {isKo ? "실험 데이터가 바뀌면 Europe PMC에서 인용을 다시 검증하고 CREDITS.md를 갱신" : "re-verifies citations in Europe PMC and updates CREDITS.md when the experiment data changes"}</li>
+                  </ul>
                   <pre className="text-[11px] text-slate-300 overflow-x-auto p-2 bg-black/60 rounded border border-slate-800">
 {`{
-  "$schema": "https://kiro.dev/schemas/hook.v1.json",
-  "name": "pubmed-citation-verifier",
-  "description": "Validates that every experiment case contains an authentic PubMed PMID / DOI and verified Yamanaka factor bridge",
-  "trigger": { "fileMatch": "src/data/bioExperiments.ts", "events": ["onSave", "onPreCommit"] },
-  "action": "run-script",
-  "command": "node scripts/verify-citations.js --strict",
-  "status": "PASSED (10/10 verified peer-reviewed studies)"
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "related-tests-on-save",
+      "trigger": "PostFileSave",
+      "matcher": "(src|api)[\\\\/].*\\.(ts|tsx)$",
+      "action": { "type": "command",
+        "command": "npx vitest related {{filePath}} --run --passWithNoTests --reporter=dot" }
+    },
+    {
+      "name": "secret-scan-on-save",
+      "trigger": "PostFileSave",
+      "action": { "type": "command", "command": "node scripts/hooks/scan-secrets.mjs {{filePath}}" }
+    },
+    {
+      "name": "private-strategy-doc-guard",
+      "trigger": "PostFileCreate",
+      "matcher": "(BLUEPRINT|ARCHITECTURE|STRATEGY|BUSINESS|COMMERCIAL|ROADMAP)[^\\\\/]*\\.md$",
+      "action": { "type": "command", "command": "node scripts/hooks/check-private-doc.mjs {{filePath}}" }
+    },
+    {
+      "name": "peer-review-citation-check",
+      "trigger": "PostFileSave",
+      "matcher": "src[\\\\/]data[\\\\/]bioExperiments\\.ts$",
+      "action": { "type": "agent",
+        "prompt": "Confirm each changed citation in Europe PMC (journal, year, lab) and list every Wikimedia file in CREDITS.md." }
+    }
+  ]
 }`}
                   </pre>
                 </div>
@@ -3798,16 +3825,21 @@ export const renderBioreactorMorph = (
 };`}
 
                     {selectedCodeSpec === "hook" &&
-`// [Kiro Generated Hook] .kiro/hooks/pubmed-citation-verifier.hook.json
+`// .kiro/hooks/prometheus-lab.json (excerpt): the citation check that runs when the experiment data changes
 {
-  "$schema": "https://kiro.dev/schemas/hook.v1.json",
-  "name": "pubmed-citation-verifier",
-  "trigger": { "fileMatch": "src/data/bioExperiments.ts", "events": ["onSave"] },
-  "validationRules": [
-    { "field": "pmidOrDoi", "pattern": "^(PMID: \\\\d+|DOI: 10\\\\.\\\\d{4,9}/.+)", "required": true },
-    { "field": "stemCellBridge.factors", "minItems": 3, "required": true }
-  ],
-  "verificationOutput": "✔ 10/10 Peer-Reviewed Landmark Frankenstein Studies Verified"
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "peer-review-citation-check",
+      "description": "When the experiment archive changes, re-check every citation against EuropePMC and every Wikimedia media link against CREDITS.md.",
+      "trigger": "PostFileSave",
+      "matcher": "src[\\\\/]data[\\\\/]bioExperiments\\.ts$",
+      "action": {
+        "type": "agent",
+        "prompt": "For every changed entry: confirm the paper in EuropePMC (journal, year, lead lab), list every Wikimedia URL in CREDITS.md, and report claims the paper does not support."
+      }
+    }
+  ]
 }`}
                   </pre>
                 </div>

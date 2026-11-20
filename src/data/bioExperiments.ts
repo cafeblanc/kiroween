@@ -256,7 +256,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pubMedSearchQuery: "perfusion decellularized matrix heart stem cell recellularization",
     wikiTitle: "Decellularization",
     // White ghost heart -> blood flows in -> beating (first + last frame); after the first play only the beating loops
-    clipUrl: "/videos/experiments/ghost_heart_beat.mp4",
+    clipUrl: "/videos/experiments/ghost_heart_beat_v2.mp4",
     clipLoopFromSec: 4.5,
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/04/Elucidation-of-a-Novel-Pathway-through-Which-HDAC1-Controls-Cardiomyocyte-Differentiation-through-pone.0045046.s001.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/4/4c/Proteolysis-regulates-cardiomyocyte-maturation-and-tissue-integration-ncomms14495-s3.ogv",
@@ -395,7 +395,7 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     pmidOrDoi: "PMID: 37924814 / DOI: 10.1016/j.cell.2023.10.005",
     pubMedSearchQuery: "Live birth of chimeric monkey with high contribution from embryonic stem cells Liu",
     wikiTitle: "Chimera_(genetics)",
-    clipUrl: "/videos/experiments/chimeric_monkey.mp4",
+    clipUrl: "/videos/experiments/chimeric_monkey_gfp.mp4",
     videoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/60/Mitosis_480%2A360.theora.ogv",
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
     microscopyPhotoUrl: "/images/fluorescent_chimeric_monkey.jpg",

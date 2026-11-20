@@ -2,7 +2,7 @@
 // The green is GFP made by the monkey's own cells, so it must stay on the same skin patches (face, hands, feet)
 // while the monkey moves; it is not coloured light. First AND last frame are the same photo, so LTX has to end
 // on the exact fluorescent pattern it started with, and the prompt describes the glow as part of the skin.
-// 6 s at 1080p ltx-2-5-fast costs about $0.78. Saves public/videos/experiments/chimeric_monkey.mp4
+// 6 s at 1080p ltx-2-5-fast costs about $0.78. Saves public/videos/experiments/chimeric_monkey_gfp.mp4
 // (the previous clip is moved to scripts/chimeric_monkey.prev.mp4 first).
 // Usage: node scripts/gen-monkey-clip.mjs   (progress: scripts/gen-monkey-clip.log)
 import { readFileSync, writeFileSync, appendFileSync, existsSync, renameSync } from "node:fs";
@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const API = "https://asura.cafeblanc.kr/api/generate-video";
 const LOG = join(ROOT, "scripts", "gen-monkey-clip.log");
-const OUT = join(ROOT, "public", "videos", "experiments", "chimeric_monkey.mp4");
+const OUT = join(ROOT, "public", "videos", "experiments", "chimeric_monkey_gfp.mp4");
 const PREV = join(ROOT, "scripts", "chimeric_monkey.prev.mp4");
 const PHOTO = join(ROOT, "public", "images", "fluorescent_chimeric_monkey.jpg");
 const DURATION = 6;
@@ -92,5 +92,5 @@ while (start < total) {
 }
 if (existsSync(OUT)) renameSync(OUT, PREV);
 writeFileSync(OUT, Buffer.concat(parts));
-log(`saved chimeric_monkey.mp4 ${Math.round(start / 1024)} KB in ${Math.round((Date.now() - started) / 1000)} s`);
+log(`saved chimeric_monkey_gfp.mp4 ${Math.round(start / 1024)} KB in ${Math.round((Date.now() - started) / 1000)} s`);
 log("done");

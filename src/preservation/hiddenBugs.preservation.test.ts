@@ -86,7 +86,7 @@ describe("3.3 muted video layered over the confocal photo (static + data)", () =
 
   it("a clip that changes from start to end plays once, then loops only its tail", () => {
     const heart = VERIFIED_BIO_EXPERIMENTS.find((e) => e.id === "case-02-ghost-heart");
-    expect(heart?.clipUrl).toBe("/videos/experiments/ghost_heart_beat.mp4");
+    expect(heart?.clipUrl).toBe("/videos/experiments/ghost_heart_beat_v2.mp4");
     expect(heart?.clipLoopFromSec).toBeGreaterThan(0);
     expect(heart?.clipLoopFromSec).toBeLessThan(8);
     expect(src).toContain("loop={!(playingClip && activeExp.clipLoopFromSec)}");
