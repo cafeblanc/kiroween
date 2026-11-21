@@ -386,6 +386,8 @@ export const BioStitchLabView: React.FC = () => {
   const [demoReplayKey, setDemoReplayKey] = useState<number>(0);
   const [demoIndex, setDemoIndex] = useState<number>(0);
   const [isDemoMenuOpen, setIsDemoMenuOpen] = useState<boolean>(false);
+  /** Where the demo menu opens (viewport px, just under the header button). */
+  const [demoMenuAnchor, setDemoMenuAnchor] = useState<{ top: number; right: number }>({ top: 48, right: 8 });
   const activeDemo = DEMO_BATTLES[demoIndex] ?? DEMO_BATTLES[0];
   const playDemoBattle = (i: number) => {
     setIsDemoMenuOpen(false);
@@ -2684,10 +2686,16 @@ export const BioStitchLabView: React.FC = () => {
                       </button>                    </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="relative">
+                      <div>
                         <button
                           type="button"
-                          onClick={() => setIsDemoMenuOpen((o) => !o)}
+                          onClick={(e) => {
+                            // The header scrolls horizontally (overflow-x-auto), which clips anything inside it, so the
+                            // menu is drawn at the top level (fixed) right under this button instead.
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setDemoMenuAnchor({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+                            setIsDemoMenuOpen((o) => !o);
+                          }}
                           aria-haspopup="menu"
                           aria-expanded={isDemoMenuOpen}
                           title={isKo ? "미리 만든 전투 영상 (무료)" : "Pre-made battle videos (free)"}
@@ -2695,26 +2703,6 @@ export const BioStitchLabView: React.FC = () => {
                         >
                           🎬 {isKo ? "무료 데모 전투" : "Free demo battle"} ▾
                         </button>
-                        {isDemoMenuOpen && (
-                          <ul
-                            role="menu"
-                            className="absolute right-0 top-full mt-1 z-[95] w-72 max-w-[85vw] rounded-xl border border-emerald-400/60 bg-slate-950/95 p-1 shadow-xl"
-                          >
-                            {DEMO_BATTLES.map((d, i) => (
-                              <li key={d.record.id} role="none">
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={() => playDemoBattle(i)}
-                                  className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-slate-100 hover:bg-emerald-500/20 flex items-center justify-between gap-2"
-                                >
-                                  <span className="truncate">{i === 0 ? "⭐ " : ""}{isKo ? d.title.ko : d.title.en}</span>
-                                  <span className="shrink-0 font-mono text-[10px] text-emerald-300">{d.seconds}{isKo ? "초" : " s"}</span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
                       </div>
                       <button
                         type="button"
@@ -3184,6 +3172,35 @@ export const BioStitchLabView: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Demo battle menu: top level and fixed, above the lab/arena window (z-50), so no container can clip or cover it */}
+      {isDemoMenuOpen && (
+        <>
+          <div className="fixed inset-0 z-[94]" aria-hidden="true" onClick={() => setIsDemoMenuOpen(false)} />
+          <ul
+            role="menu"
+            aria-label={isKo ? "무료 데모 전투 목록" : "Free demo battles"}
+            style={{ top: demoMenuAnchor.top, right: demoMenuAnchor.right }}
+            className="fixed z-[95] w-72 max-w-[85vw] rounded-xl border border-emerald-400/60 bg-slate-950/95 p-1 shadow-xl"
+            onKeyDown={(e) => { if (e.key === "Escape") setIsDemoMenuOpen(false); }}
+          >
+            {DEMO_BATTLES.map((d, i) => (
+              <li key={d.record.id} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  autoFocus={i === 0}
+                  onClick={() => playDemoBattle(i)}
+                  className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-slate-100 hover:bg-emerald-500/20 focus:bg-emerald-500/20 focus:outline-none flex items-center justify-between gap-2"
+                >
+                  <span className="truncate">{i === 0 ? "⭐ " : ""}{isKo ? d.title.ko : d.title.en}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-emerald-300">{d.seconds}{isKo ? "초" : " s"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {/* Free demo battle: full-screen playback of the pre-made 16 s video, then the story and the winner. No cost. */}

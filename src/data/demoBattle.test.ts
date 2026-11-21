@@ -21,6 +21,17 @@ describe("free demo battle", () => {
       expect(d.record.storyKo + d.record.storyEn).not.toMatch(/커스텀|\bCustom\b|Full-body shot/);
     }
   });
+  it("the dropdown menu is drawn at the top level (fixed, above the z-50 lab window), not inside the clipping header", () => {
+    const lab = readFileSync(resolve(__dirname, "..", "components", "BioStitchLabView.tsx"), "utf8");
+    const button = lab.indexOf('aria-haspopup="menu"');
+    const headerStart = lab.lastIndexOf("overflow-x-auto", button);
+    const headerEnd = lab.indexOf("{/* TAB 1:", button);
+    expect(headerStart).toBeGreaterThan(0);
+    expect(lab.slice(headerStart, headerEnd)).not.toMatch(/role="menu"/);
+    const menu = lab.slice(lab.indexOf("{/* Demo battle menu: top level"));
+    expect(menu).toMatch(/className="fixed z-\[95\]/);
+    expect(menu.indexOf('role="menu"')).toBeLessThan(menu.indexOf("{/* Free demo battle: full-screen"));
+  });
   it("the header dropdown lists every demo and the player uses the chosen one", () => {
     const lab = readFileSync(resolve(__dirname, "..", "components", "BioStitchLabView.tsx"), "utf8");
     expect(lab).toMatch(/DEMO_BATTLES\.map\(\(d, i\)/);
