@@ -64,7 +64,7 @@ Everything Kiro used is checked into **`/.kiro`** in the repository.
   - `secret-scan-on-save` warns about HuggingFace, AWS, OpenAI or GitHub tokens and private keys.
   - `private-strategy-doc-guard` checks that new strategy documents are gitignored.
   - `peer-review-citation-check` asks the agent to re-verify citations in Europe PMC and update `CREDITS.md` whenever the experiment data changes.
-- **Property-based testing:** 21 test files use **fast-check** (stage timing, heartbeat progression, the 450-point stat budget, battle odds, video fallbacks). 398 tests pass.
+- **Property-based testing:** 21 test files use **fast-check** (stage timing, heartbeat progression, the 450-point stat budget, battle odds, video fallbacks). 404 tests pass.
 - **Sub-agents:** used for parallel audits, documentation lookups and independent verification of changes.
 
 ## Challenges we ran into
@@ -98,5 +98,5 @@ Everything Kiro used is checked into **`/.kiro`** in the repository.
 - **영감:** 1818년 프랑켄슈타인의 상상이 2026년 재생 생물학에서 현실이 되었습니다. 쥐 뇌에 이식된 인간 대뇌 오가노이드, 다시 뛰는 유령 심장, 사후 4시간 뒤 되살린 돼지 뇌, 녹색으로 빛나는 키메라 원숭이가 그 예입니다.
 - **기능:** 실제 논문 6편 보관소와 실시간 PubMed·위키백과 검증, 그리고 괴수 설계실, 바이오리액터, 16초 AI 전투 결투장, 무료 데모 전투, 괴수 관리를 갖췄습니다.
 - **제작:** 과학 API, LTX 영상, HuggingFace 이미지, WebAudio 소리, IndexedDB를 한 앱에 꿰맸습니다.
-- **Kiro:** spec, steering, 실제 에이전트 훅 4개, fast-check 속성 테스트(398개 통과), 서브 에이전트를 썼습니다.
+- **Kiro:** spec, steering, 실제 에이전트 훅 4개, fast-check 속성 테스트(404개 통과), 서브 에이전트를 썼습니다.
 - **어려웠던 점:** 두 괴수가 실제로 맞붙게 만들기, 형광 원숭이를 과학적으로 정확하게 표현하기, 비용 관리.

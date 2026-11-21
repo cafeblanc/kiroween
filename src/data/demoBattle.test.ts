@@ -23,7 +23,7 @@ describe("free demo battle", () => {
   });
   it("the dropdown menu is drawn at the top level (fixed, above the z-50 lab window), not inside the clipping header", () => {
     const lab = readFileSync(resolve(__dirname, "..", "components", "BioStitchLabView.tsx"), "utf8");
-    const button = lab.indexOf('aria-haspopup="menu"');
+    const button = lab.indexOf("aria-expanded={isDemoMenuOpen}");
     const headerStart = lab.lastIndexOf("overflow-x-auto", button);
     const headerEnd = lab.indexOf("{/* TAB 1:", button);
     expect(headerStart).toBeGreaterThan(0);

@@ -22,6 +22,7 @@ import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
 import { DEMO_BATTLE, DEMO_BATTLES, DEMO_BATTLE_TITLE, DEMO_BATTLE_VIDEO_URL } from "../data/demoBattle";
+import { parseDeepLink } from "../utils/deepLink";
 import { BATTLE_PLAYBACK_RATE, BATTLE_VIDEO_COST_USD, BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
 import {
   EMPTY_SLOTS,
@@ -263,7 +264,7 @@ const KIRO_STEERING: { file: string; ko: string[]; en: string[] }[] = [
   },
 ];
 const KIRO_TESTS: { ko: string; en: string }[] = [
-  { ko: "Vitest 테스트 40개 파일, 398개 테스트가 모두 통과합니다 (npm test).", en: "40 Vitest files, 398 tests, all passing (npm test)." },
+  { ko: "Vitest 테스트 41개 파일, 404개 테스트가 모두 통과합니다 (npm test).", en: "41 Vitest files, 404 tests, all passing (npm test)." },
   { ko: "21개 파일이 fast-check 속성 기반 테스트를 씁니다: 성장 단계 시간, 심장 박동 증가, 450점 능력치 예산, 승률 0%·100% 금지, 영상 대체 경로.", en: "21 files use fast-check property-based tests: stage timing, heartbeat progression, the 450-point stat budget, win odds never 0% or 100%, video fallbacks." },
   { ko: "API 키는 테스트에서 절대 실제로 호출되지 않습니다. 외부 호출은 모두 가짜(mock)로 대체합니다.", en: "No test ever calls a paid API: every upstream request is mocked." },
 ];
@@ -435,6 +436,47 @@ export const BioStitchLabView: React.FC = () => {
     setDemoReplayKey((k) => k + 1);
     setDemoBattlePhase("playing");
   };
+
+  // Direct links (?open=…, ?case=…, ?lang=en), applied once on load; see src/utils/deepLink.ts.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const link = parseDeepLink(window.location.search, VERIFIED_BIO_EXPERIMENTS.map((e) => e.id), DEMO_BATTLES.length);
+    if (link.lang) handleGlobalLanguageChange(link.lang);
+    const exp = link.caseId ? VERIFIED_BIO_EXPERIMENTS.find((e) => e.id === link.caseId) : undefined;
+    if (exp) handleSelectExperiment(exp);
+    switch (link.open) {
+      case "help":
+        setIsHelpOpen(true);
+        break;
+      case "kiro":
+        setKiroModalTab(link.kiroTab ?? "specs");
+        setIsKiroSpecModalOpen(true);
+        break;
+      case "design":
+        setIsCustomMonsterModalOpen(true);
+        break;
+      case "arena":
+        setActiveModalTab("monster_arena");
+        setIsStitchModalOpen(true);
+        if (link.demoMenu) {
+          // The menu opens under its header button, so wait until the arena has rendered it.
+          window.setTimeout(() => {
+            const btn = document.querySelector<HTMLElement>('[aria-haspopup="menu"]');
+            const r = btn?.getBoundingClientRect();
+            if (r) setDemoMenuAnchor({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+            setIsDemoMenuOpen(true);
+          }, 300);
+        }
+        break;
+      case "demo":
+        setActiveModalTab("monster_arena");
+        setIsStitchModalOpen(true);
+        playDemoBattle(link.demoIndex ?? 0);
+        break;
+    }
+    // Run once on load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // 결투 영상 단계: 두 괴수 화면 → (생성 중) → 영상 재생 → 결과 표시
   const [battlePhase, setBattlePhase] = useState<"stage" | "playing" | "outcome">("stage");
   const [duelWinnerSide, setDuelWinnerSide] = useState<1 | 2 | null>(null);

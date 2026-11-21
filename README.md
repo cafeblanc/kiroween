@@ -34,6 +34,19 @@ The app stitches technologies that were never meant to work together into one br
    finisher and one defence move, and the winner wins with its finisher.
 6. **Monster manager.** Rename, export as ZIP, or delete your monsters and clear duplicates.
 
+### Direct links
+
+Each of these opens one screen directly (add `&lang=en` for English):
+
+| Link | Opens |
+|---|---|
+| https://asura.cafeblanc.kr/?lang=en&case=ghost-heart | The Ghost Heart case. Other cases: `xenocortication`, `brainex`, `human-pig`, `monkey`, `axolotl` |
+| https://asura.cafeblanc.kr/?lang=en&open=design | The Design Room |
+| https://asura.cafeblanc.kr/?lang=en&open=arena&menu=demo | The arena with the free demo battle menu open |
+| https://asura.cafeblanc.kr/?lang=en&open=demo | The 16 s showcase battle, full screen (`&demo=2`, `&demo=3` for the others) |
+| https://asura.cafeblanc.kr/?lang=en&open=kiro&tab=hooks | The "Built with Kiro" panel (tabs: `specs`, `steering`, `hooks`, `tests`) |
+| https://asura.cafeblanc.kr/?lang=en&open=help | The user guide |
+
 ### Cost note for judges
 
 The archive, the cross-verifier, the Design Room images and the bioreactor growth of the six sample monsters are
@@ -50,7 +63,7 @@ npx vercel dev               # serves the Vite app and the api/ functions togeth
 npm run dev
 ```
 
-Checks: `npx tsc --noEmit`, `npx tsc -p api --noEmit`, `npm test` (vitest, 40 files, 398 tests), `npm run build`.
+Checks: `npx tsc --noEmit`, `npx tsc -p api --noEmit`, `npm test` (vitest, 41 files, 404 tests), `npm run build`.
 
 ## How Kiro was used
 
