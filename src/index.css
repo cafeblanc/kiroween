@@ -328,6 +328,17 @@ iframe.goog-te-banner-frame,
   z-index: -9999 !important;
 }
 
+/* Google's floating translate button / logo and banners are injected straight under <body> with class names that
+   change over time, so match them by pattern. Only top-level elements: translated text inside #root is untouched. */
+body > .skiptranslate,
+body > [class^="VIpgJd-"],
+body > [class*=" VIpgJd-"],
+body > [id^="goog-gt-"],
+body > iframe[id^=":"],
+body > iframe[class*="goog-te"] {
+  display: none !important;
+  visibility: hidden !important;
+}
 .goog-text-highlight {
   background: transparent !important;
   box-shadow: none !important;

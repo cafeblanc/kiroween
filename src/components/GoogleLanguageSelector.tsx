@@ -58,6 +58,16 @@ function setGoogTransCookie(langCode: string) {
   }
 }
 
+/** True for the elements the Google Translate widget adds directly under <body> (logo button, banner, tooltips). */
+export function isGoogleTranslateWidget(el: { id: string; className: unknown; tagName: string }): boolean {
+  const cls = typeof el.className === "string" ? el.className : "";
+  return (
+    /(^|\s)(skiptranslate|VIpgJd-[\w-]+|goog-te[\w-]*)(\s|$)/.test(cls) ||
+    el.id.startsWith("goog-gt-") ||
+    (el.tagName === "IFRAME" && el.id.startsWith(":"))
+  );
+}
+
 function triggerGoogleTranslate(langCode: string, attempt = 0) {
   if (typeof document === "undefined") return;
   if (langCode === "ko") {
@@ -111,6 +121,20 @@ export const GoogleLanguageSelector: React.FC<GoogleLanguageSelectorProps> = ({ 
     } else if (window.google?.translate?.TranslateElement) {
       window.googleTranslateElementInit();
     }
+
+    // Google injects a floating translate button (round logo) and banners straight under <body>; hide each one as it
+    // appears. The app lives in #root and scripts are left alone, so only Google's own widgets are affected.
+    const hideInjected = () => {
+      for (const el of Array.from(document.body.children)) {
+        if (!(el instanceof HTMLElement) || el.id === "root" || el.tagName === "SCRIPT" || el.tagName === "STYLE") continue;
+        if (isGoogleTranslateWidget(el)) el.style.setProperty("display", "none", "important");
+      }
+      document.body.style.top = "0px";
+    };
+    hideInjected();
+    const observer = new MutationObserver(hideInjected);
+    observer.observe(document.body, { childList: true });
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {

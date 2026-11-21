@@ -123,9 +123,11 @@ describe('C6 Lab Manual (1.6)', () => {
     expect((m![1].match(/\bko:/g) ?? []).length).toBe(6);
   });
 
-  it('C6: modal renders 6 cards (currently 4)', () => {
-    const cards = modal.slice(0, 6000).match(/bg-slate-950\/90 border border-slate-800 rounded-xl/g) ?? [];
-    expect(cards.length).toBe(6);
+  it('C6: modal renders one card per point, each with step-by-step instructions', () => {
+    expect(modal.slice(0, 6000)).toMatch(/LAB_MANUAL_POINTS\.map\(/);
+    expect(modal.slice(0, 6000)).toMatch(/sec\.steps\.map\(/);
+    const m = /LAB_MANUAL_POINTS[^=]*=\s*\[([\s\S]*?)\n\];/.exec(src)!;
+    expect((m[1].match(/\bsteps: \[/g) ?? []).length).toBe(12); // ko + en for each of the 6 sections
   });
 
   it('C6: confirm button text is localized by isKo (currently hard-coded Korean)', () => {

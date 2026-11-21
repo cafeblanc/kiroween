@@ -21,7 +21,7 @@ import { ArenaHalf } from "./bioreactor/ArenaHalf";
 import { generateMonsterVideo } from "../services/videoGenService";
 import { LTX_MAX_WAIT_MS } from "../services/ltxJobClient";
 import { BioreactorScreen } from "./bioreactor/BioreactorScreen";
-import { DEMO_BATTLE, DEMO_BATTLE_TITLE, DEMO_BATTLE_VIDEO_URL } from "../data/demoBattle";
+import { DEMO_BATTLE, DEMO_BATTLES, DEMO_BATTLE_TITLE, DEMO_BATTLE_VIDEO_URL } from "../data/demoBattle";
 import { BATTLE_PLAYBACK_RATE, BATTLE_VIDEO_COST_USD, BATTLE_VIDEO_SECONDS, MIRROR_RIGHT_FIGHTER, generateBattleVideo } from "../services/battleVideoService";
 import {
   EMPTY_SLOTS,
@@ -90,41 +90,139 @@ const SYNAPSE_CHAT_EXIT_ANIM_MS = 550;
 
 interface LabManualPoint {
   icon: string;
-  ko: { title: string; body: string };
-  en: { title: string; body: string };
+  ko: { title: string; steps: string[] };
+  en: { title: string; steps: string[] };
 }
 
-// Concise 6-point Lab Manual (bilingual; the modal picks ko/en by isKo).
+// 6-section Lab Manual (bilingual; the modal picks ko/en by isKo). Each section explains the real buttons step by step.
 const LAB_MANUAL_POINTS: LabManualPoint[] = [
   {
-    icon: "🐭",
-    ko: { title: "1. 실제 줄기세포 실험 탐구", body: "실험 목록(아홀로틀 사지 재생·유령 심장·키메라 영장류 등)을 누르면 현미경 뷰와 논문 요약이 즉시 전환됩니다." },
-    en: { title: "1. Explore real stem-cell experiments", body: "Pick an experiment from the list (axolotl limb regeneration, ghost heart, chimeric primate and more) to switch the microscopy view and paper summary." },
+    icon: "🧭",
+    ko: {
+      title: "1. 맨 위 메뉴 버튼",
+      steps: [
+        "🧬 [괴수 설계실]: 나만의 키메라 괴수를 설계하는 창을 엽니다.",
+        "⚔️ [괴수 결투장]: 괴수끼리 싸우는 결투장을 엽니다. 무료 데모 전투도 여기서 봅니다.",
+        "🔊 [내레이터]: 실험 설명 음성과 실험실 소리를 켜고 끕니다.",
+        "❓ [사용법]: 지금 보고 있는 이 안내를 엽니다.",
+        "🌐 언어 선택: 화면 전체를 고른 언어로 번역합니다. 한국어를 고르면 원래대로 돌아옵니다.",
+      ],
+    },
+    en: {
+      title: "1. Top menu buttons",
+      steps: [
+        "🧬 [Monster Design Room]: opens the window where you design your own chimera.",
+        "⚔️ [Monster Arena]: opens the arena where monsters fight. The free demo battles are here too.",
+        "🔊 [Narrator]: turns the spoken case narration and lab sounds on or off.",
+        "❓ [Help]: opens this guide.",
+        "🌐 Language selector: translates the whole screen. Pick Korean to go back to the original.",
+      ],
+    },
   },
   {
-    icon: "📡",
-    ko: { title: "2. 전체 화면 현미경 영상", body: "화면 전체에 음소거 현미경 영상과 공초점 사진을 겹쳐 보여주며, 화면을 누르면 내레이터가 켜지고 꺼집니다. 사용법은 맨 윗줄 [❓ 사용법] 버튼에 있습니다." },
-    en: { title: "2. Full-screen microscopy view", body: "The muted microscopy video is layered over a confocal photo across the whole screen. Tap it to toggle the narrator. This guide is under [❓ Help] in the top bar." },
-  },
-  {
-    icon: "🌐",
-    ko: { title: "3. 다국어 & 내레이터", body: "우측 상단 언어 선택기로 화면 전체를 번역하고, 내레이터 버튼으로 해당 언어 음성을 듣습니다." },
-    en: { title: "3. Languages & narrator", body: "Use the language selector at the top right to translate the screen, and the Narrator button to hear it spoken." },
+    icon: "🔬",
+    ko: {
+      title: "2. 실제 실험 보관소 (첫 화면)",
+      steps: [
+        "아래쪽 사진 줄에서 실험 6개 중 하나를 누르면 화면 영상과 설명이 그 실험으로 바뀝니다.",
+        "위쪽 제목 배지에 실험 이름이 나오고, 마우스를 올리면 학술지와 연도가 보입니다.",
+        "화면을 누르면 내레이터가 켜지거나 꺼집니다.",
+        "모든 사례는 실제 논문(Nature, Cell 등)을 바탕으로 합니다. 영상과 사진은 논문 내용을 보여 주기 위한 일러스트입니다.",
+      ],
+    },
+    en: {
+      title: "2. Real experiment archive (home screen)",
+      steps: [
+        "Tap one of the 6 experiments in the photo strip at the bottom; the video and summary switch to it.",
+        "The title badge at the top names the case; hover it to see the journal and year.",
+        "Tap the screen to turn the narrator on or off.",
+        "Every case comes from a real paper (Nature, Cell and others). Videos and photos are illustrations of the findings.",
+      ],
+    },
   },
   {
     icon: "💬",
-    ko: { title: "4. 논문·백과사전 채팅", body: "맨 아래 입력창에 질문하면 PubMed와 위키백과를 실시간으로 검색해 영상 위에 답변을 보여주고, 약 3초 뒤 위로 사라집니다. 하단 사진 목록에서 6개 실험을 고를 수 있습니다." },
-    en: { title: "4. Paper & encyclopedia chat", body: "Ask in the input line at the very bottom. The lab searches PubMed and Wikipedia live, shows the answer over the video, and it slides away after about 3 seconds. Pick one of the 6 experiments from the photo strip at the bottom." },
-  },
-  {
-    icon: "⚡",
-    ko: { title: "5. 키메라 조립·부활", body: "키메라 조립 버튼으로 iPSC를 조직 사이에 주입해 괴수를 15초 배양하고 3D 각성과 결투장으로 이어갑니다." },
-    en: { title: "5. Chimera assembly", body: "Open the Chimera Assembler to inject iPSCs between tissues, culture a creature for 15 seconds, then awaken it and send it to the arena." },
+    ko: {
+      title: "3. 논문·백과사전 질문",
+      steps: [
+        "맨 아래 입력창에 질문을 쓰고 [전송]을 누르거나 Enter를 누릅니다.",
+        "PubMed(Europe PMC) 논문과 위키백과를 실시간으로 찾아 영상 위에 답과 출처(PMID)를 보여 줍니다.",
+        "답은 약 3초 뒤 위로 사라집니다. 질문은 무료이며 API 키가 필요 없습니다.",
+      ],
+    },
+    en: {
+      title: "3. Ask papers and the encyclopedia",
+      steps: [
+        "Type a question in the input line at the bottom and press [Send] or Enter.",
+        "The lab searches PubMed (Europe PMC) and Wikipedia live and shows the answer with its source (PMID) over the video.",
+        "The answer slides away after about 3 seconds. Questions are free and need no API key.",
+      ],
+    },
   },
   {
     icon: "🧬",
-    ko: { title: "6. 괴수 설계실", body: "맨 윗줄 [괴수 설계실]에서 부위를 설계하고 [괴수 배양기 가동] 또는 [생성 괴수 결투장 출격]을 누르면 이미지와 영상이 백그라운드에서 만들어집니다. 가이드를 닫으면 진행 중인 화면 그대로 돌아갑니다." },
-    en: { title: "6. Monster Design Room", body: "Design the parts in [Monster Design Room] in the top bar, then press [Start the bioreactor] or [Send to the arena]; the image and video are made in the background. Closing this guide returns you to where you were." },
+    ko: {
+      title: "4. 괴수 설계실",
+      steps: [
+        "기본 종(전설·외계·프랑켄슈타인·인간)과 머리, 팔, 다리, 꼬리 같은 부위와 특성을 고릅니다.",
+        "먼저 무료 AI 이미지로 디자인을 미리 봅니다. 마음에 들 때까지 무료로 다시 만들 수 있습니다.",
+        "능력치는 합계 450점 안에서 나눕니다. 어떤 능력치나 승률도 0%나 100%가 되지 않습니다.",
+        "괴수마다 필살기 1개와 방어 특기 1개가 있습니다.",
+        "[괴수 배양기 가동]은 바이오리액터로, [결투장 출격]은 결투장으로 보냅니다. 새 성장 영상은 유료(LTX)이며 하루 5편까지입니다.",
+      ],
+    },
+    en: {
+      title: "4. Monster Design Room",
+      steps: [
+        "Pick a base species (mythic, alien, Frankenstein, human) and the head, arms, legs, tail and traits.",
+        "Preview the design with a free AI image first; remake it for free until you like it.",
+        "Stats share a 450-point budget. No stat or win chance is ever 0% or 100%.",
+        "Every monster has one finisher and one defence move.",
+        "[Start the bioreactor] grows it; [Send to the arena] takes it to fight. New growth videos are paid (LTX), 5 per day.",
+      ],
+    },
+  },
+  {
+    icon: "⚔️",
+    ko: {
+      title: "5. 바이오리액터와 결투장",
+      steps: [
+        "바이오리액터: 배아가 심장 박동과 함께 6단계로 자라고, 유리를 깨고 깨어납니다.",
+        "🎬 [무료 데모 전투 ▾]: 목록에서 전투 영상을 골라 무료로 봅니다. 맨 위 ⭐가 16초 대표 전투입니다. 끝나면 서사, [다음 데모], [다시 보기]가 나옵니다.",
+        "직접 싸우기: 결투장에서 괴수 두 마리를 고르고 배틀 스토리를 읽거나 고칩니다(무료).",
+        "⚔️ [결투]: 두 괴수의 능력치로 16초 전투 영상을 만듭니다(약 $2.08, 유료). 이미 만든 영상은 [결투 다시 보기]로 무료로 봅니다.",
+        "📜 [지난 전투 스토리 다시보기]: 저장된 전투 기록과 영상을 다시 봅니다.",
+      ],
+    },
+    en: {
+      title: "5. Bioreactor and arena",
+      steps: [
+        "Bioreactor: the embryo grows through 6 stages as its heartbeat rises, then breaks the glass and wakes up.",
+        "🎬 [Free demo battle ▾]: pick a battle video from the list and watch it for free. The ⭐ entry is the 16 s showcase. Afterwards you get the story, [Next demo] and [Replay].",
+        "Your own fight: pick two monsters in the arena and read or edit the battle story (free).",
+        "⚔️ [Duel]: makes a 16 s battle video from both monsters' stats (about $2.08, paid). A video you already made replays for free.",
+        "📜 [Replay past battle stories]: watch saved battles and their videos again.",
+      ],
+    },
+  },
+  {
+    icon: "🗂️",
+    ko: {
+      title: "6. 괴수 관리와 팁",
+      steps: [
+        "🗂️ [괴수 관리]: 괴수 이름 바꾸기, ZIP으로 내보내기, 삭제, 중복 정리를 합니다.",
+        "만든 괴수와 영상은 이 브라우저에 저장되어 새로고침해도 남습니다.",
+        "[← 돌아가기]나 아래 버튼으로 이 안내를 닫으면 보던 화면으로 그대로 돌아갑니다.",
+      ],
+    },
+    en: {
+      title: "6. Monster manager and tips",
+      steps: [
+        "🗂️ [Manage]: rename monsters, export them as a ZIP, delete them, and clean up duplicates.",
+        "Your monsters and videos are saved in this browser and survive a reload.",
+        "Closing this guide with [← Back] or the button below returns you to where you were.",
+      ],
+    },
   },
 ];
 
@@ -286,6 +384,15 @@ export const BioStitchLabView: React.FC = () => {
   // Free demo battle (static file): "playing" -> "outcome" (story) -> closed. The replay key restarts the video.
   const [demoBattlePhase, setDemoBattlePhase] = useState<"closed" | "playing" | "outcome">("closed");
   const [demoReplayKey, setDemoReplayKey] = useState<number>(0);
+  const [demoIndex, setDemoIndex] = useState<number>(0);
+  const [isDemoMenuOpen, setIsDemoMenuOpen] = useState<boolean>(false);
+  const activeDemo = DEMO_BATTLES[demoIndex] ?? DEMO_BATTLES[0];
+  const playDemoBattle = (i: number) => {
+    setIsDemoMenuOpen(false);
+    setDemoIndex(i);
+    setDemoReplayKey((k) => k + 1);
+    setDemoBattlePhase("playing");
+  };
   // 결투 영상 단계: 두 괴수 화면 → (생성 중) → 영상 재생 → 결과 표시
   const [battlePhase, setBattlePhase] = useState<"stage" | "playing" | "outcome">("stage");
   const [duelWinnerSide, setDuelWinnerSide] = useState<1 | 2 | null>(null);
@@ -2577,14 +2684,38 @@ export const BioStitchLabView: React.FC = () => {
                       </button>                    </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => { setDemoReplayKey((k) => k + 1); setDemoBattlePhase("playing"); }}
-                        title={isKo ? "미리 만든 16초 전투 영상 (무료)" : "Pre-made 16 s battle video (free)"}
-                        className="bg-emerald-600/25 hover:bg-emerald-600/45 text-emerald-100 border border-emerald-400/70 px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer whitespace-nowrap shadow-[0_0_14px_rgba(16,185,129,0.45)]"
-                      >
-                        🎬 {isKo ? "무료 데모 전투" : "Free demo battle"}
-                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsDemoMenuOpen((o) => !o)}
+                          aria-haspopup="menu"
+                          aria-expanded={isDemoMenuOpen}
+                          title={isKo ? "미리 만든 전투 영상 (무료)" : "Pre-made battle videos (free)"}
+                          className="bg-emerald-600/25 hover:bg-emerald-600/45 text-emerald-100 border border-emerald-400/70 px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer whitespace-nowrap shadow-[0_0_14px_rgba(16,185,129,0.45)]"
+                        >
+                          🎬 {isKo ? "무료 데모 전투" : "Free demo battle"} ▾
+                        </button>
+                        {isDemoMenuOpen && (
+                          <ul
+                            role="menu"
+                            className="absolute right-0 top-full mt-1 z-[95] w-72 max-w-[85vw] rounded-xl border border-emerald-400/60 bg-slate-950/95 p-1 shadow-xl"
+                          >
+                            {DEMO_BATTLES.map((d, i) => (
+                              <li key={d.record.id} role="none">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => playDemoBattle(i)}
+                                  className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-slate-100 hover:bg-emerald-500/20 flex items-center justify-between gap-2"
+                                >
+                                  <span className="truncate">{i === 0 ? "⭐ " : ""}{isKo ? d.title.ko : d.title.en}</span>
+                                  <span className="shrink-0 font-mono text-[10px] text-emerald-300">{d.seconds}{isKo ? "초" : " s"}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={backToDesignRoom}
@@ -3006,7 +3137,7 @@ export const BioStitchLabView: React.FC = () => {
           onClick={() => setIsHelpOpen(false)}
         >
           <div
-            className="bg-slate-900 border-2 border-emerald-500/50 rounded-2xl max-w-2xl w-full p-4 sm:p-5 shadow-2xl flex flex-col gap-3.5 max-h-[90dvh] overflow-y-auto"
+            className="bg-slate-900 border-2 border-emerald-500/50 rounded-2xl max-w-3xl w-full p-4 sm:p-5 shadow-2xl flex flex-col gap-3.5 max-h-[90dvh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
@@ -3026,48 +3157,22 @@ export const BioStitchLabView: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[0].icon}</span>
-                <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[0].ko.title : LAB_MANUAL_POINTS[0].en.title}</p>
-                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[0].ko.body : LAB_MANUAL_POINTS[0].en.body}</p>
-                </div>
-              </div>
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[1].icon}</span>
-                <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[1].ko.title : LAB_MANUAL_POINTS[1].en.title}</p>
-                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[1].ko.body : LAB_MANUAL_POINTS[1].en.body}</p>
-                </div>
-              </div>
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[2].icon}</span>
-                <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[2].ko.title : LAB_MANUAL_POINTS[2].en.title}</p>
-                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[2].ko.body : LAB_MANUAL_POINTS[2].en.body}</p>
-                </div>
-              </div>
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[3].icon}</span>
-                <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[3].ko.title : LAB_MANUAL_POINTS[3].en.title}</p>
-                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[3].ko.body : LAB_MANUAL_POINTS[3].en.body}</p>
-                </div>
-              </div>
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[4].icon}</span>
-                <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[4].ko.title : LAB_MANUAL_POINTS[4].en.title}</p>
-                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[4].ko.body : LAB_MANUAL_POINTS[4].en.body}</p>
-                </div>
-              </div>
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
-                <span className="text-lg shrink-0">{LAB_MANUAL_POINTS[5].icon}</span>
-                <div>
-                  <p className="font-bold text-emerald-400 mb-0.5">{isKo ? LAB_MANUAL_POINTS[5].ko.title : LAB_MANUAL_POINTS[5].en.title}</p>
-                  <p className="text-slate-300 leading-snug">{isKo ? LAB_MANUAL_POINTS[5].ko.body : LAB_MANUAL_POINTS[5].en.body}</p>
-                </div>
-              </div>
+              {LAB_MANUAL_POINTS.map((pt) => {
+                const sec = isKo ? pt.ko : pt.en;
+                return (
+                  <section key={pt.ko.title} className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-start gap-2.5">
+                    <span className="text-lg shrink-0" aria-hidden="true">{pt.icon}</span>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-emerald-400 mb-1">{sec.title}</h3>
+                      <ul className="text-slate-300 leading-snug list-disc pl-4 space-y-1">
+                        {sec.steps.map((step) => (
+                          <li key={step}>{step}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </section>
+                );
+              })}
             </div>
 
             <button
@@ -3086,13 +3191,13 @@ export const BioStitchLabView: React.FC = () => {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={isKo ? `무료 데모 전투: ${DEMO_BATTLE_TITLE.ko}` : `Free demo battle: ${DEMO_BATTLE_TITLE.en}`}
+          aria-label={isKo ? `무료 데모 전투: ${activeDemo.title.ko}` : `Free demo battle: ${activeDemo.title.en}`}
           className="fixed inset-0 z-[90] bg-black flex items-center justify-center"
           onKeyDown={(e) => { if (e.key === "Escape") setDemoBattlePhase("closed"); }}
         >
           <video
-            key={`demo-${demoReplayKey}`}
-            src={DEMO_BATTLE_VIDEO_URL}
+            key={`demo-${activeDemo.record.id}-${demoReplayKey}`}
+            src={activeDemo.videoUrl}
             autoPlay
             muted
             playsInline
@@ -3102,7 +3207,7 @@ export const BioStitchLabView: React.FC = () => {
             className={`w-full h-full object-contain ${demoBattlePhase === "outcome" ? "opacity-30" : ""}`}
           />
           <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 border border-emerald-400/60 text-emerald-200 text-xs font-black">
-            🎬 {isKo ? `무료 데모 전투 · ${DEMO_BATTLE_TITLE.ko}` : `Free demo battle · ${DEMO_BATTLE_TITLE.en}`}
+            🎬 {isKo ? `무료 데모 전투 · ${activeDemo.title.ko} · ${activeDemo.seconds}초` : `Free demo battle · ${activeDemo.title.en} · ${activeDemo.seconds} s`}
           </div>
           <button
             type="button"
@@ -3116,12 +3221,21 @@ export const BioStitchLabView: React.FC = () => {
             <div className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:w-[min(42rem,92vw)] max-h-[70vh] overflow-y-auto rounded-2xl border border-amber-400/60 bg-slate-950/95 p-4 flex flex-col gap-3">
               <h3 className="text-sm font-black text-amber-300">📜 {isKo ? "AI 생체 배틀 서사" : "AI Bio-Battle Story"}</h3>
               <p className="text-xs sm:text-sm text-slate-100 whitespace-pre-line leading-relaxed">
-                {isKo ? DEMO_BATTLE.storyKo : DEMO_BATTLE.storyEn}
+                {isKo ? activeDemo.record.storyKo : activeDemo.record.storyEn}
               </p>
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-end flex-wrap">
+                {DEMO_BATTLES.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => playDemoBattle((demoIndex + 1) % DEMO_BATTLES.length)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-black border border-emerald-400/70 bg-emerald-600/20 text-emerald-100 hover:bg-emerald-600/40"
+                  >
+                    ⏭ {isKo ? "다음 데모" : "Next demo"}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => { setDemoReplayKey((k) => k + 1); setDemoBattlePhase("playing"); }}
+                  onClick={() => playDemoBattle(demoIndex)}
                   className="px-3 py-1.5 rounded-lg text-xs font-black text-white bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400"
                 >
                   ▶ {isKo ? "다시 보기" : "Replay"}
