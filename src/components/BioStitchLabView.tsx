@@ -105,6 +105,7 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
         "⚔️ [괴수 결투장]: 괴수끼리 싸우는 결투장을 엽니다. 무료 데모 전투도 여기서 봅니다.",
         "🔊 [내레이터]: 실험 설명 음성과 실험실 소리를 켜고 끕니다.",
         "❓ [사용법]: 지금 보고 있는 이 안내를 엽니다.",
+        "📐 [Kiro 제작기]: 이 앱을 Kiro로 만든 방법(spec, steering, 에이전트 훅, 테스트)을 보여 줍니다.",
         "🌐 언어 선택: 화면 전체를 고른 언어로 번역합니다. 한국어를 고르면 원래대로 돌아옵니다.",
       ],
     },
@@ -115,6 +116,7 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
         "⚔️ [Monster Arena]: opens the arena where monsters fight. The free demo battles are here too.",
         "🔊 [Narrator]: turns the spoken case narration and lab sounds on or off.",
         "❓ [Help]: opens this guide.",
+        "📐 [Built with Kiro]: shows how this app was built with Kiro (specs, steering, agent hooks, tests).",
         "🌐 Language selector: translates the whole screen. Pick Korean to go back to the original.",
       ],
     },
@@ -224,6 +226,46 @@ const LAB_MANUAL_POINTS: LabManualPoint[] = [
       ],
     },
   },
+];
+
+// "How this app was built with Kiro" panel. Every entry matches a real file in /.kiro or a real test in the repository.
+type KiroPanelTab = "specs" | "steering" | "hooks" | "tests";
+const KIRO_PANEL_TABS: { id: KiroPanelTab; icon: string; ko: string; en: string }[] = [
+  { id: "specs", icon: "📋", ko: "Spec (7개)", en: "Specs (7)" },
+  { id: "steering", icon: "🧭", ko: "Steering", en: "Steering" },
+  { id: "hooks", icon: "⚙️", ko: "에이전트 훅 (4개)", en: "Agent hooks (4)" },
+  { id: "tests", icon: "✅", ko: "테스트", en: "Tests" },
+];
+const KIRO_SPECS: { dir: string; ko: string; en: string }[] = [
+  { dir: "stem-cell-bio-stitcher", ko: "실제 실험 보관소, 현미경 화면, 실시간 PubMed·위키백과 검증, 3초 채팅.", en: "The real experiment archive, microscopy viewport, live PubMed/Wikipedia cross-verifier and 3-second chat." },
+  { dir: "kiroween-rearchitecture", ko: "6단계 성장 엔진, 바이오리액터 화면, 심장 박동 음향.", en: "The six-stage growth engine, bioreactor screen and heartbeat audio." },
+  { dir: "video-arena-bioreactor-overhaul", ko: "결투장과 바이오리액터 개편: 전투 흐름, 각성 연출.", en: "The arena and bioreactor overhaul: battle flow and awakening." },
+  { dir: "ltx-custom-studio-arena", ko: "LTX 영상 파이프라인, 괴수 설계실, 사용자 괴수의 성장과 결투.", en: "The LTX video pipeline, Design Room, and custom monsters growing and fighting." },
+  { dir: "hidden-bugs-audit", ko: "숨은 버그 감사: 버그 조건 탐색 테스트와 기존 동작 보존 테스트.", en: "Hidden-bugs audit: bug-condition exploration tests and preservation tests." },
+  { dir: "arena-engagement-loop", ko: "결투장 흐름: 필살기, 서사, 다시 보기.", en: "The arena loop: finishers, battle stories and replays." },
+  { dir: "sample-monster-fix", ko: "샘플 괴수 디자인과 이미지·프롬프트 일치.", en: "Sample monster designs matching their images and prompts." },
+];
+const KIRO_STEERING: { file: string; ko: string[]; en: string[] }[] = [
+  {
+    file: ".kiro/steering/product.md",
+    ko: ["Frankenstein 부문 목표와 실제 논문 기반 실험 사례", "앱의 4개 핵심 블록(현미경 화면, 내레이터, 3초 채팅, 교차 검증기)"],
+    en: ["The Frankenstein-track vision and the real, peer-reviewed cases", "The app's four core blocks (viewport, narrator, 3-second chat, cross-verifier)"],
+  },
+  {
+    file: ".kiro/steering/tech.md",
+    ko: ["React + TypeScript + Vite, 색상 팔레트", "API 키 없는 Europe PMC·위키백과 호출, 미디어 실패 시 대체 화면"],
+    en: ["React + TypeScript + Vite and the colour palette", "Key-free Europe PMC/Wikipedia calls and fallbacks for every media failure"],
+  },
+  {
+    file: "AGENTS.md",
+    ko: ["같은 작업은 최대 2번까지만 재시도", "개발 서버는 1개만 유지", "OpenAI는 사용하지 않음, 키는 서버에만", "전략 문서는 절대 커밋하지 않음"],
+    en: ["Retry the same action at most twice", "Keep exactly one dev server", "No OpenAI; keys stay on the server", "Never commit private strategy documents"],
+  },
+];
+const KIRO_TESTS: { ko: string; en: string }[] = [
+  { ko: "Vitest 테스트 40개 파일, 398개 테스트가 모두 통과합니다 (npm test).", en: "40 Vitest files, 398 tests, all passing (npm test)." },
+  { ko: "21개 파일이 fast-check 속성 기반 테스트를 씁니다: 성장 단계 시간, 심장 박동 증가, 450점 능력치 예산, 승률 0%·100% 금지, 영상 대체 경로.", en: "21 files use fast-check property-based tests: stage timing, heartbeat progression, the 450-point stat budget, win odds never 0% or 100%, video fallbacks." },
+  { ko: "API 키는 테스트에서 절대 실제로 호출되지 않습니다. 외부 호출은 모두 가짜(mock)로 대체합니다.", en: "No test ever calls a paid API: every upstream request is mocked." },
 ];
 
 function buildOfflineDossier(query: string): StitchedResearchDossier {
@@ -356,9 +398,7 @@ export const BioStitchLabView: React.FC = () => {
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [isCustomMonsterModalOpen, setIsCustomMonsterModalOpen] = useState<boolean>(false);
   const [isKiroSpecModalOpen, setIsKiroSpecModalOpen] = useState<boolean>(false);
-  const [kiroModalTab, setKiroModalTab] = useState<"requirements" | "tasks" | "hooks" | "code_gen">("requirements");
-  const [selectedCodeSpec, setSelectedCodeSpec] = useState<string>("stitcher");
-  const [isCodeCopied, setIsCodeCopied] = useState<boolean>(false);
+  const [kiroModalTab, setKiroModalTab] = useState<KiroPanelTab>("specs");
   const [isStitchModalOpen, setIsStitchModalOpen] = useState<boolean>(false);
   // 키메라 배양실(샘플 6종)은 당분간 숨김: 결투장이 기본 탭 (코드는 유지, SHOW_CHIMERA_LAB로 다시 켤 수 있음)
   const [activeModalTab, setActiveModalTab] = useState<"chimera_assembler" | "monster_arena">(
@@ -2434,6 +2474,14 @@ export const BioStitchLabView: React.FC = () => {
               <span>❓</span>
               <span>{isKo ? "사용법" : "Help / Lab Guide"}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => { setKiroModalTab("specs"); setIsKiroSpecModalOpen(true); }}
+              className="bg-purple-700 hover:bg-purple-600 text-white font-bold px-2.5 py-0.5 rounded text-[10px] sm:text-[11px] flex items-center gap-1 cursor-pointer transition shadow border border-purple-300/50 active:scale-95"
+            >
+              <span>📐</span>
+              <span>{isKo ? "Kiro 제작기" : "Built with Kiro"}</span>
+            </button>
           </div>
         </div>
 
@@ -3625,12 +3673,12 @@ export const BioStitchLabView: React.FC = () => {
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
                 <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded font-bold">
-                  KIROWEEN 2026 · VERIFIED SPEC-DRIVEN DEVELOPMENT
+                  KIROWEEN 2026 · SPEC-DRIVEN DEVELOPMENT
                 </span>
-                <h2 className="text-sm sm:text-base font-black text-white mt-1 flex items-center gap-2">
-                  <span>📐 Kiro Architecture & Live Code Generator Studio</span>
+                <h2 className="text-sm sm:text-base font-black text-white mt-1 flex items-center gap-2 flex-wrap">
+                  <span>📐 {isKo ? "Kiro로 만든 방법" : "How this app was built with Kiro"}</span>
                   <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
-                    ✔ 100% Executed
+                    github.com/cafeblanc/kiroween/.kiro
                   </span>
                 </h2>
               </div>
@@ -3645,125 +3693,54 @@ export const BioStitchLabView: React.FC = () => {
 
             {/* Sub-Navigation Tabs */}
             <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto text-xs">
-              <button
-                type="button"
-                onClick={() => setKiroModalTab("requirements")}
-                className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition ${
-                  kiroModalTab === "requirements"
-                    ? "bg-purple-600 text-white shadow"
-                    : "bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-              >
-                📋 EARS Requirements (REQ 1–5)
-              </button>
-              <button
-                type="button"
-                onClick={() => setKiroModalTab("tasks")}
-                className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition ${
-                  kiroModalTab === "tasks"
-                    ? "bg-emerald-600 text-white shadow"
-                    : "bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-              >
-                ✅ Tasks Checklist (5/5 Done)
-              </button>
-              <button
-                type="button"
-                onClick={() => setKiroModalTab("hooks")}
-                className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition ${
-                  kiroModalTab === "hooks"
-                    ? "bg-cyan-600 text-white shadow"
-                    : "bg-slate-800/80 text-slate-300 hover:text-white"
-                }`}
-              >
-                ⚙️ Steering & Hooks
-              </button>
-              <button
-                type="button"
-                onClick={() => setKiroModalTab("code_gen")}
-                className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition ${
-                  kiroModalTab === "code_gen"
-                    ? "bg-amber-600 text-slate-950 font-black shadow"
-                    : "bg-slate-800/80 text-amber-300 hover:text-white"
-                }`}
-              >
-                ⚡ Live Spec Code Generator
-              </button>
+              {KIRO_PANEL_TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setKiroModalTab(t.id)}
+                  className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition whitespace-nowrap ${
+                    kiroModalTab === t.id ? "bg-purple-600 text-white shadow" : "bg-slate-800/80 text-slate-300 hover:text-white"
+                  }`}
+                >
+                  {t.icon} {isKo ? t.ko : t.en}
+                </button>
+              ))}
             </div>
 
-            {/* TAB 1: REQUIREMENTS (EARS NOTATION) */}
-            {kiroModalTab === "requirements" && (
-              <div className="flex flex-col gap-3 text-xs">
-                <div className="bg-slate-950 border border-purple-500/40 rounded-xl p-3">
-                  <span className="font-mono text-purple-300 font-bold">REQ-1: 10대 실존 바이오-프랑켄슈타인 뷰포트 전환</span>
-                  <p className="text-slate-300 mt-1 leading-relaxed">
-                    <strong>WHEN</strong> 사용자가 검증된 10대 생체 실험(스탠퍼드 92% 쥐 대뇌 인간화, 유령 심장, 예일 BrainEx 사후 뇌 부활 등)을 클릭하면,
-                    <strong> THE SYSTEM SHALL</strong> 페이지 새로고침 없이 즉시 고해상도 현미경 동영상과 학술지(Nature/Cell/Science) 실제 실험 사진, PMID/DOI 검증 메타데이터를 로드한다.
-                  </p>
-                </div>
-                <div className="bg-slate-950 border border-purple-500/40 rounded-xl p-3">
-                  <span className="font-mono text-purple-300 font-bold">REQ-2: 점진적 사진 융합 바이오-키메라 어셈블러</span>
-                  <p className="text-slate-300 mt-1 leading-relaxed">
-                    <strong>WHEN</strong> 사용자가 두뇌·심장·몸통·사지 부위를 선택하고 조립을 시작하면,
-                    <strong> THE SYSTEM SHALL</strong> 실제 실험실 현미경 사진 4장이 원통형 배양기 속에서 유동하며 중심부로 점진적 융합(Diffusion Morphing)되고, 배양액이 배출된 뒤 살아 움직이는 생명체로 각성한다.
-                  </p>
-                </div>
-                <div className="bg-slate-950 border border-purple-500/40 rounded-xl p-3">
-                  <span className="font-mono text-purple-300 font-bold">REQ-3: WebAudio 실시간 심장박동 음향 & 가변 BPM 심전도</span>
-                  <p className="text-slate-300 mt-1 leading-relaxed">
-                    <strong>WHEN</strong> 사용자가 심박수(BPM) 슬라이더를 조절하면,
-                    <strong> THE SYSTEM SHALL</strong> 튜브 바닥의 실시간 심전도(ECG) 오실로스코프 파형과 WebAudio 저음 심근 수축음(쿵...쾅!)의 재생 주기 및 피치를 지연 없이 즉각 동기화한다.
-                  </p>
-                </div>
-                <div className="bg-slate-950 border border-purple-500/40 rounded-xl p-3">
-                  <span className="font-mono text-purple-300 font-bold">REQ-4: 3초 자동 흡수 플로팅 시냅스 채팅</span>
-                  <p className="text-slate-300 mt-1 leading-relaxed">
-                    <strong>WHEN</strong> 사용자가 생물학 키워드를 검색하거나 메시지를 수신하면,
-                    <strong> THE SYSTEM SHALL</strong> 3.0초 후 채팅창이 상단으로 부드럽게 흡수(-translate-y-full opacity-0)되어 현미경 시야를 방해하지 않는다.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: TASKS CHECKLIST */}
-            {kiroModalTab === "tasks" && (
+            {/* TAB 1: SPECS */}
+            {kiroModalTab === "specs" && (
               <div className="flex flex-col gap-2.5 text-xs">
-                <div className="bg-slate-950 border border-emerald-500/40 rounded-xl p-3 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-emerald-400 font-bold font-mono">
-                    <span>Task 1: Initialize Kiro Spec-Driven Architecture (/.kiro)</span>
-                    <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40">100% Completed</span>
+                <p className="text-slate-300">
+                  {isKo
+                    ? "기능마다 Kiro spec(요구사항 → 설계 → 작업)으로 먼저 정의하고 구현했습니다. 모두 저장소의 .kiro/specs/ 폴더에 있습니다."
+                    : "Every feature was first defined as a Kiro spec (requirements → design → tasks) and then built. They all live in .kiro/specs/ in the repository."}
+                </p>
+                {KIRO_SPECS.map((sp) => (
+                  <div key={sp.dir} className="bg-slate-950 border border-purple-500/40 rounded-xl p-3">
+                    <p className="font-mono text-purple-300 font-bold">.kiro/specs/{sp.dir}/</p>
+                    <p className="text-slate-300 mt-1 leading-relaxed">{isKo ? sp.ko : sp.en}</p>
                   </div>
-                  <ul className="text-slate-300 list-disc list-inside space-y-1">
-                    <li>1.1 Create <code>.kiro/steering/product.md</code> and <code>tech.md</code></li>
-                    <li>1.2 Author EARS-compliant <code>requirements.md</code></li>
-                    <li>1.3 Author Mermaid architecture & state diagrams in <code>design.md</code></li>
-                    <li>1.4 Configure agent hooks in <code>.kiro/hooks/prometheus-lab.json</code></li>
-                  </ul>
-                </div>
-
-                <div className="bg-slate-950 border border-emerald-500/40 rounded-xl p-3 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-emerald-400 font-bold font-mono">
-                    <span>Task 2: Verified Bio-Frankenstein Dataset (10 Peer-Reviewed Cases)</span>
-                    <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40">100% Completed</span>
-                  </div>
-                  <p className="text-slate-300">
-                    스탠퍼드대 92% 인간 뇌 오가노이드, 유령 심장, 예일 BrainEx 사후 뇌 부활, 디시브레인, 앤스로봇, 인간-돼지 키메라, 인공 합성 배아(Stembryo), 형광 키메라 영장류, 3D 혈관 심장 프린팅, 아홀로틀 재생 블라스테마 10대 검증 완료.
-                  </p>
-                </div>
-
-                <div className="bg-slate-950 border border-emerald-500/40 rounded-xl p-3 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-emerald-400 font-bold font-mono">
-                    <span>Task 3 & 4: WebAudio Synthesizer & Canvas Morphogenesis Engine</span>
-                    <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40">100% Completed</span>
-                  </div>
-                  <p className="text-slate-300">
-                    WebAudio 이중 발진기 심박음(Lub-Dub), 괴수의 호탕한 대소(大笑) 음향, 자연스러운 신경망 나레이터, 4대 현미경 사진 렌즈 융합 애니메이션 구현 완료.
-                  </p>
-                </div>
+                ))}
               </div>
             )}
 
-            {/* TAB 3: STEERING & HOOKS */}
+            {/* TAB 2: STEERING */}
+            {kiroModalTab === "steering" && (
+              <div className="flex flex-col gap-2.5 text-xs">
+                {KIRO_STEERING.map((st) => (
+                  <div key={st.file} className="bg-slate-950 border border-emerald-500/40 rounded-xl p-3">
+                    <p className="font-mono text-emerald-300 font-bold">{st.file}</p>
+                    <ul className="text-slate-300 mt-1 list-disc list-inside space-y-1">
+                      {(isKo ? st.ko : st.en).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAB 3: HOOKS */}
             {kiroModalTab === "hooks" && (
               <div className="flex flex-col gap-3 text-xs">
                 <div className="bg-slate-950 border border-cyan-500/40 rounded-xl p-3 font-mono">
@@ -3772,7 +3749,7 @@ export const BioStitchLabView: React.FC = () => {
                     <li><code>related-tests-on-save</code>: {isKo ? "에이전트가 저장한 파일과 관련된 vitest 테스트를 바로 실행" : "runs the vitest suites related to a file the agent saves"}</li>
                     <li><code>secret-scan-on-save</code>: {isKo ? "저장한 파일에서 HF·AWS·OpenAI·GitHub 토큰과 개인 키를 찾아 경고" : "warns about HF, AWS, OpenAI or GitHub tokens and private keys in a saved file"}</li>
                     <li><code>private-strategy-doc-guard</code>: {isKo ? "새 전략 문서가 .gitignore에 등록됐는지 확인" : "checks that a new strategy document is gitignored"}</li>
-                    <li><code>peer-review-citation-check</code>: {isKo ? "실험 데이터가 바뀌면 Europe PMC에서 인용을 다시 검증하고 CREDITS.md를 갱신" : "re-verifies citations in Europe PMC and updates CREDITS.md when the experiment data changes"}</li>
+                    <li><code>peer-review-citation-check</code>: {isKo ? "실험 데이터가 바뀌면 논문 인용을 다시 검증하고 CREDITS.md를 갱신" : "re-verifies citations and updates CREDITS.md when the experiment data changes"}</li>
                   </ul>
                   <pre className="text-[11px] text-slate-300 overflow-x-auto p-2 bg-black/60 rounded border border-slate-800">
 {`{
@@ -3807,173 +3784,22 @@ export const BioStitchLabView: React.FC = () => {
 }`}
                   </pre>
                 </div>
-
-                <div className="bg-slate-950 border border-purple-500/40 rounded-xl p-3 font-mono">
-                  <p className="text-purple-300 font-bold mb-1.5">📜 .kiro/steering/tech.md (Zero-Key API Constraint)</p>
-                  <p className="text-slate-300 leading-relaxed font-sans">
-                    심사위원 및 일반 사용자가 별도의 API Key 없이 즉시 전 세계 어디서나 테스트할 수 있도록, PubMed(EuropePMC) 및 Wikipedia 공개 REST API를 클라이언트 직접 호출 방식으로 무인 인증 바인딩함.
-                  </p>
-                </div>
+                <p className="text-slate-400">
+                  {isKo
+                    ? "예: 이 앱의 첫 번째 실험 카드를 고칠 때 인용 검증 훅이 실행되어, 논문(Nature 2022)에 없는 '92%' 표현을 찾아 바로잡았습니다."
+                    : "Example: when the first experiment card was edited, the citation hook ran and flagged a '92%' claim that the paper (Nature 2022) does not make; the card was corrected."}
+                </p>
               </div>
             )}
 
-            {/* TAB 4: LIVE CODE GENERATOR STUDIO */}
-            {kiroModalTab === "code_gen" && (
-              <div className="flex flex-col gap-3 text-xs">
-                <div className="flex items-center justify-between flex-wrap gap-2 bg-slate-950 p-2.5 rounded-xl border border-amber-500/40">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-amber-300">Kiro Spec Code Preset:</span>
-                    <select
-                      value={selectedCodeSpec}
-                      onChange={(e) => {
-                        setSelectedCodeSpec(e.target.value);
-                        setIsCodeCopied(false);
-                      }}
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white focus:outline-none focus:border-amber-400 cursor-pointer font-mono"
-                    >
-                      <option value="stitcher">REQ-1: Live PubMed Science Stitcher Service</option>
-                      <option value="audio">REQ-2: WebAudio High-Impact Cardiac Pulse Engine</option>
-                      <option value="canvas">REQ-3: Bioreactor Photo Diffusion Canvas Engine</option>
-                      <option value="hook">HOOK: PubMed Citation Automated Validation Hook</option>
-                    </select>
+            {/* TAB 4: TESTS */}
+            {kiroModalTab === "tests" && (
+              <div className="flex flex-col gap-2.5 text-xs">
+                {KIRO_TESTS.map((te) => (
+                  <div key={te.en} className="bg-slate-950 border border-amber-500/40 rounded-xl p-3">
+                    <p className="text-slate-200 leading-relaxed">{isKo ? te.ko : te.en}</p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const codeEl = document.getElementById("generated-spec-code");
-                      if (codeEl) {
-                        navigator.clipboard.writeText(codeEl.innerText);
-                        setIsCodeCopied(true);
-                        setTimeout(() => setIsCodeCopied(false), 2000);
-                      }
-                    }}
-                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1 rounded-lg font-black cursor-pointer transition shadow"
-                  >
-                    {isCodeCopied ? "✔ Copied to Clipboard!" : "📋 Copy Verified Code"}
-                  </button>
-                </div>
-
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono overflow-x-auto max-h-[380px]">
-                  <pre id="generated-spec-code" className="text-[11px] text-emerald-300 leading-relaxed">
-                    {selectedCodeSpec === "stitcher" &&
-`// [Kiro Generated Implementation] REQ-1: Real-Time Scientific Stitcher Service
-import axios from "axios";
-
-export interface PubMedPaper {
-  id: string;
-  title: string;
-  journal: string;
-  year: string;
-  authors: string;
-  doi: string;
-}
-
-export class ScienceStitchService {
-  async queryPubMed(keyword: string): Promise<PubMedPaper[]> {
-    const url = \`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=\${encodeURIComponent(keyword)}+AND+stem+cell&format=json&pageSize=5\`;
-    const res = await axios.get(url, { timeout: 6000 });
-    return (res.data.resultList?.result || []).map((r: any) => ({
-      id: r.pmid || r.id,
-      title: r.title,
-      journal: r.journalTitle || "Peer-Reviewed Bio-Journal",
-      year: r.pubYear || "2024",
-      authors: r.authorString || "Scientific Consortium",
-      doi: r.doi ? \`https://doi.org/\${r.doi}\` : ""
-    }));
-  }
-}
-export const scienceStitchService = new ScienceStitchService();`}
-
-                    {selectedCodeSpec === "audio" &&
-`// [Kiro Generated Implementation] REQ-2: WebAudio Sub-Bass Cardiac Thump (Lub-Dub) Engine
-export const playCardiacThump = (bpm: number, audioCtx: AudioContext) => {
-  const now = audioCtx.currentTime;
-  
-  // 1. High-Impact Low-End Lub: 65 Hz -> 26 Hz, Lowpass Filter
-  const osc1 = audioCtx.createOscillator();
-  const gain1 = audioCtx.createGain();
-  const filter1 = audioCtx.createBiquadFilter();
-  filter1.type = "lowpass";
-  filter1.frequency.setValueAtTime(220, now);
-  filter1.Q.setValueAtTime(4.2, now);
-
-  const baseFreq = Math.min(100, 52 + (bpm / 200) * 44);
-  osc1.frequency.setValueAtTime(baseFreq, now);
-  osc1.frequency.exponentialRampToValueAtTime(25, now + 0.15);
-
-  gain1.gain.setValueAtTime(0.001, now);
-  gain1.gain.linearRampToValueAtTime(1.25, now + 0.015);
-  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
-
-  osc1.connect(filter1).connect(gain1).connect(audioCtx.destination);
-  osc1.start(now);
-  osc1.stop(now + 0.18);
-
-  // 2. Snappy Valve Dub (쾅!): 160 Hz -> 35 Hz, Bandpass Resonance
-  const dubTime = now + 0.11;
-  const osc2 = audioCtx.createOscillator();
-  const gain2 = audioCtx.createGain();
-  const filter2 = audioCtx.createBiquadFilter();
-  filter2.type = "bandpass";
-  filter2.frequency.setValueAtTime(320, dubTime);
-  osc2.type = "triangle";
-  osc2.frequency.setValueAtTime(baseFreq * 1.35, dubTime);
-  osc2.frequency.exponentialRampToValueAtTime(30, dubTime + 0.13);
-
-  gain2.gain.linearRampToValueAtTime(1.05, dubTime + 0.012);
-  gain2.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.15);
-
-  osc2.connect(filter2).connect(gain2).connect(audioCtx.destination);
-  osc2.start(dubTime);
-  osc2.stop(dubTime + 0.16);
-};`}
-
-                    {selectedCodeSpec === "canvas" &&
-`// [Kiro Generated Implementation] REQ-3: Bioreactor Real Photographic Diffusion Synthesis
-export const renderBioreactorMorph = (
-  ctx: CanvasRenderingContext2D,
-  masterImg: HTMLImageElement,
-  quadImg: HTMLImageElement,
-  morphStage: "injecting" | "morphing" | "draining" | "awakened",
-  morphPercent: number,
-  vatBounds: { x: number; y: number; w: number; h: number }
-) => {
-  // 1. Photographic Specimen Center Clip
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(vatBounds.x + 2, vatBounds.y + 2, vatBounds.w - 4, vatBounds.h - 4);
-  ctx.clip();
-
-  if (morphStage === "injecting") {
-    // Progressive AI Stem-Cell Diffusion Filter
-    const blurPx = Math.max(1, Math.round(12 - (morphPercent / 100) * 10));
-    ctx.filter = \`blur(\${blurPx}px) contrast(\${1 + (morphPercent / 100) * 0.4})\`;
-  }
-  ctx.drawImage(masterImg, vatBounds.x + 10, vatBounds.y + 10, vatBounds.w - 20, vatBounds.h - 20);
-  ctx.filter = "none";
-  ctx.restore();
-};`}
-
-                    {selectedCodeSpec === "hook" &&
-`// .kiro/hooks/prometheus-lab.json (excerpt): the citation check that runs when the experiment data changes
-{
-  "version": "v1",
-  "hooks": [
-    {
-      "name": "peer-review-citation-check",
-      "description": "When the experiment archive changes, re-check every citation against EuropePMC and every Wikimedia media link against CREDITS.md.",
-      "trigger": "PostFileSave",
-      "matcher": "src[\\\\/]data[\\\\/]bioExperiments\\.ts$",
-      "action": {
-        "type": "agent",
-        "prompt": "For every changed entry: confirm the paper in EuropePMC (journal, year, lead lab), list every Wikimedia URL in CREDITS.md, and report claims the paper does not support."
-      }
-    }
-  ]
-}`}
-                  </pre>
-                </div>
+                ))}
               </div>
             )}
           </div>

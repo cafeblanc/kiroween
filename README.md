@@ -21,11 +21,11 @@ The app stitches technologies that were never meant to work together into one br
 
 1. **Experiment archive.** Six real cases, each with the paper's journal, year and PMID/DOI, footage and a narrator:
    - Stanford xenocortication: human cortical organoids in rat brains (Pașca lab, *Nature*).
-   - Ghost Heart: decellularised hearts re-seeded with cardiac cells (Taylor lab, *Nature Medicine*).
+   - Ghost Heart: decellularised hearts re-seeded with cardiac cells (Taylor and Ott labs, *Nature Medicine*).
    - Yale BrainEx: circulation and cell function restored in pig brains hours after death (Sestan lab, *Nature*).
-   - DishBrain: cortical neurons on a multi-electrode chip learning *Pong* (Cortical Labs, *Neuron*).
-   - Anthrobots: self-assembling biobots built from human airway cells (Levin lab, *Advanced Science*).
    - Human-pig chimera embryos (Izpisua Belmonte lab, *Cell*).
+   - A live-born chimeric monkey whose stem-cell-derived cells glow green (Liu and Sun labs, *Cell*).
+   - Axolotl limb regeneration (Tanaka and Whited labs).
 2. **Cross-verifier.** Ask about any case. The lab queries Europe PMC and Wikipedia live and shows the sources.
 3. **Design Room.** Pick a base species and traits. A free HuggingFace image previews the design before you spend
    anything on video. Stats share a 450-point budget, and no stat or win chance ever reaches 0% or 100%.
@@ -50,7 +50,7 @@ npx vercel dev               # serves the Vite app and the api/ functions togeth
 npm run dev
 ```
 
-Checks: `npx tsc --noEmit`, `npx tsc -p api --noEmit`, `npm test` (vitest, 37 files), `npm run build`.
+Checks: `npx tsc --noEmit`, `npx tsc -p api --noEmit`, `npm test` (vitest, 40 files, 398 tests), `npm run build`.
 
 ## How Kiro was used
 

@@ -61,7 +61,7 @@ steering rules, and agent hooks.
 
 14
 00:02:40,000 --> 00:02:49,500
-394 tests, including property-based tests with fast-check.
+398 tests, including property-based tests with fast-check.
 
 15
 00:02:50,000 --> 00:02:55,000

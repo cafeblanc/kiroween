@@ -199,13 +199,13 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     id: "case-01-xenocortication",
     codeName: "CASE #01 · XENOCORTICATION",
     badgeIcon: "🐭🧠",
-    shortTitle: "92% Human-Brain Mouse",
-    koreanShortTitle: "쥐 뇌 92% 인간화",
-    headline: "Stanford 'Xenocortication': Mouse Cortex 92% Replaced by Human Stem-Cell Brain",
-    koreanHeadline: "[최신 뉴스] 쥐의 뇌 92%를 대체한 인간 줄기세포 대뇌 오가노이드 (스탠퍼드대)",
+    shortTitle: "Human Brain Organoids in Rats",
+    koreanShortTitle: "쥐 뇌에 이식된 인간 뇌",
+    headline: "Stanford: Human Brain Organoids Transplanted into Rats Wire into Their Circuits",
+    koreanHeadline: "쥐의 뇌에 이식된 인간 줄기세포 대뇌 오가노이드가 쥐의 신경 회로에 연결되다 (스탠퍼드대)",
     institution: "Stanford University (Sergiu Pașca Lab)",
-    leadScientist: "Dr. Sergiu Pașca et al.",
-    journalCitation: "Nature (2022–2026 Landmark Xenocortication Series)",
+    leadScientist: "Revah, Gore, Kelley … Pașca SP",
+    journalCitation: "Nature (2022) Vol. 610, pp. 319–326",
     pmidOrDoi: "PMID: 36224417 / DOI: 10.1038/s41586-022-05277-w",
     pubMedSearchQuery: "human cortical organoids transplanted rodent brain Pasca",
     wikiTitle: "Cerebral_organoid",
@@ -214,29 +214,29 @@ export const VERIFIED_BIO_EXPERIMENTS: BioExperimentCase[] = [
     fallbackVideoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fd/MTS_mitosis_project.theora.ogv",
     microscopyPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/6/61/Human_Cerebral_Organoids_%2853728295930%29.jpg",
     secondaryPhotoUrl: "https://upload.wikimedia.org/wikipedia/commons/e/ee/Human_Brain_Organoid.jpg",
-    hostTissueA: "Genetically Depleted Rodent Neocortex & Hippocampus Cavity",
-    koreanHostTissueA: "대뇌 피질과 해마 영역을 비워낸 설치류(쥐) 두개골 숙주",
+    hostTissueA: "Somatosensory Cortex of Newborn Athymic Rats",
+    koreanHostTissueA: "갓 태어난 무흉선 쥐(면역 거부가 없는 쥐)의 체감각 피질",
     stemCellBridge: {
       factors: ["OCT4", "SOX2", "KLF4", "c-MYC", "Dual-SMAD Inhibition"],
-      lineage: "hiPSC-Derived Cortical Organoids & Von Economo Neurons",
-      koreanLineage: "인간 유도만능줄기세포(hiPSC) 대뇌 오가노이드 & 폰 에코노모 자아 뉴런",
+      lineage: "Human Stem-Cell-Derived Cortical Neurons and Glia",
+      koreanLineage: "인간 줄기세포에서 분화한 대뇌 피질 신경세포와 교세포",
       viabilityPercent: 92,
-      fusionMechanism: "Host rodent blood vessels vascularize the human stem-cell organoid; human axons project down to the mouse spinal cord and wire into whisker/visual sensory circuits.",
-      koreanFusionMechanism: "쥐의 뇌혈관이 이식된 인간 줄기세포 뇌 오가노이드 속으로 자라 들어가 영양을 공급하고, 인간 신경 다발이 쥐의 척수까지 뻗어 내려가 수염 감각 및 행동 회로를 직접 장악합니다."
+      fusionMechanism: "The grafted organoid grows and matures inside the rat cortex, receives thalamocortical and corticocortical inputs, responds to whisker touch, and extends axons throughout the rat brain.",
+      koreanFusionMechanism: "이식된 오가노이드가 쥐의 대뇌 피질 안에서 자라고 성숙하며, 시상과 대뇌 피질에서 신호를 받아 수염 자극에 반응하고, 쥐의 뇌 전체로 축삭을 뻗습니다."
     },
     donorTissueB: "Human Induced Pluripotent Stem Cell (hiPSC) 3D Cerebral Organoid",
     koreanDonorTissueB: "인간 유도만능줄기세포(hiPSC) 3차원 대뇌 피질 오가노이드",
-    eerieRealitySummary: "By depleting the native mouse cortex and transplanting human pluripotent stem-cell brain organoids, human neural tissue expanded to occupy 92% of the cortical volume—spontaneously awakening human-specific 'von Economo' consciousness neurons and actively driving the animal's behavior.",
-    koreanSummary: "쥐의 대뇌 피질을 비워내고 인간 유도만능줄기세포(hiPSC)로 배양한 뇌 오가노이드를 이식하자, 쥐의 뇌 혈관이 인간 뇌세포에 연결되며 대뇌의 무려 92%가 인간 뇌 조직으로 채워졌습니다. 심지어 배양 접시에서는 절대 나타나지 않던 인간 고유의 고차원 자아 신경세포(폰 에코노모 뉴런)까지 깨어나 쥐의 척수와 행동을 직접 통제하기 시작했습니다.",
+    eerieRealitySummary: "Human stem-cell brain organoids transplanted into newborn rats grew, became more mature than the same neurons kept in a dish, and wired into the rat's own sensory and reward circuits. Touching the rat's whiskers made the human neurons fire, and switching the human neurons on with light could drive the rat's reward-seeking behaviour.",
+    koreanSummary: "인간 줄기세포로 키운 대뇌 오가노이드를 갓 태어난 쥐의 뇌에 이식하자, 오가노이드가 자라면서 배양 접시에서보다 훨씬 성숙한 신경세포가 되었고 쥐의 감각 회로와 보상 회로에 연결되었습니다. 쥐의 수염을 건드리면 인간 신경세포가 반응했고, 빛으로 인간 신경세포를 켜면 쥐가 보상을 찾는 행동을 하게 만들 수 있었습니다.",
     narratorScript: [
-      "Welcome to Project Prometheus. You are viewing Case Zero-One: Stanford University's Xenocortication breakthrough.",
-      "Using human induced pluripotent stem cells, researchers grew three-dimensional human cerebral organoids and grafted them into a living rodent brain.",
-      "The result shocked the scientific world: human neurons expanded to replace ninety-two percent of the host cortex, awakening human-specific von Economo neurons inside an animal skull."
+      "Welcome to Project Prometheus. You are viewing Case Zero-One: Stanford University's xenocortication experiment.",
+      "Researchers grew three-dimensional human cortical organoids from stem cells and transplanted them into the brains of newborn rats.",
+      "The human neurons matured, wired into the rat's circuits and answered when its whiskers were touched. Switched on with light, they could even steer the rat's reward-seeking behaviour."
     ],
     koreanNarratorScript: [
       "프로메테우스 줄기세포 실험실에 오신 것을 환영합니다. 첫 번째 사례는 스탠퍼드 대학의 제노코티케이션 실험입니다.",
-      "연구진은 인간의 유도만능줄기세포로 입체 대뇌 오가노이드를 배양한 뒤 살아있는 쥐의 뇌 속에 이식했습니다.",
-      "결과는 충격적이었습니다. 인간 뇌세포가 쥐 대뇌 피질의 구십이 퍼센트를 대체하며 척수까지 연결되었고, 인간 고유의 고차원 자아 신경세포인 폰 에코노모 뉴런까지 깨어났습니다."
+      "연구진은 인간 줄기세포로 입체 대뇌 오가노이드를 키운 뒤 갓 태어난 쥐의 뇌에 이식했습니다.",
+      "인간 신경세포는 쥐의 뇌 속에서 성숙해 쥐의 신경 회로에 연결되었고, 쥐의 수염을 건드리면 반응했습니다. 빛으로 이 신경세포를 켜자 쥐가 보상을 찾는 행동까지 하게 되었습니다."
     ],
     themeColor: "emerald",
     pulseBpm: 88

@@ -5,91 +5,98 @@ Copy the English text into the Devpost form. The Korean is for your reference on
 
 ## Fields / 기본 칸
 
-- **Project name / 프로젝트 이름:** PROMETHEUS-iPSC: The Modern Bio-Frankenstein Lab
-- **Tagline / 한 줄 소개:** Six real stem-cell "Frankenstein" experiments, and a lab where you stitch, grow and battle your own chimera.
-  (실제 줄기세포 "프랑켄슈타인" 실험 6편, 그리고 나만의 키메라를 꿰매고 키우고 싸우게 하는 연구실.)
+- **Project name / 프로젝트 이름:** PROMETHEUS-iPSC: Bio-Frankenstein Stem-Cell Lab
+- **Elevator pitch / 한 줄 소개 (195 chars):** What if Victor Frankenstein used pluripotent stem cells (iPSCs) instead of thread? Explore 6 real bio-chimera experiments, query live PubMed, then grow your own monster and battle it in AI video.
+- **Thumbnail / 썸네일:** `docs/devpost-thumbnail.jpg` (1500x1000, 3:2)
 - **Category / 부문:** Frankenstein
 - **App URL:** https://asura.cafeblanc.kr
 - **Repository:** https://github.com/cafeblanc/kiroween
 - **Video:** (your YouTube link / 직접 올린 YouTube 링크)
-- **Built with / 사용 기술:** React, TypeScript, Vite, Tailwind CSS, Vercel Functions, LTX Video API, HuggingFace Inference (Stable Diffusion 3), Europe PMC API, Wikipedia API, WebAudio, IndexedDB, Vitest, fast-check, Kiro
+- **Built with / 사용 기술:** React, TypeScript, Vite, Tailwind CSS, Vercel Functions, LTX Video API, HuggingFace Inference (Stable Diffusion 3), Europe PMC API, Wikipedia API, WebAudio, Web Speech API, IndexedDB, Vitest, fast-check, Kiro
 
-## About the project (English, paste this)
+## About the project (English, paste everything below this line into Devpost)
 
-### Inspiration
-In 1818 Victor Frankenstein stitched the dead together with thread and lightning. Today regenerative biology does
-things that sound just as strange: decellularised "ghost hearts" re-seeded with cells until they beat, pig brains
-whose circulation is restored hours after death, human cortical organoids wired into rat brains, neurons on a chip
-that learn Pong. We wanted an app that makes people ask: has science already crossed Frankenstein's threshold?
+## Inspiration
 
-### What it does
-- **Experiment archive.** Six real, peer-reviewed cases. Each card shows the journal, year and PubMed ID, footage, and a narrator.
-- **Cross-verifier.** Ask any question; the lab queries Europe PMC and Wikipedia live and shows the sources.
-- **Design Room.** Stitch your own chimera from species and traits. A free AI image previews the design before any video is made. Stats share a 450-point budget, and no stat or win chance is ever 0% or 100%.
-- **Bioreactor.** The embryo grows through six stages while a synthesized heartbeat speeds up, then breaks the glass and roars.
-- **Arena.** Two monsters fight in a 16-second AI video written from their stats. Each has a signature finisher and defence, and the winner wins with its finisher. A free demo battle plays without spending credits.
-- **Monster Manager.** Rename, export as ZIP, delete, and clean up duplicates.
+In 1818, Mary Shelley imagined **Victor Frankenstein** stitching together lifeless tissue and waking it with a spark of electricity. Two centuries later, regenerative biology has crossed thresholds that sound just as Gothic:
 
-### How we built it (the chimera)
-The app stitches together technologies that were never meant to meet:
-peer-reviewed science APIs (Europe PMC, Wikipedia), generative video (LTX-2.5 through a Vercel serverless proxy that
-keeps the key on the server), generative images (Stable Diffusion 3 on HuggingFace, with a free fallback), procedural
-WebAudio sound (heartbeat, bubbles and roars synthesized in code), and IndexedDB to keep your monsters and videos in the browser.
+- **Xenocortication** (*Nature*, Pașca lab): human cortical organoids transplanted into newborn rat brains mature, wire into the rat's circuits and respond to its senses.
+- **Ghost Hearts** (*Nature Medicine*, Taylor and Ott labs): a heart is washed with detergent until only a translucent white collagen "ghost" remains, then re-seeded with cells until it beats again.
+- **BrainEx** (*Nature*, 2019, Sestan lab): circulation and cellular functions restored in pig brains four hours after death.
+- **A chimeric monkey** (*Cell*, 2023): a live-born macaque built partly from embryonic stem cells that glow green in its own skin.
 
-### How we used Kiro
-- **Specs:** every feature started as requirements, design and tasks in `.kiro/specs/` (experiment archive, six-stage growth engine, arena, LTX pipeline, a hidden-bugs audit, and more).
-- **Steering:** `.kiro/steering/product.md` and `tech.md`, plus `AGENTS.md`, hold the product vision, palette, API rules and working rules for the agent (retry limits, one dev server, private strategy docs never committed).
-- **Agent hooks:** `.kiro/hooks/prometheus-lab.json` runs the related tests when the agent saves a file, scans saved files for leaked tokens, checks that strategy documents are gitignored, and asks the agent to re-verify citations in Europe PMC whenever the experiment archive changes.
-- **Property-based testing:** 21 test files use fast-check (stage timing, heartbeat progression, stat budget, battle odds, video fallbacks). 387 tests pass.
+We asked: **what if Victor Frankenstein's laboratory existed in 2026?** For Kiroween's **Frankenstein track** we stitched together technologies that were never meant to meet, so that peer-reviewed stem-cell science and a monster lab live in one app.
+
+## What it does
+
+**PROMETHEUS-iPSC** is a dark, bilingual (English and Korean, plus machine translation into other languages) biotech laboratory with two connected wings.
+
+### 1. The experiment archive
+- **Six real, peer-reviewed cases:** human brain organoids in rats, the beating Ghost Heart, Yale BrainEx, human-pig chimera embryos (*Cell*, 2017), the green-fluorescent chimeric monkey, and axolotl limb regeneration. Every card shows the journal, year and PubMed ID.
+- **Microscopy viewport:** each case plays its own clip over CC-licensed Wikimedia microscopy and a photo, with a spoken narrator and a procedural WebAudio heartbeat.
+- **Live, key-free cross-verifier:** ask any question and the lab queries **Europe PMC (PubMed)** and the **Wikipedia REST API** in real time, then shows the answer with its sources (PMID, year).
+
+### 2. The monster lab
+- **Design Room:** pick a base species (mythic, alien, Frankenstein, human) and its head, arms, legs, tail and traits. A **free AI image** (Stable Diffusion 3 on HuggingFace) previews the design before anything costs money. Alien monsters are non-carbon life (silicon, boron nitride).
+- **Balanced stats:** every monster shares a 450-point stat budget, and no stat or win chance is ever 0% or 100%. Each monster has one signature finisher and one defence move, for example Prometheus' emerald laser gaze and elastic body, or Frankenstein's titanium hammer punch and hyper-regeneration.
+- **Bioreactor:** the embryo grows through six stages while its synthesized heartbeat speeds up, then it cracks the glass and roars.
+- **Arena:** two monsters fight in a **16-second AI battle video (LTX-2.5)** written from their stats. It is one continuous take of close combat: fists, claws, tail whips, spinning kicks, head-butts, bites, a flame cannon, and the winner's finisher. A 3-act battle story is written alongside it.
+- **Free demo battles:** judges can open **🎬 Free demo battle ▾** in the arena and watch pre-made battles at no cost, starting with the 16-second showcase.
+- **Monster Manager:** rename monsters, export them as a ZIP, delete them, and clean up duplicates. Everything is stored in the browser (IndexedDB).
+
+## How we built it
+
+The chimera of technologies:
+1. **Peer-reviewed science APIs:** Europe PMC and Wikipedia, called from the browser with no API key.
+2. **Generative video:** LTX-2.5 through a Vercel serverless proxy that keeps the key on the server, with a daily cap. The first frame of each battle is composed in a canvas: both monsters on one shared arena, bodies already touching, the right fighter mirrored.
+3. **Generative images:** Stable Diffusion 3 through a server route with a HuggingFace token, falling back to Pollinations, then to bundled samples.
+4. **Procedural sound:** WebAudio heartbeat, bubbles and roars synthesized in code, plus a Web Speech narrator.
+5. **Local persistence:** IndexedDB for monsters, videos and battle chronicles.
+
+Stack: React 18, TypeScript, Vite, Tailwind CSS, Vercel Functions.
+
+### How Kiro powered development
+Everything Kiro used is checked into **`/.kiro`** in the repository.
+- **Specs** (`.kiro/specs/`): each feature started as requirements, design and tasks. They cover the stem-cell bio-stitcher, the six-stage growth engine, the video arena and bioreactor overhaul, the LTX custom studio and arena, a hidden-bugs audit with bug-condition and preservation tests, the arena engagement loop, and the sample monster fixes.
+- **Steering** (`.kiro/steering/product.md`, `tech.md`, plus `AGENTS.md`): the product vision, palette and API rules. It also holds working rules for the agent: at most two retries, a single dev server, OpenAI not used, and private strategy documents never committed.
+- **Agent hooks** (`.kiro/hooks/prometheus-lab.json`):
+  - `related-tests-on-save` runs the vitest suites that import a file the agent saves.
+  - `secret-scan-on-save` warns about HuggingFace, AWS, OpenAI or GitHub tokens and private keys.
+  - `private-strategy-doc-guard` checks that new strategy documents are gitignored.
+  - `peer-review-citation-check` asks the agent to re-verify citations in Europe PMC and update `CREDITS.md` whenever the experiment data changes.
+- **Property-based testing:** 21 test files use **fast-check** (stage timing, heartbeat progression, the 450-point stat budget, battle odds, video fallbacks). 398 tests pass.
 - **Sub-agents:** used for parallel audits, documentation lookups and independent verification of changes.
 
-### Challenges
-Getting two AI-generated monsters to actually fight each other instead of posing for the camera: we compose one shared
-first frame with both bodies already in contact, mirror the right fighter, and write a single-take prompt where every
-blow names the attacker, the body part it hits, and the reaction.
+## Challenges we ran into
 
-### Accomplishments
-A 16-second, full-contact battle (fists, claws, tail, spinning kicks, head-butt, bite, flame cannon, laser-eye finisher)
-generated from game stats, and an archive where every scientific claim links to its paper.
+1. **Making two AI monsters actually fight.** Early videos showed creatures posing for the camera, breathing fire toward the viewer, or dancing separately with a wall between them. We solved it with a shared first frame where the bodies already touch, a mirrored right fighter, and a single-take prompt in which every blow names the attacker, the body part it hits and the reaction.
+2. **Keeping real biology real.** The green in the chimeric monkey is a protein made by its own cells, not coloured light. We regenerated the clip with the same photo as its first and last frame, so the fluorescent patches stay on the same skin while it moves.
+3. **Spending carefully.** Video costs real money, so the lab previews designs with free images, caps paid videos per day, and ships free demo battles for judges.
 
-### What we learned
-Real biology is stranger than fiction, and video models need very concrete direction to stay in one continuous fight.
+## Accomplishments that we're proud of
 
-### What's next
-More real experiments, user-written battle stories, and tournaments between saved monsters.
+- A 16-second, full-contact battle generated from game stats, ending in the winner's own finisher.
+- An archive where every scientific claim links to its paper, verified live against Europe PMC.
+- A Kiro workflow that is visible both in the repository and inside the running app: the **📐 Built with Kiro** button in the top bar shows our specs, steering rules, the four real agent hooks and the test suite.
+- The citation hook caught a real mistake: our first experiment card claimed a "92%" human-brain mouse that the paper (*Nature*, 2022, rats) never reported, and we corrected it.
+
+## What we learned
+
+- Real biology is stranger than fiction, and it deserves accurate details: who did the experiment, in which animal, and what was actually shown.
+- Video models need very concrete direction to stay in one continuous fight, and spec-driven development kept a fast-moving hackathon project from collapsing under its own features.
+
+## What's next for PROMETHEUS-iPSC
+
+- More real experiments, imported from any PubMed ID.
+- Tournaments between saved monsters, and user-written battle stories.
+- A 3D viewer for the Yamanaka factors (OCT4, SOX2, KLF4, c-MYC).
 
 ---
 
-## 프로젝트 소개 (한국어 참고 번역)
+## 한국어 참고 번역 (요약)
 
-### 영감
-1818년 프랑켄슈타인은 실과 번개로 죽은 조직을 꿰맸습니다. 오늘날 재생 생물학은 그만큼 기묘한 일을 해냅니다.
-세포를 씻어낸 "유령 심장"에 세포를 다시 심어 뛰게 하고, 죽은 지 몇 시간 된 돼지 뇌의 혈류를 되살리고, 인간 대뇌
-오가노이드를 쥐의 뇌에 연결하고, 칩 위의 신경세포가 퐁 게임을 배웁니다. "과학은 이미 프랑켄슈타인의 문턱을 넘었을까?"를
-묻게 만드는 앱을 만들고 싶었습니다.
-
-### 기능
-- **실험 보관소:** 실제 논문 6편. 학술지, 연도, PubMed 번호, 영상, 내레이션.
-- **교차 검증기:** 질문하면 Europe PMC와 위키백과를 실시간 조회해 출처를 보여 줍니다.
-- **괴수 설계실:** 종과 특성을 골라 키메라를 설계하고 무료 AI 이미지로 먼저 확인합니다. 능력치 합계 450점, 0%·100% 확률 없음.
-- **바이오리액터:** 심장 박동이 빨라지며 6단계로 자라고, 유리를 깨고 포효합니다.
-- **결투장:** 능력치로 쓴 16초 AI 전투 영상. 괴수마다 필살기와 방어 특기가 있고, 승자는 필살기로 이깁니다. 무료 데모 전투 제공.
-- **괴수 관리:** 이름 변경, ZIP 내보내기, 삭제, 중복 정리.
-
-### 제작 방식 (키메라)
-과학 논문 API, 생성형 영상(LTX-2.5, 키는 서버에만 보관), 생성형 이미지(HuggingFace SD3), 코드로 합성한 WebAudio 소리,
-브라우저 저장소 IndexedDB를 하나의 앱으로 꿰맸습니다.
-
-### Kiro 활용
-- **Spec:** 모든 기능을 `.kiro/specs/`의 요구사항, 설계, 작업 문서로 시작했습니다.
-- **Steering:** `product.md`, `tech.md`, `AGENTS.md`에 제품 방향, 색상, API 규칙, 에이전트 작업 규칙을 담았습니다.
-- **에이전트 훅:** 파일 저장 시 관련 테스트 실행, 토큰 유출 검사, 전략 문서 gitignore 확인, 논문 인용 재검증.
-- **속성 기반 테스트:** fast-check를 쓴 테스트 파일 21개, 전체 387개 테스트 통과.
-- **서브 에이전트:** 병렬 점검, 문서 조회, 변경 사항 독립 검증.
-
-### 어려웠던 점
-AI가 만든 두 괴수가 카메라를 향해 포즈를 잡지 않고 서로 싸우게 만드는 것. 두 몸이 이미 맞닿은 첫 프레임을 만들고,
-오른쪽 괴수를 좌우 반전하고, 공격마다 누가 어디를 치고 어떻게 밀려나는지 적은 한 컷짜리 프롬프트로 해결했습니다.
-
-### 다음 계획
-실험 사례 추가, 사용자가 쓰는 전투 서사, 저장된 괴수끼리의 토너먼트.
+- **영감:** 1818년 프랑켄슈타인의 상상이 2026년 재생 생물학에서 현실이 되었습니다. 쥐 뇌에 이식된 인간 대뇌 오가노이드, 다시 뛰는 유령 심장, 사후 4시간 뒤 되살린 돼지 뇌, 녹색으로 빛나는 키메라 원숭이가 그 예입니다.
+- **기능:** 실제 논문 6편 보관소와 실시간 PubMed·위키백과 검증, 그리고 괴수 설계실, 바이오리액터, 16초 AI 전투 결투장, 무료 데모 전투, 괴수 관리를 갖췄습니다.
+- **제작:** 과학 API, LTX 영상, HuggingFace 이미지, WebAudio 소리, IndexedDB를 한 앱에 꿰맸습니다.
+- **Kiro:** spec, steering, 실제 에이전트 훅 4개, fast-check 속성 테스트(398개 통과), 서브 에이전트를 썼습니다.
+- **어려웠던 점:** 두 괴수가 실제로 맞붙게 만들기, 형광 원숭이를 과학적으로 정확하게 표현하기, 비용 관리.

@@ -27,7 +27,7 @@
 | 1:55–2:15 | 전투 영상을 레이저 눈 필살기까지 끝까지 틀어 둡니다. 마우스는 움직이지 않습니다. | Fists, claws, tail, spinning kicks, a flame cannon, and a laser-eye finisher. | 주먹, 발톱, 꼬리, 회전 차기, 화염포, 그리고 레이저 눈 필살기. |
 | 2:15–2:25 | 영상이 끝나면 나오는 전투 서사를 잠깐 보여 줍니다. [Back to the arena]를 누르고, 🗂️ [Manage](괴수 관리)를 열어 보여 줍니다. | Every battle gets its story; the Monster Manager saves, renames and exports your monsters. | 모든 전투에는 서사가 남고, 괴수 관리에서 저장, 이름 변경, 내보내기를 합니다. |
 | 2:25–2:40 | 에디터로 바꿔 `.kiro/specs` 폴더 → `.kiro/steering/product.md` → `.kiro/hooks/prometheus-lab.json` 순서로 엽니다. | Built with Kiro: specs for every feature, steering rules, and agent hooks. | Kiro로 제작: 기능마다 spec, steering 규칙, 에이전트 훅. |
-| 2:40–2:50 | 터미널에서 `npm test`를 실행해 모두 통과하는 결과를 보여 줍니다. | 394 tests, including property-based tests with fast-check. | fast-check 속성 기반 테스트를 포함한 394개 테스트. |
+| 2:40–2:50 | 터미널에서 `npm test`를 실행해 모두 통과하는 결과를 보여 줍니다. | 398 tests, including property-based tests with fast-check. | fast-check 속성 기반 테스트를 포함한 398개 테스트. |
 | 2:50–2:55 | 브라우저로 돌아와 첫 화면을 보여 주고 끝냅니다. | PROMETHEUS-iPSC. Has science already crossed Frankenstein's threshold? | 프로메테우스-iPSC. 과학은 이미 프랑켄슈타인의 문턱을 넘었을까요? |
 
 ## 녹화 팁
